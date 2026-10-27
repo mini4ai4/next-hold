@@ -13,3 +13,10 @@ PluginsUserPreferences/
 Support/
 *.lock
 .DS_Store
+
+# Added by Lens Studio (LEAF plugin)
+leaf_plugin_settings.json
+tempAssetGen/
+.virtual-scene.json
+Packages/AiPreviewAgentInspect.lspkg
+Packages/AiPreviewAgentInspect.lspkg.meta

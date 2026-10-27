@@ -1,0 +1,65 @@
+- !<AssetImportMetadata/b4eb7744-a64c-4b5c-ae5c-cd848563e6d2>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> e1a274f6-0c8e-4a87-a27a-b4a844eb5885
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> e1a274f6-0c8e-4a87-a27a-b4a844eb5885
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 04047a52-fc20-4c35-8bb5-4d82012a07cf
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/04047a52-fc20-4c35-8bb5-4d82012a07cf>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  VersionPrerelease: ""
+  UpdateOrder: 0
+  ComponentUid: bdff29be-a99f-4f4a-9f45-46bf588714fc
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    buttonGap: false
+    buttonHeight: false
+    buttonWidth: false
+    climbLabel: false
+    safetyNote: false
+    setupLabel: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - buttonWidth: !<float> 8.000000
+      buttonHeight: !<float> 5.000000
+      buttonGap: !<float> 2.000000
+      safetyNote: Bouldering / top-rope aid only. Not a spotter or instructor.
+      climbLabel: Climb
+      setupLabel: Setup
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">NextHoldControlRowUI – limb toggles, ? and mode switch</span>"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"Settings"}'
+    - '// @input float buttonWidth = 8 {"hint":"Width of each control button in cm (brief: about 8 cm)", "widget":"slider", "min":6, "max":12, "step":0.5}'
+    - '// @input float buttonHeight = 5 {"hint":"Height of each control button in cm", "widget":"slider", "min":3, "max":8, "step":0.5}'
+    - '// @input float buttonGap = 2 {"hint":"Gap between buttons in cm (brief: 2 cm or more)", "widget":"slider", "min":2, "max":5, "step":0.25}'
+    - "// @input string safetyNote = \"Bouldering / top-rope aid only. Not a spotter or instructor.\" {\"hint\":\"Not-a-spotter note shown under the row. Never use the word 'safe'.\"}"
+    - '// @input string climbLabel = "Climb" {"hint":"Mode switch label while in climb mode"}'
+    - '// @input string setupLabel = "Setup" {"hint":"Mode switch label while in setup mode"}'
+    - '// @ui {"widget":"group_end"}'

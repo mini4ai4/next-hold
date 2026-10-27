@@ -1,0 +1,68 @@
+- !<AssetImportMetadata/121072d5-2717-47be-8e9d-ed0c6c42691b>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 451022a0-ce5f-43be-8420-3e539fcb97ea
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 451022a0-ce5f-43be-8420-3e539fcb97ea
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 7acd6ee9-8a54-4be3-acec-9433116d4046
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/7acd6ee9-8a54-4be3-acec-9433116d4046>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  VersionPrerelease: ""
+  UpdateOrder: 0
+  ComponentUid: 9636003b-2a14-4312-8a80-97c2efc168aa
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    arrowColor: false
+    chime: false
+    chimeVolume: false
+    distanceCm: false
+    edgeInset: false
+    material: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - material: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      chime: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      distanceCm: !<float> 80.000000
+      edgeInset: 0.780000
+      arrowColor: !<Vec4> {x: 0.950000, y: 0.950000, z: 0.800000, w: 1.000000}
+      chimeVolume: 0.500000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">NextHoldOffViewArrow – edge arrow + chime for an off-view suggestion</span>"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"References"}'
+    - '// @input Asset.Material material {"hint":"Unlit material, cloned for the arrow"}'
+    - '// @input Asset.AudioTrackAsset chime {"hint":"One soft chime when the arrow appears for a new suggestion"}'
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"Settings"}'
+    - '// @input float distanceCm = 80 {"hint":"How far in front of the eyes the arrow sits, in cm", "widget":"slider", "min":40, "max":150, "step":1}'
+    - '// @input float edgeInset = 0.78 {"hint":"How close to the edge of the view the arrow sits (1 = the very edge)", "widget":"slider", "min":0.5, "max":0.95, "step":0.01}'
+    - '// @input vec4 arrowColor = "{0.95,0.95,0.8,1}" {"hint":"Arrow colour (keep it light: the display is additive)", "widget":"color"}'
+    - '// @input float chimeVolume = 0.5 {"hint":"Chime volume", "widget":"slider", "min":0, "max":1, "step":0.05}'
+    - '// @ui {"widget":"group_end"}'

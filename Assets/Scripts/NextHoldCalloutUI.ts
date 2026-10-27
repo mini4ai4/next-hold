@@ -1,0 +1,190 @@
+// NextHoldCalloutUI — the two pieces of text that appear on the wall:
+//   SuggestLabel: the limb label beside the suggested hold ("R hand"); it
+//                 fades after about 2 s (brief: "When things show").
+//   WhyLine:      that hold's "why" line, only when asked for with '?'.
+//
+// Owns: the text widgets, the label's fade timer. Passive view.
+// Main -> UI: showSuggestion(), hideSuggestion(), showWhy(), hideWhy().
+// Must not: score anything or pick the suggestion; Main does that.
+
+import {BackPlate} from "SpectaclesUIKit.lspkg/Scripts/BackPlate"
+import {FlexLayout} from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexLayout"
+import {FlexItem} from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexItem"
+import {FlexAlign, FlexDirection, FlexJustify} from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexTypes"
+
+// ── Typography ───────────────────────────────────────────────────────────────
+const FONT_SIZE_SCALE = 1.0
+type TextRole = "HeadlineXL" | "Headline1" | "Headline2" | "Body"
+const TYPE_SCALE: Record<TextRole, {size: number; weight: number}> = {
+  HeadlineXL: {size: 62, weight: 700}, Headline1: {size: 54, weight: 700},
+  Headline2: {size: 48, weight: 700}, Body: {size: 39, weight: 500},
+}
+function applyTextRole(t: Text, role: TextRole, distanceCm: number = 110): void {
+  t.size = TYPE_SCALE[role].size * FONT_SIZE_SCALE * (distanceCm / 110)
+  ;(t as Text & {weight?: number}).weight = TYPE_SCALE[role].weight
+}
+
+const LABEL_W = 16
+const WHY_W = 40
+
+@component
+export class NextHoldCalloutUI extends BaseScriptComponent {
+  @ui.label('<span style="color: #60A5FA;">NextHoldCalloutUI – suggestion label and why-line</span>')
+  @ui.separator
+  @ui.group_start("Settings")
+  @input
+  @hint("Seconds the suggestion label stays fully visible before fading")
+  @widget(new SliderWidget(0.5, 5, 0.1))
+  labelHoldSeconds: number = 1.5
+
+  @input
+  @hint("Seconds the suggestion label takes to fade out (hold + fade ≈ 2 s per the brief)")
+  @widget(new SliderWidget(0.1, 3, 0.1))
+  labelFadeSeconds: number = 0.5
+
+  @input("vec4", "{0.92,1.0,0.95,1.0}")
+  @hint("Suggestion label colour (keep it light: the display is additive)")
+  @widget(new ColorWidget())
+  labelColor: vec4 = new vec4(0.92, 1.0, 0.95, 1.0)
+
+  @input("vec4", "{1,1,1,1}")
+  @hint("Why-line text colour")
+  @widget(new ColorWidget())
+  whyColor: vec4 = new vec4(1, 1, 1, 1)
+  @ui.group_end
+
+  private labelRoot: SceneObject
+  private labelText: Text
+  private whyRoot: SceneObject
+  private whyText: Text
+  private whyPlate: BackPlate
+
+  private labelShownAt = -1
+  private labelOpacity = 0
+  private whyWanted = false
+  private whyReady = false
+  private whyHoldId: string | null = null
+
+  onAwake() {
+    this.sceneObject.createComponent("Component.Canvas")
+
+    // ── SuggestLabel ──
+    this.labelRoot = this.obj(this.sceneObject, "SuggestLabel")
+    this.labelText = this.labelRoot.createComponent("Component.Text") as Text
+    this.labelText.depthTest = true
+    applyTextRole(this.labelText, "HeadlineXL")
+    this.labelText.horizontalAlignment = HorizontalAlignment.Center
+    this.labelText.verticalAlignment = VerticalAlignment.Center
+    this.labelText.horizontalOverflow = HorizontalOverflow.Overflow
+    this.labelText.verticalOverflow = VerticalOverflow.Overflow
+    this.labelText.layoutRect = Rect.create(-LABEL_W / 2, LABEL_W / 2, -1.6, 1.6)
+    this.labelRoot.enabled = false
+
+    // ── WhyLine: a dark plate behind the text so it reads over the wall ──
+    this.whyRoot = this.obj(this.sceneObject, "WhyLine")
+    this.whyPlate = this.whyRoot.createComponent(BackPlate.getTypeName()) as BackPlate
+    const content = this.obj(this.whyRoot, "Content", new vec3(0, 0, 0.6))
+    const flex = content.createComponent(FlexLayout.getTypeName()) as FlexLayout
+    flex.autoDiscoverItemsOnStart = false // items are registered explicitly via addItems
+    flex.width = -1
+    flex.height = -1
+    flex.direction = FlexDirection.Column
+    flex.alignItems = FlexAlign.Center
+    flex.justifyContent = FlexJustify.Center
+    flex.paddingTop = 1.0
+    flex.paddingBottom = 1.0
+    flex.paddingLeft = 1.4
+    flex.paddingRight = 1.4
+    flex.onLayoutComplete.add((r) => {
+      this.whyPlate.size = new vec2(r.containerWidth, r.containerHeight)
+    })
+    const textSO = this.obj(content, "WhyText", new vec3(0, 0, 0.02))
+    const item = textSO.createComponent(FlexItem.getTypeName()) as FlexItem
+    item.overrideWidth = WHY_W
+    item.overrideHeight = 3
+    this.whyText = textSO.createComponent("Component.Text") as Text
+    this.whyText.depthTest = true
+    applyTextRole(this.whyText, "Headline2")
+    this.whyText.textFill.color = this.whyColor
+    this.whyText.horizontalAlignment = HorizontalAlignment.Center
+    this.whyText.verticalAlignment = VerticalAlignment.Center
+    this.whyText.horizontalOverflow = HorizontalOverflow.Overflow
+    this.whyText.verticalOverflow = VerticalOverflow.Overflow
+    this.whyText.layoutRect = Rect.create(-WHY_W / 2, WHY_W / 2, -1.5, 1.5)
+    flex.addItems([item])
+    // start hidden, but only after the plate has initialised
+    this.whyPlate.onInitialized.add(() => {
+      this.whyReady = true
+      this.whyRoot.enabled = this.whyWanted
+    })
+
+    this.createEvent("UpdateEvent").bind(() => this.tickLabel())
+  }
+
+  // ── Main -> UI ────────────────────────────────────────────────────────────
+  /** Show the limb label centred at worldPos (just below the suggested ring), then fade it. */
+  showSuggestion(worldPos: vec3, worldRot: quat, text: string): void {
+    const tr = this.labelRoot.getTransform()
+    tr.setWorldPosition(worldPos)
+    tr.setWorldRotation(worldRot)
+    this.labelText.text = text
+    this.labelShownAt = getTime()
+    this.setLabelOpacity(1)
+  }
+
+  hideSuggestion(): void {
+    this.labelShownAt = -1
+    this.setLabelOpacity(0)
+  }
+
+  showWhy(worldPos: vec3, worldRot: quat, text: string, holdId: string): void {
+    const tr = this.whyRoot.getTransform()
+    tr.setWorldPosition(worldPos)
+    tr.setWorldRotation(worldRot)
+    this.whyText.text = text
+    this.whyHoldId = holdId
+    this.whyWanted = true
+    if (this.whyReady) this.whyRoot.enabled = true
+  }
+
+  hideWhy(): void {
+    this.whyWanted = false
+    this.whyHoldId = null
+    if (this.whyReady) this.whyRoot.enabled = false
+  }
+
+  // ── read-back (tests) ─────────────────────────────────────────────────────
+  isLabelVisible(): boolean { return this.labelOpacity > 0.01 }
+  getLabelOpacity(): number { return this.labelOpacity }
+  getLabelText(): string { return this.labelText ? this.labelText.text : "" }
+  isWhyVisible(): boolean { return this.whyWanted }
+  getWhyText(): string { return this.whyWanted && this.whyText ? this.whyText.text : "" }
+  getWhyHoldId(): string | null { return this.whyHoldId }
+
+  private tickLabel(): void {
+    if (this.labelShownAt < 0) return
+    const t = getTime() - this.labelShownAt
+    if (t <= this.labelHoldSeconds) {
+      this.setLabelOpacity(1)
+    } else if (t < this.labelHoldSeconds + this.labelFadeSeconds) {
+      this.setLabelOpacity(1 - (t - this.labelHoldSeconds) / this.labelFadeSeconds)
+    } else {
+      this.labelShownAt = -1
+      this.setLabelOpacity(0)
+    }
+  }
+
+  private setLabelOpacity(a: number): void {
+    this.labelOpacity = a
+    const c = this.labelColor
+    this.labelText.textFill.color = new vec4(c.x, c.y, c.z, c.w * a)
+    this.labelRoot.enabled = a > 0.01
+  }
+
+  private obj(parent: SceneObject, name: string, position?: vec3): SceneObject {
+    const so = global.scene.createSceneObject(name)
+    so.setParent(parent)
+    if (position) so.getTransform().setLocalPosition(position)
+    return so
+  }
+}

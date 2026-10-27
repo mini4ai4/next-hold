@@ -1,0 +1,89 @@
+- !<AssetImportMetadata/088dd016-a16b-4b49-860f-df86729453bb>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 52fc87a1-333a-47f9-a9df-6acb27a80a62
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 52fc87a1-333a-47f9-a9df-6acb27a80a62
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 62bf55f6-ecbe-4ce1-814c-433f113e2e9f
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/62bf55f6-ecbe-4ce1-814c-433f113e2e9f>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  VersionPrerelease: ""
+  UpdateOrder: 0
+  ComponentUid: e510ec67-e42e-4493-b64b-c3f3785966f3
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    callouts: false
+    climberHeightCm: false
+    controlRow: false
+    debugColliders: false
+    greenColor: false
+    offViewArrow: false
+    redColor: false
+    ringMaterial: false
+    rowDropCm: false
+    typePicker: false
+    wall: false
+    yellowColor: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - wall: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      controlRow: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
+      typePicker: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
+      callouts: !<MappingBased.AssignableType_4> 00000000-0000-0000-0000-000000000000
+      offViewArrow: !<MappingBased.AssignableType_5> 00000000-0000-0000-0000-000000000000
+      ringMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      climberHeightCm: !<float> 175.000000
+      rowDropCm: !<float> 18.000000
+      greenColor: !<Vec4> {x: 0.400000, y: 1.000000, z: 0.500000, w: 1.000000}
+      yellowColor: !<Vec4> {x: 1.000000, y: 0.880000, z: 0.300000, w: 1.000000}
+      redColor: !<Vec4> {x: 1.000000, y: 0.420000, z: 0.420000, w: 1.000000}
+      debugColliders: false
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">NextHoldMain – state, scoring and input for Next Hold</span>"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"References"}'
+    - '// @input AssignableType_1 wall {"hint":"The ClimbingWall stand-in (builds the panel and the Hold_<id> objects)"}'
+    - '// @input AssignableType_2 controlRow {"hint":"Control row UI (limb toggles, ?, mode switch)"}'
+    - '// @input AssignableType_3 typePicker {"hint":"Setup-mode type picker UI"}'
+    - '// @input AssignableType_4 callouts {"hint":"Suggestion label + why-line UI"}'
+    - '// @input AssignableType_5 offViewArrow {"hint":"Off-view arrow + chime"}'
+    - '// @input Asset.Material ringMaterial {"hint":"Unlit material, cloned for every ring and marker"}'
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"Settings"}'
+    - '// @input float climberHeightCm = 175 {"hint":"Climber height in cm. Reach = height x 0.44 (175 cm -> 77 cm); feet use the same reach.", "widget":"slider", "min":120, "max":210, "step":1}'
+    - "// @input float rowDropCm = 20 {\"hint\":\"How far below the lower hand hold the control row's centre sits, in cm\", \"widget\":\"slider\", \"min\":10, \"max\":40, \"step\":0.5}"
+    - '// @input vec4 greenColor = "{0.4,1,0.5,1}" {"hint":"Green ring: secure grip for you, from where you are now (score >= 0.7)", "widget":"color"}'
+    - '// @input vec4 yellowColor = "{1,0.88,0.3,1}" {"hint":"Yellow ring: possible but harder (score 0.4 - 0.7)", "widget":"color"}'
+    - '// @input vec4 redColor = "{1,0.42,0.42,1}" {"hint":"Red ring: poor or out of reach (score < 0.4)", "widget":"color"}'
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"Debug"}'
+    - '// @input bool debugColliders {"hint":"Draw the hold pinch colliders as wireframes"}'
+    - '// @ui {"widget":"group_end"}'

@@ -1,0 +1,49 @@
+- !<AssetImportMetadata/3ccc4184-1432-44f7-8083-ec6a9fe869dc>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> f7329ce4-bef1-4cb2-84e6-b1bdd7e300e7
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> f7329ce4-bef1-4cb2-84e6-b1bdd7e300e7
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> d94b5a96-ca2c-48b7-8364-94e3dcf7da60
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/d94b5a96-ca2c-48b7-8364-94e3dcf7da60>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  VersionPrerelease: ""
+  UpdateOrder: 0
+  ComponentUid: 8723b6d7-ae21-49f9-9748-ad3a90b15ccc
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    addColliders: false
+    material: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - material: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      addColliders: true
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input Asset.Material material {"hint":"vertexBaseColorMaterial (SimpleVertexBaseColor package)"}'
+    - '// @input bool addColliders = true {"hint":"Add a box collider per hold, sized to its ring, for pinch targets"}'

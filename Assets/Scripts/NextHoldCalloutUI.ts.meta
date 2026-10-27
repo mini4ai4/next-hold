@@ -1,0 +1,59 @@
+- !<AssetImportMetadata/5228af4a-554a-451f-9d5e-f0482f7498ff>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 32b3cd03-d017-45a2-9b67-a385c850af56
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 32b3cd03-d017-45a2-9b67-a385c850af56
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 35c63f33-ba19-4de7-a25b-2f17ecbe4b34
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/35c63f33-ba19-4de7-a25b-2f17ecbe4b34>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  VersionPrerelease: ""
+  UpdateOrder: 0
+  ComponentUid: 2b13b2dd-1b53-4c0b-9726-5796d1e23566
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    labelColor: false
+    labelFadeSeconds: false
+    labelHoldSeconds: false
+    whyColor: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - labelHoldSeconds: 1.500000
+      labelFadeSeconds: 0.500000
+      labelColor: !<Vec4> {x: 0.920000, y: 1.000000, z: 0.950000, w: 1.000000}
+      whyColor: !<Vec4> {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">NextHoldCalloutUI – suggestion label and why-line</span>"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"Settings"}'
+    - '// @input float labelHoldSeconds = 1.5 {"hint":"Seconds the suggestion label stays fully visible before fading", "widget":"slider", "min":0.5, "max":5, "step":0.1}'
+    - '// @input float labelFadeSeconds = 0.5 {"hint":"Seconds the suggestion label takes to fade out (hold + fade ≈ 2 s per the brief)", "widget":"slider", "min":0.1, "max":3, "step":0.1}'
+    - '// @input vec4 labelColor = "{0.92,1.0,0.95,1.0}" {"hint":"Suggestion label colour (keep it light: the display is additive)", "widget":"color"}'
+    - '// @input vec4 whyColor = "{1,1,1,1}" {"hint":"Why-line text colour", "widget":"color"}'
+    - '// @ui {"widget":"group_end"}'

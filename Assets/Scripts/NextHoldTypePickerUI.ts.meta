@@ -1,0 +1,59 @@
+- !<AssetImportMetadata/27f7e52a-0b81-4892-aa59-c91c142d6752>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> fb84daf1-9ac3-4406-895e-25f1345a9810
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> fb84daf1-9ac3-4406-895e-25f1345a9810
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> f10938d1-4f4c-42f9-972b-81a39a53ee67
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/f10938d1-4f4c-42f9-972b-81a39a53ee67>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  VersionPrerelease: ""
+  UpdateOrder: 0
+  ComponentUid: 4ea530e8-7b35-40cf-af9a-ca02ff5231aa
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    buttonGap: false
+    buttonHeight: false
+    buttonWidth: false
+    title: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - buttonWidth: !<float> 13.000000
+      buttonHeight: !<float> 5.000000
+      buttonGap: !<float> 2.000000
+      title: Hold type
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">NextHoldTypePickerUI – hold type picker (setup mode)</span>"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"Settings"}'
+    - '// @input float buttonWidth = 13 {"hint":"Width of each type button in cm", "widget":"slider", "min":8, "max":20, "step":0.5}'
+    - '// @input float buttonHeight = 5 {"hint":"Height of each type button in cm", "widget":"slider", "min":3, "max":8, "step":0.5}'
+    - '// @input float buttonGap = 2 {"hint":"Gap between type buttons in cm", "widget":"slider", "min":1, "max":5, "step":0.25}'
+    - '// @input string title = "Hold type" {"hint":"Title above the type buttons"}'
+    - '// @ui {"widget":"group_end"}'

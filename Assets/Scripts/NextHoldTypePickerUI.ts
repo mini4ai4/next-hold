@@ -1,0 +1,195 @@
+// NextHoldTypePickerUI — setup mode's type picker (brief: "Mark a hold").
+// Big buttons beside the hold just pinched: jug / crimp / pinch / pocket / sloper.
+//
+// Owns: the picker panel and its buttons. Passive view, starts hidden.
+// Main -> UI: showFor(), hide(). UI -> Main: onTypePicked(type).
+// Must not: change hold types itself; Main owns the marked types.
+//
+// Stable scene names for tests: TypePicker panel, TypeButton_<type>.
+
+import {BackPlate} from "SpectaclesUIKit.lspkg/Scripts/BackPlate"
+import {Button} from "SpectaclesUIKit.lspkg/Scripts/Components/Button/Button"
+import {FlexLayout} from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexLayout"
+import {FlexItem} from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexItem"
+import {FlexAlign, FlexDirection, FlexJustify} from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexTypes"
+import Event, {PublicApi} from "SpectaclesInteractionKit.lspkg/Utils/Event"
+
+// ── Typography ───────────────────────────────────────────────────────────────
+const FONT_SIZE_SCALE = 1.0
+type TextRole = "Headline1" | "Headline2" | "Subheadline" | "Body" | "Caption"
+const TYPE_SCALE: Record<TextRole, {size: number; weight: number}> = {
+  Headline1: {size: 54, weight: 700}, Headline2: {size: 48, weight: 700},
+  Subheadline: {size: 41, weight: 700}, Body: {size: 39, weight: 500}, Caption: {size: 38, weight: 500},
+}
+function applyTextRole(t: Text, role: TextRole, distanceCm: number = 110): void {
+  t.size = TYPE_SCALE[role].size * FONT_SIZE_SCALE * (distanceCm / 110)
+  ;(t as Text & {weight?: number}).weight = TYPE_SCALE[role].weight
+}
+
+const LAYOUT_Z_LIFT = 0.02
+const BUTTON_LABEL_Z = 0.08
+const TYPES = ["jug", "crimp", "pinch", "pocket", "sloper"]
+
+@component
+export class NextHoldTypePickerUI extends BaseScriptComponent {
+  @ui.label('<span style="color: #60A5FA;">NextHoldTypePickerUI – hold type picker (setup mode)</span>')
+  @ui.separator
+  @ui.group_start("Settings")
+  @input
+  @hint("Width of each type button in cm")
+  @widget(new SliderWidget(8, 20, 0.5))
+  buttonWidth: number = 13
+
+  @input
+  @hint("Height of each type button in cm")
+  @widget(new SliderWidget(3, 8, 0.5))
+  buttonHeight: number = 5
+
+  @input
+  @hint("Gap between type buttons in cm")
+  @widget(new SliderWidget(1, 5, 0.25))
+  buttonGap: number = 2
+
+  @input
+  @hint("Title above the type buttons")
+  title: string = "Hold type"
+  @ui.group_end
+
+  private _onTypePicked = new Event<string>()
+  get onTypePicked(): PublicApi<string> { return this._onTypePicked.publicApi() }
+
+  private panel: SceneObject
+  private buttons: {[type: string]: Button} = {}
+  private current: string | null = null
+  private wantVisible = false
+  private ready = false
+  private pending = TYPES.length + 1 // buttons + backplate
+  private resync: DelayedCallbackEvent
+
+  onAwake() {
+    this.sceneObject.createComponent("Component.Canvas")
+    this.panel = this.obj(this.sceneObject, "TypePickerPanel")
+    const backPlate = this.panel.createComponent(BackPlate.getTypeName()) as BackPlate
+    backPlate.onInitialized.add(() => this.markInit())
+
+    const content = this.obj(this.panel, "Content", new vec3(0, 0, 0.6))
+    const flex = content.createComponent(FlexLayout.getTypeName()) as FlexLayout
+    flex.autoDiscoverItemsOnStart = false // items are registered explicitly via addItems
+    flex.width = -1
+    flex.height = -1
+    flex.direction = FlexDirection.Column
+    flex.alignItems = FlexAlign.Center
+    flex.justifyContent = FlexJustify.Center
+    flex.rowGap = this.buttonGap
+    flex.paddingTop = 1.4
+    flex.paddingBottom = 1.4
+    flex.paddingLeft = 1.4
+    flex.paddingRight = 1.4
+    flex.onLayoutComplete.add((r) => {
+      backPlate.size = new vec2(r.containerWidth, r.containerHeight)
+    })
+
+    this.flexChild(content, {w: this.buttonWidth, h: 2.6}, (so) => {
+      so.name = "TypePickerTitle"
+      const t = so.createComponent("Component.Text") as Text
+      t.text = this.title
+      t.depthTest = true
+      applyTextRole(t, "Subheadline")
+      t.textFill.color = new vec4(1, 1, 1, 0.8)
+      t.horizontalAlignment = HorizontalAlignment.Center
+      t.verticalAlignment = VerticalAlignment.Center
+      t.horizontalOverflow = HorizontalOverflow.Overflow
+      t.layoutRect = Rect.create(-this.buttonWidth / 2, this.buttonWidth / 2, -1.2, 1.2)
+    })
+
+    for (const type of TYPES) {
+      this.flexChild(content, {w: this.buttonWidth, h: this.buttonHeight}, (so) => {
+        so.name = "TypeButton_" + type
+        const btn = so.createComponent(Button.getTypeName()) as Button
+        btn.size = new vec3(this.buttonWidth, this.buttonHeight, 1)
+        btn.setIsToggleable(true)
+        btn.onInitialized.add(() => this.markInit())
+        btn.onTriggerUp.add(() => {
+          this._onTypePicked.invoke(type)
+          this.resync.reset(0)
+        })
+        this.addButtonLabel(so, type.charAt(0).toUpperCase() + type.slice(1), this.buttonWidth - 0.5)
+        this.buttons[type] = btn
+      })
+    }
+
+    this.resync = this.createEvent("DelayedCallbackEvent")
+    this.resync.bind(() => this.applyStates())
+  }
+
+  // ── Main -> UI ────────────────────────────────────────────────────────────
+  /** Show the picker at worldPos (beside the hold), with the hold's current type lit. */
+  showFor(worldPos: vec3, worldRot: quat, currentType: string | null): void {
+    const tr = this.getTransform()
+    tr.setWorldPosition(worldPos)
+    tr.setWorldRotation(worldRot)
+    this.current = currentType
+    this.wantVisible = true
+    if (this.ready) this.panel.enabled = true
+    this.applyStates()
+  }
+
+  hide(): void {
+    this.wantVisible = false
+    if (this.ready) this.panel.enabled = false
+  }
+
+  isVisible(): boolean {
+    return this.wantVisible
+  }
+
+  private markInit(): void {
+    this.pending--
+    if (this.pending > 0) return
+    this.ready = true
+    this.applyStates()
+    // start hidden: the disable lands only after every widget has initialised
+    this.panel.enabled = this.wantVisible
+  }
+
+  private applyStates(): void {
+    for (const type of TYPES) {
+      const b = this.buttons[type]
+      if (b) b.isOn = type === this.current
+    }
+  }
+
+  private addButtonLabel(parent: SceneObject, text: string, widthCM: number): void {
+    const so = this.obj(parent, "Label", new vec3(0, 0, BUTTON_LABEL_Z))
+    const t = so.createComponent("Component.Text") as Text
+    t.text = text
+    t.depthTest = true
+    applyTextRole(t, "Headline2")
+    t.horizontalAlignment = HorizontalAlignment.Center
+    t.verticalAlignment = VerticalAlignment.Center
+    t.horizontalOverflow = HorizontalOverflow.Overflow
+    t.verticalOverflow = VerticalOverflow.Overflow
+    t.layoutRect = Rect.create(-widthCM / 2, widthCM / 2, -1.4, 1.4)
+  }
+
+  private obj(parent: SceneObject, name: string, position?: vec3): SceneObject {
+    const so = global.scene.createSceneObject(name)
+    so.setParent(parent)
+    if (position) so.getTransform().setLocalPosition(position)
+    return so
+  }
+
+  private flexChild(parent: SceneObject, size: {w?: number; h?: number},
+                    builder: (child: SceneObject) => void): SceneObject {
+    const child = this.obj(parent, "Item", new vec3(0, 0, LAYOUT_Z_LIFT))
+    const item = child.createComponent(FlexItem.getTypeName()) as FlexItem
+    if (size.w !== undefined && size.w > 0) item.overrideWidth = size.w
+    if (size.h !== undefined && size.h > 0) item.overrideHeight = size.h
+    item.flexGrow = 0
+    item.flexShrink = 0
+    builder(child)
+    const parentFlex = parent.getComponent(FlexLayout.getTypeName()) as FlexLayout | null
+    if (parentFlex) parentFlex.addItems([item])
+    return child
+  }
+}

@@ -1,0 +1,281 @@
+// NextHoldControlRowUI — the compact control row on the wall plane (brief:
+// "Control row"). Four limb toggles (LH, RH, LF, RF), a '?' button and a
+// Setup/Climb mode switch, plus the small not-a-spotter note underneath.
+//
+// Owns: the row's UIKit widgets and their lit/unlit look. Passive view.
+// Main -> UI: setSelectedLimb(), setAskArmed(), setMode(), placeAt().
+// UI -> Main: onLimbPressed, onAskPressed, onModePressed.
+// Must not: hold climbing state or decide anything; Main owns all state.
+//
+// Stable scene names for tests: Toggle_LH, Toggle_RH, Toggle_LF, Toggle_RF,
+// AskButton, ModeSwitch, SafetyNote.
+
+import {BackPlate} from "SpectaclesUIKit.lspkg/Scripts/BackPlate"
+import {Button} from "SpectaclesUIKit.lspkg/Scripts/Components/Button/Button"
+import {FlexLayout} from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexLayout"
+import {FlexItem} from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexItem"
+import {FlexAlign, FlexDirection, FlexJustify} from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexTypes"
+import Event, {PublicApi} from "SpectaclesInteractionKit.lspkg/Utils/Event"
+
+// ── Typography: the single source of truth for text size + weight ────────────
+const FONT_SIZE_SCALE = 1.0
+type TextRole =
+  | "Title1" | "Title2" | "HeadlineXL" | "Headline1" | "Headline2"
+  | "Subheadline" | "Button" | "Callout" | "Body" | "Caption"
+const TYPE_SCALE: Record<TextRole, {size: number; weight: number}> = {
+  Title1: {size: 105, weight: 700}, Title2: {size: 93, weight: 700},
+  HeadlineXL: {size: 62, weight: 700}, Headline1: {size: 54, weight: 700},
+  Headline2: {size: 48, weight: 700}, Subheadline: {size: 41, weight: 700},
+  Button: {size: 39, weight: 500}, Callout: {size: 39, weight: 700},
+  Body: {size: 39, weight: 500}, Caption: {size: 38, weight: 500},
+}
+function roleSize(role: TextRole, distanceCm: number = 110): number {
+  return TYPE_SCALE[role].size * FONT_SIZE_SCALE * (distanceCm / 110)
+}
+function applyTextRole(t: Text, role: TextRole, distanceCm: number = 110): void {
+  t.size = roleSize(role, distanceCm)
+  ;(t as Text & {weight?: number}).weight = TYPE_SCALE[role].weight
+}
+
+const LAYOUT_Z_LIFT = 0.02
+const BUTTON_LABEL_Z = 0.08
+/** Text uses the 110 cm scale; the row is ~100 cm away, so it reads a little larger. */
+const VIEW_DISTANCE_CM = 110
+
+const LIMB_ORDER = ["LH", "RH", "LF", "RF"]
+
+@component
+export class NextHoldControlRowUI extends BaseScriptComponent {
+  @ui.label('<span style="color: #60A5FA;">NextHoldControlRowUI – limb toggles, ? and mode switch</span>')
+  @ui.separator
+  @ui.group_start("Settings")
+  @input
+  @hint("Width of each control button in cm (brief: about 8 cm)")
+  @widget(new SliderWidget(6, 12, 0.5))
+  buttonWidth: number = 8
+
+  @input
+  @hint("Height of each control button in cm")
+  @widget(new SliderWidget(3, 8, 0.5))
+  buttonHeight: number = 5
+
+  @input
+  @hint("Gap between buttons in cm (brief: 2 cm or more)")
+  @widget(new SliderWidget(2, 5, 0.25))
+  buttonGap: number = 2
+
+  @input
+  @hint("Not-a-spotter note shown under the row. Never use the word 'safe'.")
+  safetyNote: string = "Bouldering / top-rope aid only. Not a spotter or instructor."
+
+  @input
+  @hint("Mode switch label while in climb mode")
+  climbLabel: string = "Climb"
+
+  @input
+  @hint("Mode switch label while in setup mode")
+  setupLabel: string = "Setup"
+  @ui.group_end
+
+  private _onLimbPressed = new Event<string>()
+  private _onAskPressed = new Event<void>()
+  private _onModePressed = new Event<void>()
+  get onLimbPressed(): PublicApi<string> { return this._onLimbPressed.publicApi() }
+  get onAskPressed(): PublicApi<void> { return this._onAskPressed.publicApi() }
+  get onModePressed(): PublicApi<void> { return this._onModePressed.publicApi() }
+
+  private limbButtons: {[limb: string]: Button} = {}
+  private askButton: Button
+  private modeButton: Button
+  private modeLabel: Text
+
+  private selectedLimb: string | null = null
+  private askArmed = false
+  private mode = "climb"
+  private resync: DelayedCallbackEvent
+
+  onAwake() {
+    this.sceneObject.createComponent("Component.Canvas")
+    const backPlate = this.sceneObject.createComponent(BackPlate.getTypeName()) as BackPlate
+
+    const content = this.obj(this.sceneObject, "Content", new vec3(0, 0, 0.6))
+    const flex = content.createComponent(FlexLayout.getTypeName()) as FlexLayout
+    flex.autoDiscoverItemsOnStart = false // items are registered explicitly via addItems
+    flex.width = -1
+    flex.height = -1
+    flex.direction = FlexDirection.Column
+    flex.alignItems = FlexAlign.Center
+    flex.justifyContent = FlexJustify.Center
+    flex.rowGap = 0.8
+    flex.paddingTop = 1.2
+    flex.paddingBottom = 1.0
+    flex.paddingLeft = 1.4
+    flex.paddingRight = 1.4
+    flex.onLayoutComplete.add((r) => {
+      backPlate.size = new vec2(r.containerWidth, r.containerHeight)
+    })
+
+    // Two rows of three (hands above feet) so the block fits inside the SPECS
+    // view at ~1 m; a single 6-button row is ~60 cm, wider than the view there.
+    const n = 3
+    const rowW = n * this.buttonWidth + (n - 1) * this.buttonGap
+    const addLimb = (row: SceneObject, limb: string) => {
+      const b = this.addButton(row, "Toggle_" + limb, limb, this.buttonWidth, this.buttonHeight, "Headline1")
+      this.limbButtons[limb] = b.btn
+      b.btn.onTriggerUp.add(() => {
+        this._onLimbPressed.invoke(limb)
+        this.resync.reset(0)
+      })
+    }
+    this.flexChild(content, {w: rowW, h: this.buttonHeight}, (rowSO) => {
+      rowSO.name = "HandsRow"
+      const row = this.makeFlex(rowSO, FlexDirection.Row, rowW, this.buttonHeight, this.buttonGap)
+      addLimb(row, "LH")
+      addLimb(row, "RH")
+      const ask = this.addButton(row, "AskButton", "?", this.buttonWidth, this.buttonHeight, "HeadlineXL")
+      this.askButton = ask.btn
+      ask.btn.onTriggerUp.add(() => {
+        this._onAskPressed.invoke()
+        this.resync.reset(0)
+      })
+    })
+    this.flexChild(content, {w: rowW, h: this.buttonHeight}, (rowSO) => {
+      rowSO.name = "FeetRow"
+      const row = this.makeFlex(rowSO, FlexDirection.Row, rowW, this.buttonHeight, this.buttonGap)
+      addLimb(row, "LF")
+      addLimb(row, "RF")
+      const mode = this.addButton(row, "ModeSwitch", this.climbLabel, this.buttonWidth, this.buttonHeight, "Headline2")
+      this.modeButton = mode.btn
+      this.modeLabel = mode.label
+      mode.btn.onTriggerUp.add(() => {
+        this._onModePressed.invoke()
+        this.resync.reset(0)
+      })
+    })
+
+    this.flexChild(content, {w: rowW, h: 3.6}, (noteSO) => {
+      noteSO.name = "SafetyNote"
+      const t = noteSO.createComponent("Component.Text") as Text
+      t.text = this.safetyNote
+      t.depthTest = true
+      applyTextRole(t, "Caption", VIEW_DISTANCE_CM)
+      t.textFill.color = new vec4(1, 1, 1, 0.7)
+      t.horizontalAlignment = HorizontalAlignment.Center
+      t.verticalAlignment = VerticalAlignment.Center
+      t.horizontalOverflow = HorizontalOverflow.Wrap
+      t.verticalOverflow = VerticalOverflow.Overflow
+      t.layoutRect = Rect.create(-rowW / 2, rowW / 2, -1.8, 1.8)
+    })
+
+    // UIKit toggles flip themselves on press; re-apply Main's state one frame
+    // later so the lit button always matches the real state.
+    this.resync = this.createEvent("DelayedCallbackEvent")
+    this.resync.bind(() => this.applyStates())
+    this.applyStates()
+  }
+
+  // ── Main -> UI ────────────────────────────────────────────────────────────
+  setSelectedLimb(limb: string | null): void {
+    this.selectedLimb = limb
+    this.applyStates()
+  }
+
+  setAskArmed(armed: boolean): void {
+    this.askArmed = armed
+    this.applyStates()
+  }
+
+  setMode(mode: string): void {
+    this.mode = mode
+    this.applyStates()
+  }
+
+  /** Move the row (Main computes the anchor between the hands). */
+  placeAt(worldPos: vec3, worldRot: quat): void {
+    const tr = this.getTransform()
+    tr.setWorldPosition(worldPos)
+    tr.setWorldRotation(worldRot)
+  }
+
+  /** Read-back for tests. */
+  isAskLit(): boolean { return this.askButton ? this.askButton.isOn : false }
+  getLitLimb(): string | null {
+    for (const l of LIMB_ORDER) if (this.limbButtons[l] && this.limbButtons[l].isOn) return l
+    return null
+  }
+
+  private applyStates(): void {
+    for (const limb of LIMB_ORDER) {
+      const b = this.limbButtons[limb]
+      if (b) b.isOn = limb === this.selectedLimb
+    }
+    if (this.askButton) this.askButton.isOn = this.askArmed
+    if (this.modeButton) this.modeButton.isOn = this.mode === "setup"
+    if (this.modeLabel) this.modeLabel.text = this.mode === "setup" ? this.setupLabel : this.climbLabel
+  }
+
+  // ── builders ──────────────────────────────────────────────────────────────
+  private addButton(parent: SceneObject, name: string, label: string, w: number, h: number,
+                    role: TextRole): {btn: Button; label: Text} {
+    let btn: Button
+    let text: Text
+    this.flexChild(parent, {w, h}, (so) => {
+      so.name = name
+      btn = so.createComponent(Button.getTypeName()) as Button
+      btn.size = new vec3(w, h, 1)
+      btn.setIsToggleable(true)
+      text = this.addButtonLabel(so, label, w - 0.5, role)
+    })
+    return {btn, label: text}
+  }
+
+  private addButtonLabel(parent: SceneObject, text: string, widthCM: number, role: TextRole): Text {
+    const so = this.obj(parent, "Label", new vec3(0, 0, BUTTON_LABEL_Z))
+    const t = so.createComponent("Component.Text") as Text
+    t.text = text
+    t.depthTest = true
+    applyTextRole(t, role, VIEW_DISTANCE_CM)
+    t.horizontalAlignment = HorizontalAlignment.Center
+    t.verticalAlignment = VerticalAlignment.Center
+    t.horizontalOverflow = HorizontalOverflow.Overflow
+    t.verticalOverflow = VerticalOverflow.Overflow
+    t.layoutRect = Rect.create(-widthCM / 2, widthCM / 2, -1.4, 1.4)
+    return t
+  }
+
+  private obj(parent: SceneObject, name: string, position?: vec3): SceneObject {
+    const so = global.scene.createSceneObject(name)
+    so.setParent(parent)
+    if (position) so.getTransform().setLocalPosition(position)
+    return so
+  }
+
+  private makeFlex(so: SceneObject, direction: FlexDirection, width: number, height: number, gap: number): SceneObject {
+    const f = so.createComponent(FlexLayout.getTypeName()) as FlexLayout
+    f.autoDiscoverItemsOnStart = false
+    f.onInitialized.add(() => {
+      f.width = width
+      f.height = height
+      f.direction = direction
+      if (direction === FlexDirection.Row) f.columnGap = gap
+      else f.rowGap = gap
+      f.justifyContent = FlexJustify.Center
+      f.alignItems = FlexAlign.Center
+    })
+    return so
+  }
+
+  private flexChild(parent: SceneObject, size: {w?: number; h?: number; grow?: number},
+                    builder: (child: SceneObject) => void): SceneObject {
+    const child = this.obj(parent, "Item", new vec3(0, 0, LAYOUT_Z_LIFT))
+    const item = child.createComponent(FlexItem.getTypeName()) as FlexItem
+    if (size.w !== undefined && size.w > 0) item.overrideWidth = size.w
+    if (size.h !== undefined && size.h > 0) item.overrideHeight = size.h
+    item.flexGrow = size.grow ?? 0
+    item.flexShrink = 0
+    builder(child)
+    const parentFlex = parent.getComponent(FlexLayout.getTypeName()) as FlexLayout | null
+    if (parentFlex) parentFlex.addItems([item])
+    return child
+  }
+}
