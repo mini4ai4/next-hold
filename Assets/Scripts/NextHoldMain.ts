@@ -30,6 +30,10 @@ import {NextHoldControlRowUI} from "./NextHoldControlRowUI"
 import {NextHoldTypePickerUI} from "./NextHoldTypePickerUI"
 import {NextHoldCalloutUI} from "./NextHoldCalloutUI"
 import {NextHoldOffViewArrow} from "./NextHoldOffViewArrow"
+import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/CameraProvider/WorldCameraFinderProvider"
+
+/** half the why-line plate: WHY_W (40 cm) in NextHoldCalloutUI plus its padding */
+const WHY_HALF_W = 21.5
 
 export type Mode = "climb" | "setup"
 
@@ -277,8 +281,10 @@ export class NextHoldMain extends BaseScriptComponent {
   private showWhyFor(id: string, r: ScoreResult): void {
     const h = this.holds[id]
     const ringR = this.ringRadius(id)
-    const y = h.y > 265 ? h.y - ringR - 5 : h.y + ringR + 5
-    this.callouts.showWhy(this.wall.wallToWorld(h.x, y, 10), this.wallRot(), r.why, id)
+    // toward the middle of the view: a hold above the eye line gets its line below, and the other way round
+    // (a fixed 265 cm cut-off put the line off the top of the narrow SPECS view for the holds you look up at)
+    const y = this.isAboveViewCentre(this.wall.wallToWorld(h.x, h.y, 0)) ? h.y - ringR - 5 : h.y + ringR + 5
+    this.callouts.showWhy(this.keepInView(this.wall.wallToWorld(h.x, y, 10), WHY_HALF_W), this.wallRot(), r.why, id)
   }
 
   private setHover(id: string | null): void {
@@ -289,6 +295,29 @@ export class NextHoldMain extends BaseScriptComponent {
   // ── helpers ───────────────────────────────────────────────────────────────
   private reach(): number { return this.climberHeightCm * 0.44 }
   private wallRot(): quat { return this.wall.getTransform().getWorldRotation() }
+  /** Slide a point sideways (in camera space) so a panel halfW cm wide around it stays inside the view. */
+  private keepInView(p: vec3, halfW: number): vec3 {
+    const cam = WorldCameraFinderProvider.getInstance()
+    const camComp = cam ? cam.getComponent() : null
+    if (!camComp) return p
+    const camT = camComp.getSceneObject().getTransform()
+    const local = camT.getInvertedWorldTransform().multiplyPoint(p)
+    const depth = -local.z
+    if (depth <= 1e-3) return p
+    const edge = depth * Math.tan(camComp.fov / 2) * camComp.aspect - halfW - 1
+    if (edge <= 0) return p
+    const x = Math.max(-edge, Math.min(edge, local.x))
+    return camT.getWorldTransform().multiplyPoint(new vec3(x, local.y, local.z))
+  }
+
+  /** True if the point sits above the middle of the wearer's view (camera space, +Y is up). */
+  private isAboveViewCentre(p: vec3): boolean {
+    const cam = WorldCameraFinderProvider.getInstance()
+    const camComp = cam ? cam.getComponent() : null
+    if (!camComp) return false
+    return camComp.getSceneObject().getTransform().getInvertedWorldTransform().multiplyPoint(p).y > 0
+  }
+
   private ringRadius(id: string): number {
     const def = holdById(id)
     return def ? HOLD_SIZE[def.type].ringR : 9

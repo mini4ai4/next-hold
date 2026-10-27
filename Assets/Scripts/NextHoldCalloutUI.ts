@@ -30,6 +30,7 @@ const LABEL_SCALE = 1.3
 const LABEL_OUTLINE = 0.3
 const LABEL_OUTLINE_COLOR = new vec4(0.08, 0.1, 0.09, 0.85)
 const WHY_W = 40
+const WHY_SCALE = 1.5
 
 @component
 export class NextHoldCalloutUI extends BaseScriptComponent {
@@ -115,6 +116,7 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     this.whyText = textSO.createComponent("Component.Text") as Text
     this.whyText.depthTest = true
     applyTextRole(this.whyText, "Headline2")
+    this.whyText.size *= WHY_SCALE   // read at arm's length on a wall, mid-climb: bigger than a panel headline
     this.whyText.textFill.color = this.whyColor
     this.whyText.horizontalAlignment = HorizontalAlignment.Center
     this.whyText.verticalAlignment = VerticalAlignment.Center
