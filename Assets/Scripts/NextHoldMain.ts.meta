@@ -73,7 +73,7 @@
     - '// @input AssignableType_3 typePicker {"hint":"Setup-mode type picker UI"}'
     - '// @input AssignableType_4 callouts {"hint":"Suggestion label + why-line UI"}'
     - '// @input AssignableType_5 offViewArrow {"hint":"Off-view arrow + chime"}'
-    - '// @input Asset.Material ringMaterial {"hint":"Unlit material, cloned for every ring and marker"}'
+    - '// @input Asset.Material ringMaterial {"hint":"Unlit material with Base Texture enabled (NextHoldTexturedUnlit), cloned for every ring and marker"}'
     - '// @ui {"widget":"group_end"}'
     - '// @ui {"widget":"separator"}'
     - '// @ui {"widget":"group_start", "label":"Settings"}'

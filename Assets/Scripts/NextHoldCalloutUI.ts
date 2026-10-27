@@ -25,6 +25,10 @@ function applyTextRole(t: Text, role: TextRole, distanceCm: number = 110): void 
 }
 
 const LABEL_W = 16
+/** the label is the one word read mid-climb: a step above the largest UI role */
+const LABEL_SCALE = 1.3
+const LABEL_OUTLINE = 0.3
+const LABEL_OUTLINE_COLOR = new vec4(0.08, 0.1, 0.09, 0.85)
 const WHY_W = 40
 
 @component
@@ -73,11 +77,17 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     this.labelText = this.labelRoot.createComponent("Component.Text") as Text
     this.labelText.depthTest = true
     applyTextRole(this.labelText, "HeadlineXL")
+    this.labelText.size *= LABEL_SCALE
     this.labelText.horizontalAlignment = HorizontalAlignment.Center
     this.labelText.verticalAlignment = VerticalAlignment.Center
     this.labelText.horizontalOverflow = HorizontalOverflow.Overflow
     this.labelText.verticalOverflow = VerticalOverflow.Overflow
     this.labelText.layoutRect = Rect.create(-LABEL_W / 2, LABEL_W / 2, -1.6, 1.6)
+    // a dark outline keeps the label crisp over the light ply; on the
+    // additive display it simply drops out and the light text remains
+    this.labelText.outlineSettings.enabled = true
+    this.labelText.outlineSettings.size = LABEL_OUTLINE
+    this.labelText.outlineSettings.fill.color = LABEL_OUTLINE_COLOR
     this.labelRoot.enabled = false
 
     // ── WhyLine: a dark plate behind the text so it reads over the wall ──
@@ -178,6 +188,8 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     this.labelOpacity = a
     const c = this.labelColor
     this.labelText.textFill.color = new vec4(c.x, c.y, c.z, c.w * a)
+    const o = LABEL_OUTLINE_COLOR
+    this.labelText.outlineSettings.fill.color = new vec4(o.x, o.y, o.z, o.w * a)
     this.labelRoot.enabled = a > 0.01
   }
 

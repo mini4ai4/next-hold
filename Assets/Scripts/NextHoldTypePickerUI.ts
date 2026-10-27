@@ -27,8 +27,11 @@ function applyTextRole(t: Text, role: TextRole, distanceCm: number = 110): void 
 }
 
 const LAYOUT_Z_LIFT = 0.02
-const BUTTON_LABEL_Z = 0.08
+/** in front of the prism's face, including its 0.3 cm hover pop */
+const BUTTON_LABEL_Z = 1.6
 const TYPES = ["jug", "crimp", "pinch", "pocket", "sloper"]
+/** same UI Kit look as the control row (SnapOS 3 prism buttons) */
+const BUTTON_VARIANT = {theme: "SnapOS3", shape: "Rectangle", style: "Prism"}
 
 @component
 export class NextHoldTypePickerUI extends BaseScriptComponent {
@@ -106,6 +109,7 @@ export class NextHoldTypePickerUI extends BaseScriptComponent {
       this.flexChild(content, {w: this.buttonWidth, h: this.buttonHeight}, (so) => {
         so.name = "TypeButton_" + type
         const btn = so.createComponent(Button.getTypeName()) as Button
+        btn.setVariant(BUTTON_VARIANT)
         btn.size = new vec3(this.buttonWidth, this.buttonHeight, 1)
         btn.setIsToggleable(true)
         btn.onInitialized.add(() => this.markInit())

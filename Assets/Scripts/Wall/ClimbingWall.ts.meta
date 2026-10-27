@@ -30,6 +30,7 @@
   ScriptInputsHidden:
     addColliders: false
     material: false
+    texturedMaterial: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -40,10 +41,12 @@
     []
   DefaultScriptInputs:
     - material: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      texturedMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
       addColliders: true
   ScriptTypes:
     -
       {}
   InputLines:
     - '// @input Asset.Material material {"hint":"vertexBaseColorMaterial (SimpleVertexBaseColor package)"}'
+    - '// @input Asset.Material texturedMaterial {"hint":"Unlit material with Base Texture enabled (NextHoldTexturedUnlit): ply face and hold shadows"}'
     - '// @input bool addColliders = true {"hint":"Add a box collider per hold, sized to its ring, for pinch targets"}'

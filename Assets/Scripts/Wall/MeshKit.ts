@@ -22,18 +22,23 @@ export type V3 = [number, number, number];
 
 // Key light from upper left-front, toward the wall face (+Z faces the user).
 const LIGHT: V3 = normalize([-0.35, 0.6, 0.72]);
-const AMBIENT = 0.55;
+// Half vector for a viewer straight in front of the wall: a soft resin sheen.
+const HALF: V3 = normalize([LIGHT[0], LIGHT[1], LIGHT[2] + 1]);
 
-function normalize(v: V3): V3 {
+export function normalize(v: V3): V3 {
   const l = Math.hypot(v[0], v[1], v[2]) || 1;
   return [v[0] / l, v[1] / l, v[2] / l];
 }
 
+/** Gym lighting baked into vertex colours: sky-ish ambient, wrapped key light, soft sheen. */
 export function shade(c: RGBA, n: V3, bake: boolean): RGBA {
   if (!bake) return c;
-  const d = Math.max(0, n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2]);
-  const k = AMBIENT + (1 - AMBIENT) * d;
-  return [c[0] * k, c[1] * k, c[2] * k, c[3]];
+  const nl = n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2];
+  const d = Math.max(0, (nl + 0.25) / 1.25);
+  const k = 0.5 + 0.1 * n[1] + 0.45 * d;
+  const nh = Math.max(0, n[0] * HALF[0] + n[1] * HALF[1] + n[2] * HALF[2]);
+  const spec = 0.16 * Math.pow(nh, 28);
+  return [Math.min(1, c[0] * k + spec), Math.min(1, c[1] * k + spec), Math.min(1, c[2] * k + spec), c[3]];
 }
 
 export class Geo {
@@ -265,6 +270,67 @@ export function addDisc(g: Geo, r: number, segments: number, color: RGBA, z = 0)
     g.vert([r * Math.cos(t), r * Math.sin(t), z], [0, 0, 1], color);
   }
   for (let i = 0; i < segments; i++) g.tri(ctr, ring + i, ring + i + 1);
+}
+
+// ---------------------------------------------------------------- textured overlays
+/** position(3) normal(3) uv(2): for meshes painted by a ProceduralTextures profile row */
+export const UV_LAYOUT = [
+  { name: "position", components: 3 },
+  { name: "normal", components: 3, normalized: true },
+  { name: "texture0", components: 2 },
+];
+
+export class UVGeo {
+  v: number[] = [];
+  i: number[] = [];
+  count = 0;
+
+  vert(p: V3, u: number, v: number): number {
+    this.v.push(p[0], p[1], p[2], 0, 0, 1, u, v);
+    return this.count++;
+  }
+
+  tri(a: number, b: number, c: number) {
+    this.i.push(a, b, c);
+  }
+}
+
+/**
+ * Flat annulus facing +Z with U = 0 at rIn and U = 1 at rOut (V fixed), so a
+ * profile row paints it radially. sx / sy stretch it into an ellipse, `rot`
+ * spins it (radians), `c` offsets it.
+ */
+export function addProfileAnnulus(
+  g: UVGeo, rIn: number, rOut: number, segments: number, v: number,
+  c: V3 = [0, 0, 0], sx = 1, sy = 1, rot = 0,
+) {
+  const start = g.count;
+  const cr = Math.cos(rot), sr = Math.sin(rot);
+  const at = (r: number, t: number): V3 => {
+    const x = r * Math.cos(t) * sx, y = r * Math.sin(t) * sy;
+    return [c[0] + x * cr - y * sr, c[1] + x * sr + y * cr, c[2]];
+  };
+  for (let k = 0; k <= segments; k++) {
+    const t = (k / segments) * Math.PI * 2;
+    g.vert(at(rIn, t), 0, v);
+    g.vert(at(rOut, t), 1, v);
+  }
+  for (let k = 0; k < segments; k++) {
+    const in0 = start + k * 2, out0 = in0 + 1, in1 = in0 + 2, out1 = in0 + 3;
+    g.tri(in0, out0, out1);
+    g.tri(in0, out1, in1);
+  }
+}
+
+/** Flat textured quad facing +Z: corners (x0,y0)-(x1,y1), UV rect (u0,v0)-(u1,v1). */
+export function addUVQuad(
+  g: UVGeo, x0: number, y0: number, x1: number, y1: number, z: number,
+  u0: number, v0: number, u1: number, v1: number,
+) {
+  const a = g.vert([x0, y0, z], u0, v0), b = g.vert([x1, y0, z], u1, v0);
+  const c = g.vert([x1, y1, z], u1, v1), d = g.vert([x0, y1, z], u0, v1);
+  g.tri(a, b, c);
+  g.tri(a, c, d);
 }
 
 /** Flat arrow in the XY plane facing +Z, pointing +X, tip at the origin. */

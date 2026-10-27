@@ -62,7 +62,7 @@ export class NextHoldMain extends BaseScriptComponent {
   offViewArrow: NextHoldOffViewArrow
 
   @input
-  @hint("Unlit material, cloned for every ring and marker")
+  @hint("Unlit material with Base Texture enabled (NextHoldTexturedUnlit), cloned for every ring and marker")
   ringMaterial: Material
   @ui.group_end
 

@@ -38,11 +38,15 @@ function applyTextRole(t: Text, role: TextRole, distanceCm: number = 110): void 
 }
 
 const LAYOUT_Z_LIFT = 0.02
-const BUTTON_LABEL_Z = 0.08
+/** in front of the prism's face, including its 0.3 cm hover pop */
+const BUTTON_LABEL_Z = 1.6
 /** Text uses the 110 cm scale; the row is ~100 cm away, so it reads a little larger. */
 const VIEW_DISTANCE_CM = 110
 
 const LIMB_ORDER = ["LH", "RH", "LF", "RF"]
+
+/** UI Kit's current Specs look (SnapOS 3 prism buttons); set before the button initialises */
+const BUTTON_VARIANT = {theme: "SnapOS3", shape: "Rectangle", style: "Prism"}
 
 @component
 export class NextHoldControlRowUI extends BaseScriptComponent {
@@ -222,6 +226,7 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
     this.flexChild(parent, {w, h}, (so) => {
       so.name = name
       btn = so.createComponent(Button.getTypeName()) as Button
+      btn.setVariant(BUTTON_VARIANT)
       btn.size = new vec3(w, h, 1)
       btn.setIsToggleable(true)
       text = this.addButtonLabel(so, label, w - 0.5, role)

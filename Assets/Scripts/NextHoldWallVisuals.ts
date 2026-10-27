@@ -6,8 +6,14 @@
 // Main pushes state in with apply(); this class never scores or decides.
 // Plain class (not a component): Main creates it once in onAwake.
 
-import {GEO_LAYOUT, Geo, addDisc, addRing} from "./Wall/MeshKit"
+//
+// Look: every overlay is a flat annulus painted by a ProceduralTextures
+// profile row (crisp core + soft halo), alpha-blended over the wall. Ring hue
+// lives in mainPass.baseColor (tests classify it); the halo is in the texture.
+
+import {UVGeo, UV_LAYOUT, addProfileAnnulus} from "./Wall/MeshKit"
 import {HOLDS, HOLD_SIZE, HoldDef} from "./Wall/WallLayout"
+import {GLOW_PROFILE, HOVER_PROFILE, ProfileRow, RING_PROFILE, overlayMaterial, profileV} from "./Wall/ProceduralTextures"
 
 export type RingColour = "green" | "yellow" | "red"
 
@@ -28,18 +34,20 @@ export interface OverlayColours {
   red: vec4
 }
 
-const RING_W = 1.6          // ring band width, cm
+const RING_W = RING_PROFILE.core // crisp ring band width, cm (1.6)
 const RING_Z = 0.4          // just proud of the wall face
-const GLOW_W = 2.6          // glow band just outside the suggested ring
-const GLOW_OFFSET = RING_W / 2 + 1.3
 const RING_DIM = 0.8       // non-suggested rings: a little dimmer than the glowing one
+const SEG = 64
 const MARKER_R = 2.6
-const MARKER_DIM = 0.38     // "small dim marker"
-const MARKER_SELECTED = 0.75
+const MARKER_DIM = 0.42     // "small dim marker"
+const MARKER_SELECTED = 0.95
 const HOVER_COLOR = new vec4(0.95, 0.97, 1.0, 1)
+/** glow breathing: alpha range of the suggestion's halo */
+const GLOW_MIN = 0.6
+const GLOW_MAX = 1.0
 
-function toMesh(g: Geo): RenderMesh {
-  const b = new MeshBuilder(GEO_LAYOUT)
+function toMesh(g: UVGeo): RenderMesh {
+  const b = new MeshBuilder(UV_LAYOUT)
   b.topology = MeshTopology.Triangles
   b.indexType = MeshIndexType.UInt16
   b.appendVerticesInterleaved(g.v)
@@ -80,9 +88,8 @@ export class NextHoldWallVisuals {
       this.rings[h.id] = so
     }
 
-    const disc = new Geo()
-    disc.bake = false
-    addDisc(disc, MARKER_R, 28, [1, 1, 1, 1])
+    const disc = new UVGeo()
+    addProfileAnnulus(disc, 0, MARKER_R, 40, profileV(ProfileRow.Marker))
     const discMesh = toMesh(disc)
     for (const limb of ["LH", "RH", "LF", "RF"]) {
       const m = this.makeVisual("Marker_" + limb, discMesh)
@@ -90,14 +97,16 @@ export class NextHoldWallVisuals {
       this.markers[limb] = m
     }
 
-    const glowVis = this.makeVisual("SuggestGlow", this.ringMesh(10, GLOW_W, GLOW_OFFSET))
+    const glowMeshes: {[r: string]: RenderMesh} = {}
+    const glowVis = this.makeVisual("SuggestGlow", this.glowMesh(glowMeshes, 10))
     glowVis.so.enabled = false
-    this.glow = {...glowVis, meshes: {}, rmv: glowVis.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual}
+    this.glow = {...glowVis, meshes: glowMeshes, rmv: glowVis.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual}
 
-    const hoverVis = this.makeVisual("HoverRing", this.ringMesh(12, 0.6, 2.4))
+    const hoverMeshes: {[r: string]: RenderMesh} = {}
+    const hoverVis = this.makeVisual("HoverRing", this.hoverMesh(hoverMeshes, 12))
     hoverVis.mat.mainPass.baseColor = HOVER_COLOR
     hoverVis.so.enabled = false
-    this.hover = {so: hoverVis.so, rmv: hoverVis.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual, meshes: {}}
+    this.hover = {so: hoverVis.so, rmv: hoverVis.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual, meshes: hoverMeshes}
   }
 
   apply(s: OverlayState): void {
@@ -113,9 +122,10 @@ export class NextHoldWallVisuals {
     const glowColour = s.glowHoldId ? s.rings[s.glowHoldId] : null
     if (glowHold && glowColour) {
       const r = HOLD_SIZE[glowHold.type].ringR
-      this.glow.rmv.mesh = this.cachedRing(this.glow.meshes, r, GLOW_W, GLOW_OFFSET)
+      this.glow.rmv.mesh = this.glowMesh(this.glow.meshes, r)
       this.glow.so.getTransform().setLocalPosition(this.wallToLocal(glowHold.x, glowHold.y, RING_Z + 0.05))
       this.glow.so.enabled = true
+      this.setGlowColour(glowColour, GLOW_MAX)
     } else {
       this.glow.so.enabled = false
     }
@@ -140,8 +150,14 @@ export class NextHoldWallVisuals {
     if (!this.state || !this.glow.so.enabled || !this.state.glowHoldId) return
     const c = this.state.rings[this.state.glowHoldId]
     if (!c) return
-    const k = 0.55 + 0.4 * (0.5 + 0.5 * Math.sin(time * Math.PI * 2 * 0.8))
-    this.glow.mat.mainPass.baseColor = scaled(this.colours[c], k)
+    const breath = 0.5 + 0.5 * Math.sin(time * Math.PI * 2 * 0.8)
+    this.setGlowColour(c, GLOW_MIN + (GLOW_MAX - GLOW_MIN) * breath)
+  }
+
+  /** the glow keeps the ring's full hue; it breathes in opacity, not in colour */
+  private setGlowColour(c: RingColour, alpha: number): void {
+    const col = this.colours[c]
+    this.glow.mat.mainPass.baseColor = new vec4(col.x, col.y, col.z, alpha)
   }
 
   setHover(id: string | null): void {
@@ -151,7 +167,7 @@ export class NextHoldWallVisuals {
       return
     }
     const r = HOLD_SIZE[h.type].ringR
-    this.hover.rmv.mesh = this.cachedRing(this.hover.meshes, r + 2.4, 0.6, 0)
+    this.hover.rmv.mesh = this.hoverMesh(this.hover.meshes, r)
     this.hover.so.getTransform().setLocalPosition(this.wallToLocal(h.x, h.y, RING_Z + 0.1))
     this.hover.so.enabled = true
   }
@@ -176,18 +192,31 @@ export class NextHoldWallVisuals {
     return null
   }
 
-  private ringMesh(r: number, width: number = RING_W, offset: number = 0): RenderMesh {
-    return this.cachedRing(this.ringMeshes, r, width, offset)
+  /** ring with its crisp core centred on radius r, halo inside and out */
+  private ringMesh(r: number): RenderMesh {
+    const {inner, core, outer} = RING_PROFILE
+    const rIn = r - RING_W / 2 - inner
+    return this.cachedAnnulus(this.ringMeshes, rIn, rIn + inner + core + outer, ProfileRow.Ring)
   }
 
-  /** ring centred on radius r + offset, `width` wide */
-  private cachedRing(cache: {[k: string]: RenderMesh}, r: number, width: number, offset: number): RenderMesh {
-    const key = r + "/" + width + "/" + offset
+  /** suggestion glow: bloom and target ring outside the ring of radius r */
+  private glowMesh(cache: {[k: string]: RenderMesh}, r: number): RenderMesh {
+    const rIn = r + RING_W / 2
+    return this.cachedAnnulus(cache, rIn, rIn + GLOW_PROFILE.span, ProfileRow.Glow)
+  }
+
+  /** aim highlight: thin ring 2.4 cm outside the ring of radius r */
+  private hoverMesh(cache: {[k: string]: RenderMesh}, r: number): RenderMesh {
+    const {span, coreAt, coreW} = HOVER_PROFILE
+    const rIn = r + 2.4 - (coreAt + coreW / 2)
+    return this.cachedAnnulus(cache, rIn, rIn + span, ProfileRow.Hover)
+  }
+
+  private cachedAnnulus(cache: {[k: string]: RenderMesh}, rIn: number, rOut: number, row: ProfileRow): RenderMesh {
+    const key = rIn + "/" + rOut
     if (!cache[key]) {
-      const g = new Geo()
-      g.bake = false
-      const mid = r + offset
-      addRing(g, mid - width / 2, mid + width / 2, 48, [1, 1, 1, 1])
+      const g = new UVGeo()
+      addProfileAnnulus(g, Math.max(0, rIn), rOut, SEG, profileV(row))
       cache[key] = toMesh(g)
     }
     return cache[key]
@@ -198,8 +227,7 @@ export class NextHoldWallVisuals {
     so.setParent(this.group)
     const rmv = so.createComponent("Component.RenderMeshVisual") as RenderMeshVisual
     rmv.mesh = mesh
-    const mat = this.material.clone()
-    mat.mainPass.baseColor = new vec4(1, 1, 1, 1)
+    const mat = overlayMaterial(this.material, new vec4(1, 1, 1, 1))
     rmv.mainMaterial = mat
     return {so, mat}
   }
