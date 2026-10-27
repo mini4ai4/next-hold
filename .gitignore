@@ -22,3 +22,6 @@ Packages/AiPreviewAgentInspect.lspkg
 Packages/AiPreviewAgentInspect.lspkg.meta
 Packages/AiPreviewAgentInteract.lspkg
 Packages/AiPreviewAgentInteract.lspkg.meta
+
+# signing keys never go in the repo
+*.pem
