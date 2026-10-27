@@ -20,3 +20,5 @@ tempAssetGen/
 .virtual-scene.json
 Packages/AiPreviewAgentInspect.lspkg
 Packages/AiPreviewAgentInspect.lspkg.meta
+Packages/AiPreviewAgentInteract.lspkg
+Packages/AiPreviewAgentInteract.lspkg.meta
