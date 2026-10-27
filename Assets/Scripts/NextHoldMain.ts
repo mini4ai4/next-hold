@@ -34,6 +34,9 @@ import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/
 
 /** half the why-line plate: WHY_W (40 cm) in NextHoldCalloutUI plus its padding */
 const WHY_HALF_W = 21.5
+/** half the type picker: 13 cm buttons + padding wide; title, five 5 cm buttons, gaps and padding tall */
+const PICKER_HALF_W = 8
+const PICKER_HALF_H = 20.5
 
 export type Mode = "climb" | "setup"
 
@@ -177,7 +180,9 @@ export class NextHoldMain extends BaseScriptComponent {
       const right = h.x < 160
       const px = right ? h.x + ringR + 9.5 : h.x - ringR - 9.5
       const py = Math.min(275, Math.max(25, h.y))
-      this.typePicker.showFor(this.wall.wallToWorld(px, py, 12), this.wallRot(), this.holdTypes[id] || null)
+      // the picker is ~40 cm tall: keep all five types inside the view, not just its centre
+      this.typePicker.showFor(this.keepInView(this.wall.wallToWorld(px, py, 12), PICKER_HALF_W, PICKER_HALF_H),
+        this.wallRot(), this.holdTypes[id] || null)
       return
     }
     // climb mode
@@ -295,8 +300,8 @@ export class NextHoldMain extends BaseScriptComponent {
   // ── helpers ───────────────────────────────────────────────────────────────
   private reach(): number { return this.climberHeightCm * 0.44 }
   private wallRot(): quat { return this.wall.getTransform().getWorldRotation() }
-  /** Slide a point sideways (in camera space) so a panel halfW cm wide around it stays inside the view. */
-  private keepInView(p: vec3, halfW: number): vec3 {
+  /** Slide a point (in camera space) so a panel halfW x halfH cm around it stays inside the view. */
+  private keepInView(p: vec3, halfW: number, halfH = 0): vec3 {
     const cam = WorldCameraFinderProvider.getInstance()
     const camComp = cam ? cam.getComponent() : null
     if (!camComp) return p
@@ -304,10 +309,12 @@ export class NextHoldMain extends BaseScriptComponent {
     const local = camT.getInvertedWorldTransform().multiplyPoint(p)
     const depth = -local.z
     if (depth <= 1e-3) return p
-    const edge = depth * Math.tan(camComp.fov / 2) * camComp.aspect - halfW - 1
-    if (edge <= 0) return p
-    const x = Math.max(-edge, Math.min(edge, local.x))
-    return camT.getWorldTransform().multiplyPoint(new vec3(x, local.y, local.z))
+    const tanV = Math.tan(camComp.fov / 2)
+    const edgeX = depth * tanV * camComp.aspect - halfW - 1
+    const edgeY = depth * tanV - halfH - 1
+    const x = edgeX > 0 ? Math.max(-edgeX, Math.min(edgeX, local.x)) : local.x
+    const y = edgeY > 0 ? Math.max(-edgeY, Math.min(edgeY, local.y)) : local.y
+    return camT.getWorldTransform().multiplyPoint(new vec3(x, y, local.z))
   }
 
   /** True if the point sits above the middle of the wearer's view (camera space, +Y is up). */
