@@ -71,7 +71,7 @@ Every action is a single pinch (in the preview, a mouse click).
 
 ## Done criteria
 Each one can be checked in Lens Studio's preview.
-1. When the Lens opens in climb mode, every marked hold shows exactly one ring (green, yellow or red). Each colour matches the reference rule (`devpost/scoring-reference`) for the selected limb from the preset position.
+1. When the Lens opens in climb mode, every marked hold that no limb is on shows exactly one ring (green, yellow or red). Each colour matches the reference rule (`devpost/scoring-reference`) for the selected limb from the preset position. The four occupied holds show only the dim position marker, no ring (the reference doesn't score them).
 2. Pinching a hold moves the selected limb there. Its dim position marker jumps to that hold, all rings recompute in the same frame, and the limb with the best next move is auto-selected on the toggle row.
 3. A hold beyond reach is always red. A jug within 80% of reach, above the centre of mass, with both feet on holds, is green.
 4. The single suggested hold glows with the limb label (e.g. "R hand"), and the label fades after about 2 s. If that hold is outside the view, an arrow appears at that edge.
