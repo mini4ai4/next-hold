@@ -1,4 +1,4 @@
-# Next Hold — a climbing coach on SPECS (Roma's idea, 27.10, msg 14226)
+# Next Hold — a climbing coach on SPECS
 
 ## The one spatial moment
 You're on the wall, both hands busy, and you can't see the route from where you hang. The glasses colour every hold you could go to next — green (secure for you, now), yellow (possible), red (risky) — based on **where your body is right now** and **how far you can actually reach**. The next suggested move lights up with the limb to use: "right hand → here".
