@@ -11,7 +11,7 @@ The colour isn't a guess about the route. It's worked out from where your body i
 - **Reach:** how far the hold is from the shoulder (or hip) of the limb that would move, against your own reach. Past it, the hold is always red.
 - **Balance:** a hand move is better with both feet on and the new hold above your centre of mass; crossing your body costs.
 
-Move a hand or a foot and every ring recolours in the same frame, and the Lens picks the best next move across all four limbs. Pinch "?" and then a ring, and it tells you why in plain words: "good jug, but a long reach".
+Move a hand or a foot and every ring recolours in the same frame, and the Lens picks the best next move across all four limbs. Pinch "?" and then a ring, and it tells you why in plain words: "PINCH HOLD · LONG REACH".
 
 ## Who it's for
 Indoor boulderers, especially newer ones, who stall halfway up a problem because they can't see their options from where they hang. A phone can't help there: you'd have to let go of the wall to look at it, and a beta video has to be studied before you start, not while you're on the problem.

@@ -109,14 +109,16 @@ function scoreHold({ limb, holdId, holds, holdTypes, position, reach, top = null
   const gf = goalFactor(limb, target, position, holds, top, reach, com);
   const rank = score * gf;
 
-  // human-readable "why" (shown only on the suggested hold / on ask)
+  // human-readable "why" (shown only on ask), in capitals: "PINCH HOLD · LONG REACH".
+  // The type is always written as "<TYPE> HOLD", so "pinch" can't be read as a
+  // gesture instruction.
   const why = [];
-  why.push(quality >= 0.9 ? "good jug" : holdTypes[holdId]);
-  if (rf === 0) why.push("out of reach");
-  else if (rf < 1) why.push("a long reach");
-  if (bf < 1) why.push("committing balance");
+  why.push(String(holdTypes[holdId] || "unmarked").toUpperCase() + " HOLD");
+  if (rf === 0) why.push("OUT OF REACH");
+  else if (rf < 1) why.push("LONG REACH");
+  if (bf < 1) why.push("COMMITTING BALANCE");
 
-  return { holdId, limb, score, colour: colourFor(score), rank, why: why.join(", "),
+  return { holdId, limb, score, colour: colourFor(score), rank, why: why.join(" · "),
            parts: { quality, reachFactor: rf, balanceFactor: bf, goalFactor: gf, dist: d } };
 }
 

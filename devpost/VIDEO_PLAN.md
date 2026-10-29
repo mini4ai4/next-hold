@@ -12,7 +12,7 @@ Corner note on preview scenes: "Lens Studio preview. Hold recognition and body p
 | 0 | Preview, eye-level on the wall: rings fade in on the holds, one ring pulses, "R hand" appears beside it. | "Halfway up the wall, your forearms are burning, and you can't see where to go next." |
 | 1 | Slow look up the wall; green, yellow and red rings; the suggested hold glows. | "You can't step back to look, and every second you hang there costs grip. Next Hold colours every hold you can reach from where you are right now: green, a secure grip for you; red, out of reach." |
 | 2 | Pinch RH, pinch the glowing hold: the hand marker jumps, every ring recolours, LF auto-selects. | "Move a hand and everything recomputes at once, and it picks the best next move across all four limbs." |
-| 3 | Pinch "?", then a yellow ring: the line "good jug, but a long reach". | "Ask why, and it tells you in plain words." |
+| 3 | Pinch "?", then the ring on the pinch hold h09: the line "PINCH HOLD · LONG REACH". | "Ask why, and it tells you in plain words." |
 | 4 | Setup mode: pinch a hold, the type picker appears, pick "crimp", back to climb, the ring changes. | "On real glasses it would recognise the holds. In the preview, you mark them yourself, which is the stand-in the rules suggest." |
 | 5 | The brief in the editor (`devpost/design-brief.md`): the one spatial moment, the done criteria. | "We planned it with the plan-lens skill: one spatial moment, five things the Lens has to do, each checkable." |
 | 6 | Terminal and editor: CLAD building; then the LEAF run, 6 of 6 pass; the scoring tests, 18 of 18. | "CLAD built it through the Lens Studio MCP, and every done criterion has a LEAF test. All six pass." |

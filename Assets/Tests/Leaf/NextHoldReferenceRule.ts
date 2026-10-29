@@ -90,12 +90,12 @@ export class ReferenceRule {
       const progress = Math.max(-1, Math.min(1, ((t.y - from.y) + (dt(from) - dt(t))) / (2 * this.reach)))
       gf = 0.75 + 0.25 * progress
     }
-    const why: string[] = [q >= 0.9 ? "good jug" : this.types[holdId]]
-    if (rf === 0) why.push("out of reach")
-    else if (rf < 1) why.push("a long reach")
-    if (bf < 1) why.push("committing balance")
+    const why: string[] = [String(this.types[holdId] || "unmarked").toUpperCase() + " HOLD"]
+    if (rf === 0) why.push("OUT OF REACH")
+    else if (rf < 1) why.push("LONG REACH")
+    if (bf < 1) why.push("COMMITTING BALANCE")
     const colour: RefColour = s >= 0.7 ? "green" : s >= 0.4 ? "yellow" : "red"
-    return {holdId, limb, score: s, colour, rank: s * gf, why: why.join(", "), dist: d, reachFactor: rf, balanceFactor: bf, goalFactor: gf}
+    return {holdId, limb, score: s, colour, rank: s * gf, why: why.join(" · "), dist: d, reachFactor: rf, balanceFactor: bf, goalFactor: gf}
   }
 
   /** Every hold no limb is on, scored for `limb`. */

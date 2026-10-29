@@ -1,7 +1,8 @@
 // NextHoldCalloutUI — the two pieces of text that appear on the wall:
 //   SuggestLabel: the limb label beside the suggested hold ("R hand"); it
 //                 fades after about 2 s (brief: "When things show").
-//   WhyLine:      that hold's "why" line, only when asked for with '?'.
+//   WhyLine:      that hold's "why" line, only when asked for with '?', in
+//                 capitals: "PINCH HOLD · LONG REACH".
 //
 // Owns: the text widgets, the label's fade timer. Passive view.
 // Main -> UI: showSuggestion(), hideSuggestion(), showWhy(), hideWhy().
@@ -120,7 +121,8 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     this.whyText.textFill.color = this.whyColor
     this.whyText.horizontalAlignment = HorizontalAlignment.Center
     this.whyText.verticalAlignment = VerticalAlignment.Center
-    this.whyText.horizontalOverflow = HorizontalOverflow.Overflow
+    // capitals run wide ("CRIMP HOLD · OUT OF REACH · COMMITTING BALANCE"): shrink a long line to the plate, never past it
+    this.whyText.horizontalOverflow = HorizontalOverflow.Shrink
     this.whyText.verticalOverflow = VerticalOverflow.Overflow
     this.whyText.layoutRect = Rect.create(-WHY_W / 2, WHY_W / 2, -1.5, 1.5)
     flex.addItems([item])

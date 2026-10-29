@@ -82,5 +82,19 @@ const farTop = S.scoreHold({ limb: "RH", holdId: "far", holds, holdTypes, positi
 check("out of reach stays red and ranks 0, even as the top hold",
   farTop.colour === "red" && farTop.score === 0 && farTop.rank === 0 && farTop.parts.goalFactor > 0.75, farTop);
 
+// ---- the "why" line wording --------------------------------------------------
+// The hold type is written "<TYPE> HOLD" in capitals, so "pinch" reads as a hold
+// type, never as a gesture instruction ("pinch this").
+check("why for a jug in comfortable reach: \"JUG HOLD\"", upRes.why === "JUG HOLD", upRes.why);
+const wHolds = { ...holds, pin: { x: 138, y: 201 } }; // ~70 cm from the RH shoulder: a stretch
+const wTypes = { ...holdTypes, pin: "pinch" };
+const pinRes = S.scoreHold({ limb: "RH", holdId: "pin", holds: wHolds, holdTypes: wTypes, position, reach: REACH });
+check("why for a pinch at a stretch: \"PINCH HOLD · LONG REACH\"", pinRes.why === "PINCH HOLD · LONG REACH", pinRes.why);
+check("why for the far cross-body crimp: \"CRIMP HOLD · OUT OF REACH · COMMITTING BALANCE\"",
+  sideRes.why === "CRIMP HOLD · OUT OF REACH · COMMITTING BALANCE", sideRes.why);
+const WHY_FORM = /^[A-Z]+ HOLD( · (LONG REACH|OUT OF REACH|COMMITTING BALANCE))*$/;
+check("every why is capitals in the form \"<TYPE> HOLD · ...\" (no lowercase \"pinch\")",
+  ev.results.concat(gEv.results, [pinRes, lowRes]).every((r) => WHY_FORM.test(r.why)));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -44,9 +44,10 @@ export class C5AskWhyScenario extends Scenario {
     if (main.isWhyVisible()) errs.push(`pinch on occupied ${occ} showed a why line`)
     if (!samePosition(main.getPosition() as RefPosition, pos0)) errs.push(`pinch on occupied ${occ} while armed moved a limb: ${fmtPos(main.getPosition() as RefPosition)}`)
 
-    // pick a ringed hold whose reference why says "a long reach" (the brief's example), else any ringed hold
+    // pick a ringed hold whose reference why says "LONG REACH" (the brief's example, in the
+    // review's wording: was "a long reach"), else any ringed hold
     const ev = ref.evaluate(sel0 as any, pos0)
-    const target = ev.results.filter((r) => r.why.indexOf("a long reach") >= 0)[0] || ev.results[0]
+    const target = ev.results.filter((r) => r.why.indexOf("LONG REACH") >= 0)[0] || ev.results[0]
     if (!mustFind("Ring_" + target.holdId).enabled) errs.push(`setup: ${target.holdId} has no ring`)
     const markers0: {[l: string]: string | null} = {}
     for (const l of REF_LIMBS) markers0[l] = main.getMarkerHold(l as any)

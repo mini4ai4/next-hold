@@ -67,6 +67,16 @@ check("goalFactor stays within 0.5..1", gEv.results.every((r) => r.parts.goalFac
 const farTop = P.scoreHold({ limb: "RH", holdId: "far", holds, holdTypes, position, reach: REACH, top: "far" });
 check("out of reach stays red and ranks 0, even as the top hold",
   farTop.colour === "red" && farTop.score === 0 && farTop.rank === 0 && farTop.parts.goalFactor > 0.75, farTop);
+// the reference's why-wording checks, against the port
+check("why for a jug in comfortable reach: \"JUG HOLD\"", upRes.why === "JUG HOLD", upRes.why);
+const pinRes = P.scoreHold({ limb: "RH", holdId: "pin", holds: { ...holds, pin: { x: 138, y: 201 } },
+  holdTypes: { ...holdTypes, pin: "pinch" }, position, reach: REACH });
+check("why for a pinch at a stretch: \"PINCH HOLD · LONG REACH\"", pinRes.why === "PINCH HOLD · LONG REACH", pinRes.why);
+check("why for the far cross-body crimp: \"CRIMP HOLD · OUT OF REACH · COMMITTING BALANCE\"",
+  sideRes.why === "CRIMP HOLD · OUT OF REACH · COMMITTING BALANCE", sideRes.why);
+const WHY_FORM = /^[A-Z]+ HOLD( · (LONG REACH|OUT OF REACH|COMMITTING BALANCE))*$/;
+check("every why is capitals in the form \"<TYPE> HOLD · ...\" (no lowercase \"pinch\")",
+  ev.results.concat(gEv.results, [pinRes, lowRes]).every((r) => WHY_FORM.test(r.why)));
 
 // ---- 2. port == reference on the real Lens wall ------------------------------
 const wHolds = {}, wTypes = {};
