@@ -23,7 +23,7 @@ import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {HOLDS} from "../../Scripts/Wall/WallLayout"
 import {
   activeRingBox, camera, checkArrowPointsAt, checkRowClearOfRing, checkWhyAgrees, eyeToWallCm, fmtBox, frames, getMain,
-  mustFind, notOnScreen, restorePreset,
+  makeReference, mustFind, notOnScreen, restorePreset, screenBoxOf,
 } from "./NextHoldTestKit"
 
 const SPEED = 8
@@ -89,10 +89,21 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
     want(!off.length, `not fully in view: ${off.join(", ")}`)
     checkRowClearOfRing(camera(), e, "on wall")
   }
-  /** session 18, scene 4: the −/+ row and badge 2 in the shot while the height changes */
+  /** session 18, scene 4: the −/+ row and badge 2 in the shot while the height changes; session 19:
+   *  and the whole glow of "up" (move 1) */
   const heightInShot = () => {
     const off = notOnScreen(["HeightDown", "HeightLabel", "HeightUp", "GhostNumber_2"], camera())
     want(!off.length, `not fully in view: ${off.join(", ")}`)
+    print(`[d1] ${key}: row ${fmtBox(screenBoxOf("HeightDown", camera()))} .. ${fmtBox(screenBoxOf("HeightUp", camera()))}, ` +
+      `badge 2 ${fmtBox(screenBoxOf("GhostNumber_2", camera()))}`)
+    glowInShot("up")
+  }
+  /** session 19: the glowing ring's whole glow is inside the frame */
+  const glowInShot = (id: string) => {
+    const g = activeRingBox(camera())
+    want(main.isRingGlowing(id), `the glow is not on ${id}`)
+    want(!!g && g.x0 >= 0 && g.x1 <= 1 && g.y0 >= 0 && g.y1 <= 1, `the glow of ${id} is cut by the frame (${fmtBox(g)})`)
+    print(`[d1] ${key}: glow of ${id} ${fmtBox(g)}`)
   }
   const badge2 = (hold: string, text: string) => {
     const b = badge(2)
@@ -168,6 +179,7 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
       want(pos.RH === "up" && pos.LH === "h09", `RH ${pos.RH}, LH ${pos.LH}; want up, h09`)
       want(main.getSelectedLimb() === "LF" && main.getLitLimb() === "LF", `selected ${main.getSelectedLimb()}, lit ${main.getLitLimb()}`)
       want(main.getHoldColour("lh") === "green" && main.isRingVisible("lh"), `lh for LF is ${main.getHoldColour("lh")}`)
+      glowInShot("lh")
       break
     case "s5-why":
       want(main.isWhyVisible() && main.getWhyHoldId() === "h11", `why-line shown ${main.isWhyVisible()} on ${main.getWhyHoldId()}`)
@@ -183,7 +195,7 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
     case "s6-back":
       want(!main.isOffViewArrowVisible(), "the off-view arrow stays after looking back")
       want(!main.isWhyVisible(), "the why-line is still open")
-      ground(240, 260)
+      ground(290, 310) // session 19: scenes 5-6 from 3.0 m
       break
     case "s7-picker":
       want(main.getMode() === "setup", `mode ${main.getMode()}`)

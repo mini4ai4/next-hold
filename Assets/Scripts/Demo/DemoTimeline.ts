@@ -53,16 +53,22 @@ const H09_X = -15.5 // h09 (115, 190)
 const WALL_PITCH = 18.9
 // scene 4: a step left and back to 2.8 m, the eye left of the problem's middle, so the panel sits on
 // the left, beside h09 and h10: the −/+ row, the height label and "2 · LH" (on h09 at 155 cm, on h10
-// at 195 cm) share one frame while the height changes
+// at 195 cm) share one frame while the height changes. Session 19: from 4.0 m, not 2.8 m, so the
+// whole glow of "up" (move 1) fits too: the panel and the glow grow with the distance (up to Ground's
+// 3.65 m sizing), the ~68 cm between them doesn't, and from 2.8 m or 3.0 m the three spanned ~1.1
+// frame widths, the glow cut at the right edge
 const HEIGHT_X = -15
-const HEIGHT_Z = 155
-const HEIGHT_YAW = -11.8
-const HEIGHT_PITCH = 3.9
+const HEIGHT_Z = 275
+const HEIGHT_YAW = -7.7
+const HEIGHT_PITCH = 2
 // scenes 5-6: the eye stays just left of the problem's middle (wall x 125.5), so the panel stays on
 // the left, out of the shot, and looks a little right, midway between lh (90) and h11 (182): the
-// why-line then sits right over h11 with nothing to slide away from
+// why-line then sits right over h11 with nothing to slide away from. Session 19: from 3.0 m, not
+// 2.5 m (from 2.5 m lh's glow was cut at the left edge): the glow and the why-line grow with the
+// distance, the gap between lh and h11 doesn't, so both now fit, and the look is centred between them
 const FEET_X = -5
-const FEET_YAW = 5.6
+const FEET_Z = 175
+const FEET_YAW = 2.9
 // scene 6: the head turns up and right, over the top right of the problem, until the next hold (lh)
 // and its glow are out of view down to the left: the arrow in the lower left points back at lh past
 // bare wall, and the panel (on the left, beyond lh) is out of the shot. Session 17 turned 42° right
@@ -96,15 +102,15 @@ export const CAMERA: CameraKey[] = [
   {t: 61.5, x: 0, y: 0, z: BACK, pitch: UPPER, yaw: 0},
   {t: 64.5, x: HEIGHT_X, y: 0, z: HEIGHT_Z, pitch: HEIGHT_PITCH, yaw: HEIGHT_YAW},
   {t: 90, x: HEIGHT_X, y: 0, z: HEIGHT_Z, pitch: HEIGHT_PITCH, yaw: HEIGHT_YAW},
-  // 5: back to 2.5 m and level, between lh (the foot) and h11 (see FEET_X)
-  {t: 92.5, x: FEET_X, y: 0, z: BACK, pitch: 0, yaw: FEET_YAW},
+  // 5: to 3.0 m and level, between lh (the foot) and h11 (see FEET_X)
+  {t: 92.5, x: FEET_X, y: 0, z: FEET_Z, pitch: 0, yaw: FEET_YAW},
   // 6: turn the head away from the next hold, then back
-  {t: 106, x: FEET_X, y: 0, z: BACK, pitch: 0, yaw: FEET_YAW},
-  {t: 108.5, x: FEET_X, y: 0, z: BACK, pitch: AWAY_PITCH, yaw: AWAY},
-  {t: 112.5, x: FEET_X, y: 0, z: BACK, pitch: AWAY_PITCH, yaw: AWAY},
-  {t: 115, x: FEET_X, y: 0, z: BACK, pitch: 0, yaw: FEET_YAW},
+  {t: 106, x: FEET_X, y: 0, z: FEET_Z, pitch: 0, yaw: FEET_YAW},
+  {t: 108.5, x: FEET_X, y: 0, z: FEET_Z, pitch: AWAY_PITCH, yaw: AWAY},
+  {t: 112.5, x: FEET_X, y: 0, z: FEET_Z, pitch: AWAY_PITCH, yaw: AWAY},
+  {t: 115, x: FEET_X, y: 0, z: FEET_Z, pitch: 0, yaw: FEET_YAW},
   // 7: step in and right a little, toward h12 (still Ground: 1.7 m)
-  {t: 117, x: FEET_X, y: 0, z: BACK, pitch: 0, yaw: FEET_YAW},
+  {t: 117, x: FEET_X, y: 0, z: FEET_Z, pitch: 0, yaw: FEET_YAW},
   {t: 120, x: 20, y: 0, z: 45, pitch: -4, yaw: 0},
   {t: END, x: 20, y: 0, z: 45, pitch: -4, yaw: 0},
 ]
