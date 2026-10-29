@@ -69,6 +69,17 @@ export const PRESET_POSITION: Record<Limb, string | null> = {
 };
 
 /**
+ * demo preset problem ("your problem"): the holds of one gym boulder, from the
+ * preset position up to a clear top hold. Only these are scored and ringed
+ * outside setup mode; the rest of the wall stays visible but dim.
+ */
+export const PRESET_PROBLEM: string[] = ["lf", "rf", "lh", "rh", "low", "h16", "up", "h09", "h11", "h20"];
+/** the problem's start holds (both hands start here, as in the preset position) */
+export const PRESET_START: string[] = ["lh", "rh"];
+/** the problem's top hold: a jug, clearly the highest hold of the problem */
+export const PRESET_TOP = "h20";
+
+/**
  * Hold footprint per type (cm): width x height on the wall, depth out of it,
  * and the ring radius to draw around it (rings are 15-20 cm across, a little
  * bigger than the hold).

@@ -1,8 +1,10 @@
 // NextHoldMain — orchestrator for Next Hold (devpost/design-brief.md).
 //
-// Owns ALL climbing state: the four-limb position, the marked hold types, the
-// selected limb, mode (climb / setup), the '?' armed flag, and the current
-// evaluation. On every change it recomputes synchronously (same frame) and
+// Owns ALL climbing state: the four-limb position, the marked hold types,
+// "your problem" (which holds belong to the boulder, its start holds and its
+// top hold), the selected limb, mode (climb / setup), the '?' armed flag, and
+// the current evaluation. Outside setup only the problem's holds are scored and
+// ringed; the others stay visible but dim and are not targets. On every change it recomputes synchronously (same frame) and
 // pushes the result into the passive views: wall overlays, control row,
 // callouts, type picker, off-view arrow.
 //
@@ -15,13 +17,15 @@
 // getPosition(), getSelectedLimb(), getHoldColour(id), getHoldScore(id),
 // isRingVisible(id), getSuggestion(), isRingGlowing(id), isLabelVisible(),
 // getLabelOpacity(), getLabelText(), getWhyText(), isWhyVisible(),
-// isAskArmed(), isOffViewArrowVisible(), isTypePickerVisible(), getHoldType(id).
+// isAskArmed(), isOffViewArrowVisible(), isTypePickerVisible(), getHoldType(id),
+// isInProblem(id), getProblemHolds(), getStartHolds(), getTopHold(), isHoldDim(id),
+// isMarkVisible(id), getTagText(id).
 // Action API mirrors a pinch: pressHold(id), pressLimb(limb), pressAsk(),
-// pressMode(), pickType(type).
+// pressMode(), pickType(type), pressStart(), pressTop().
 
 import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
 import {ClimbingWall} from "./Wall/ClimbingWall"
-import {HOLDS, PRESET_POSITION, HOLD_SIZE, holdById} from "./Wall/WallLayout"
+import {HOLDS, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP, HOLD_SIZE, holdById} from "./Wall/WallLayout"
 import {
   Evaluation, HoldTypes, Holds, LIMBS, Limb, Position, ScoreResult, bestMove, evaluate,
 } from "./NextHoldScoring"
@@ -34,9 +38,10 @@ import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/
 
 /** half the why-line plate: WHY_W (40 cm) in NextHoldCalloutUI plus its padding */
 const WHY_HALF_W = 21.5
-/** half the type picker: 13 cm buttons + padding wide; title, five 5 cm buttons, gaps and padding tall */
-const PICKER_HALF_W = 8
-const PICKER_HALF_H = 20.5
+/** half the type picker: the Start / Top row (2 x 8 cm + gap) + padding wide;
+ *  title, five type buttons, the Start / Top row, gaps and padding tall */
+const PICKER_HALF_W = 10.5
+const PICKER_HALF_H = 24
 
 export type Mode = "climb" | "setup"
 
@@ -111,6 +116,11 @@ export class NextHoldMain extends BaseScriptComponent {
   // ── state (single owner) ──────────────────────────────────────────────────
   private holds: Holds = {}
   private holdTypes: HoldTypes = {}
+  /** "your problem": the holds of the boulder being climbed. Only these are scored outside setup. */
+  private problem: {[id: string]: boolean} = {}
+  /** start / top flags; they stay on a hold taken out of the problem, but only count while it is in */
+  private startFlags: {[id: string]: boolean} = {}
+  private topFlag: string | null = null
   private position: Position = {LH: null, RH: null, LF: null, RF: null}
   private mode: Mode = "climb"
   private selected: Limb = "RH"
@@ -128,6 +138,10 @@ export class NextHoldMain extends BaseScriptComponent {
       this.holds[h.id] = {x: h.x, y: h.y}
       this.holdTypes[h.id] = h.type // demo preset: every hold already marked
     }
+    // demo preset: a plausible problem is already marked, from the preset position up to its top
+    for (const id of PRESET_PROBLEM) this.problem[id] = true
+    for (const id of PRESET_START) this.startFlags[id] = true
+    this.topFlag = PRESET_TOP
     this.position = {...PRESET_POSITION}
 
     this.wall.build()
@@ -161,6 +175,8 @@ export class NextHoldMain extends BaseScriptComponent {
       this.controlRow.onAskPressed.add(() => this.pressAsk())
       this.controlRow.onModePressed.add(() => this.pressMode())
       this.typePicker.onTypePicked.add((t) => this.pickType(t))
+      this.typePicker.onStartPressed.add(() => this.pressStart())
+      this.typePicker.onTopPressed.add(() => this.pressTop())
 
       this.ready = true
       // The Lens opens in climb mode with the preset position: auto-select the best move.
@@ -174,17 +190,29 @@ export class NextHoldMain extends BaseScriptComponent {
   pressHold(id: string): void {
     if (!this.ready || !this.holds[id]) return
     if (this.mode === "setup") {
-      this.pickerHold = id
-      const h = this.holds[id]
-      const ringR = this.ringRadius(id)
-      const right = h.x < 160
-      const px = right ? h.x + ringR + 9.5 : h.x - ringR - 9.5
-      const py = Math.min(275, Math.max(25, h.y))
-      // the picker is ~40 cm tall: keep all five types inside the view, not just its centre
-      this.typePicker.showFor(this.keepInView(this.wall.wallToWorld(px, py, 12), PICKER_HALF_W, PICKER_HALF_H),
-        this.wallRot(), this.holdTypes[id] || null)
+      // a pinch toggles the hold in or out of "your problem"; a hold just added gets the picker
+      if (this.problem[id]) {
+        delete this.problem[id]
+        if (this.pickerHold === id) {
+          this.pickerHold = null
+          this.typePicker.hide()
+        }
+      } else {
+        this.problem[id] = true
+        this.pickerHold = id
+        const h = this.holds[id]
+        const ringR = this.ringRadius(id)
+        const right = h.x < 160
+        const px = right ? h.x + ringR + PICKER_HALF_W + 1.5 : h.x - ringR - PICKER_HALF_W - 1.5
+        const py = Math.min(275, Math.max(25, h.y))
+        // the picker is ~47 cm tall: keep all five types and Start / Top inside the view, not just its centre
+        this.typePicker.showFor(this.keepInView(this.wall.wallToWorld(px, py, 12), PICKER_HALF_W, PICKER_HALF_H),
+          this.wallRot(), this.holdTypes[id] || null, !!this.startFlags[id], this.topFlag === id)
+      }
+      this.recompute(false)
       return
     }
+    if (!this.problem[id]) return // outside setup only the problem's holds are targets
     // climb mode
     if (this.askArmed) {
       const r = this.byHold[id]
@@ -231,20 +259,51 @@ export class NextHoldMain extends BaseScriptComponent {
     this.typePicker.hide()
   }
 
+  /** Setup: toggle the hold just pinched as one of the problem's start holds. */
+  pressStart(): void {
+    if (!this.ready || this.mode !== "setup" || !this.pickerHold) return
+    const id = this.pickerHold
+    if (this.startFlags[id]) delete this.startFlags[id]
+    else this.startFlags[id] = true
+    this.typePicker.setFlags(!!this.startFlags[id], this.topFlag === id)
+    this.recompute(false)
+  }
+
+  /** Setup: make the hold just pinched the problem's top hold (pinch again to clear it). */
+  pressTop(): void {
+    if (!this.ready || this.mode !== "setup" || !this.pickerHold) return
+    const id = this.pickerHold
+    this.topFlag = this.topFlag === id ? null : id
+    this.typePicker.setFlags(!!this.startFlags[id], this.topFlag === id)
+    this.recompute(false)
+  }
+
   // ── recompute: same frame as the change ──────────────────────────────────
   private recompute(autoSelect: boolean): void {
     const reach = this.reach()
+    const holds = this.scoredHolds()
     if (autoSelect) {
-      const best = bestMove({holds: this.holds, holdTypes: this.holdTypes, position: this.position, reach})
+      const best = bestMove({holds, holdTypes: this.holdTypes, position: this.position, reach})
       if (best) this.selected = best.limb
     }
-    this.evaluation = evaluate({holds: this.holds, holdTypes: this.holdTypes, position: this.position, limb: this.selected, reach})
+    this.evaluation = evaluate({holds, holdTypes: this.holdTypes, position: this.position, limb: this.selected, reach})
     this.byHold = {}
     for (const r of this.evaluation.results) this.byHold[r.holdId] = r
 
     const climb = this.mode === "climb"
     const rings: {[id: string]: RingColour | null} = {}
-    for (const id of Object.keys(this.holds)) rings[id] = climb && this.byHold[id] ? this.byHold[id].colour : null
+    const marks: {[id: string]: boolean} = {}
+    const tags: {[id: string]: string} = {}
+    const top = this.getTopHold()
+    for (const id of Object.keys(this.holds)) {
+      rings[id] = climb && this.byHold[id] ? this.byHold[id].colour : null
+      // outside setup the holds that aren't in the problem stay visible, but dim
+      this.wall.setHoldDim(id, climb && !this.problem[id])
+      if (climb || !this.problem[id]) continue
+      marks[id] = true
+      const tag = (this.startFlags[id] ? ["START"] : []).concat(top === id ? ["TOP"] : [])
+      if (tag.length) tags[id] = tag.join(" · ")
+    }
     const sug = climb ? this.evaluation.suggestion : null
     this.visuals.apply({
       rings,
@@ -252,6 +311,8 @@ export class NextHoldMain extends BaseScriptComponent {
       position: this.position,
       selectedLimb: this.selected,
       showMarkers: true,
+      marks,
+      tags,
     })
 
     this.controlRow.setSelectedLimb(this.selected)
@@ -293,12 +354,22 @@ export class NextHoldMain extends BaseScriptComponent {
   }
 
   private setHover(id: string | null): void {
+    // outside setup a hold that isn't in the problem is not a target, so it doesn't highlight
+    if (id && this.mode === "climb" && !this.problem[id]) id = null
     this.hovered = id
     this.visuals.setHover(id)
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────
   private reach(): number { return this.climberHeightCm * 0.44 }
+  /** The holds the rule sees: the problem's, plus any hold a limb is on (the centre of mass needs it). */
+  private scoredHolds(): Holds {
+    const out: Holds = {}
+    for (const id of Object.keys(this.holds)) {
+      if (this.problem[id] || this.isOccupied(id)) out[id] = this.holds[id]
+    }
+    return out
+  }
   private wallRot(): quat { return this.wall.getTransform().getWorldRotation() }
   /** Slide a point (in camera space) so a panel halfW x halfH cm around it stays inside the view. */
   private keepInView(p: vec3, halfW: number, halfH = 0): vec3 {
@@ -388,4 +459,14 @@ export class NextHoldMain extends BaseScriptComponent {
   isOffViewArrowVisible(): boolean { return this.offViewArrow.isArrowVisible() }
   isTypePickerVisible(): boolean { return this.typePicker.isVisible() }
   getPickerHold(): string | null { return this.pickerHold }
+  isInProblem(id: string): boolean { return !!this.problem[id] }
+  getProblemHolds(): string[] { return Object.keys(this.holds).filter((id) => this.problem[id]) }
+  /** start holds of the problem (flags on holds taken out of the problem don't count) */
+  getStartHolds(): string[] { return this.getProblemHolds().filter((id) => this.startFlags[id]) }
+  getTopHold(): string | null { return this.topFlag && this.problem[this.topFlag] ? this.topFlag : null }
+  isHoldDim(id: string): boolean { return this.wall.isHoldDim(id) }
+  isMarkVisible(id: string): boolean { return this.visuals ? this.visuals.isMarkVisible(id) : false }
+  getTagText(id: string): string | null { return this.visuals ? this.visuals.tagText(id) : null }
+  isStartLit(): boolean { return this.typePicker.isStartLit() }
+  isTopLit(): boolean { return this.typePicker.isTopLit() }
 }

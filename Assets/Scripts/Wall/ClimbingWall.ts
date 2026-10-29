@@ -37,6 +37,8 @@ const TNUT_HOLE: RGBA = [0.13, 0.12, 0.11, 1];
 const FACE_TINT = new vec4(0.72, 0.72, 0.72, 1);
 /** one texture tile covers this many cm of ply */
 const TEX_CM = 60;
+/** brightness of a hold outside "your problem": still readable as a hold, clearly behind the problem's */
+const HOLD_DIM = 0.4;
 
 const SHEET_W = 120;
 const SHEET_H = 100;
@@ -68,6 +70,8 @@ export class ClimbingWall extends BaseScriptComponent {
   addColliders: boolean = true;
 
   private holdObjects: { [id: string]: SceneObject } = {};
+  /** per hold: its lit and dim meshes (dim = outside "your problem") and the visual that shows one */
+  private holdLooks: { [id: string]: { rmv: RenderMeshVisual; lit: RenderMesh; dim: RenderMesh; isDim: boolean } } = {};
   private built = false;
 
   onAwake() {
@@ -94,6 +98,19 @@ export class ClimbingWall extends BaseScriptComponent {
 
   getHoldIds(): string[] {
     return HOLDS.map((h) => h.id);
+  }
+
+  /** Show the hold dim (still visible, clearly not part of the problem) or lit. */
+  setHoldDim(id: string, dim: boolean) {
+    const look = this.holdLooks[id];
+    if (!look || look.isDim === dim) return;
+    look.isDim = dim;
+    look.rmv.mesh = dim ? look.dim : look.lit;
+  }
+
+  isHoldDim(id: string): boolean {
+    const look = this.holdLooks[id];
+    return !!look && look.isDim;
   }
 
   /** Wall coords (x from left edge, y from floor, z out of the face) to this object's local space. */
@@ -225,8 +242,8 @@ export class ClimbingWall extends BaseScriptComponent {
   // ------------------------------------------------------------------ holds
   private buildHolds() {
     const meshes: { [k: string]: RenderMesh } = {};
-    const meshFor = (t: HoldType, tone: number) =>
-      meshes[t + tone] || (meshes[t + tone] = toMesh(buildHoldGeo(t, tone)));
+    const meshFor = (t: HoldType, tone: number, k = 1) =>
+      meshes[t + tone + "/" + k] || (meshes[t + tone + "/" + k] = toMesh(buildHoldGeo(t, tone, k)));
 
     for (const h of HOLDS) {
       const so = global.scene.createSceneObject("Hold_" + h.id);
@@ -236,8 +253,10 @@ export class ClimbingWall extends BaseScriptComponent {
       tr.setLocalRotation(quat.fromEulerAngles(0, 0, ((h.spin || 0) * Math.PI) / 180));
 
       const rmv = so.createComponent("Component.RenderMeshVisual") as RenderMeshVisual;
-      rmv.mesh = meshFor(h.type, toneFor(h.id));
+      const lit = meshFor(h.type, toneFor(h.id));
+      rmv.mesh = lit;
       if (this.material) rmv.mainMaterial = this.material;
+      this.holdLooks[h.id] = { rmv, lit, dim: meshFor(h.type, toneFor(h.id), HOLD_DIM), isDim: false };
 
       if (this.addColliders) this.addHoldCollider(so, h);
       this.holdObjects[h.id] = so;

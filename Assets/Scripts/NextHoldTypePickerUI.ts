@@ -1,11 +1,14 @@
 // NextHoldTypePickerUI — setup mode's type picker (brief: "Mark a hold").
-// Big buttons beside the hold just pinched: jug / crimp / pinch / pocket / sloper.
+// Big buttons beside the hold just pinched: jug / crimp / pinch / pocket / sloper,
+// and a row under them: Start (toggle: one of the problem's start holds) and
+// Top (the problem's top hold).
 //
 // Owns: the picker panel and its buttons. Passive view, starts hidden.
-// Main -> UI: showFor(), hide(). UI -> Main: onTypePicked(type).
-// Must not: change hold types itself; Main owns the marked types.
+// Main -> UI: showFor(), setFlags(), hide().
+// UI -> Main: onTypePicked(type), onStartPressed, onTopPressed.
+// Must not: change hold types or the problem itself; Main owns them.
 //
-// Stable scene names for tests: TypePicker panel, TypeButton_<type>.
+// Stable scene names for tests: TypePicker panel, TypeButton_<type>, StartButton, TopButton.
 
 import {BackPlate} from "SpectaclesUIKit.lspkg/Scripts/BackPlate"
 import {Button} from "SpectaclesUIKit.lspkg/Scripts/Components/Button/Button"
@@ -56,17 +59,30 @@ export class NextHoldTypePickerUI extends BaseScriptComponent {
   @input
   @hint("Title above the type buttons")
   title: string = "Hold type"
+
+  @input
+  @hint("Width of the Start and Top buttons in cm")
+  @widget(new SliderWidget(6, 12, 0.5))
+  flagButtonWidth: number = 8
   @ui.group_end
 
   private _onTypePicked = new Event<string>()
   get onTypePicked(): PublicApi<string> { return this._onTypePicked.publicApi() }
+  private _onStartPressed = new Event<void>()
+  get onStartPressed(): PublicApi<void> { return this._onStartPressed.publicApi() }
+  private _onTopPressed = new Event<void>()
+  get onTopPressed(): PublicApi<void> { return this._onTopPressed.publicApi() }
 
   private panel: SceneObject
   private buttons: {[type: string]: Button} = {}
+  private startButton: Button
+  private topButton: Button
   private current: string | null = null
+  private isStart = false
+  private isTop = false
   private wantVisible = false
   private ready = false
-  private pending = TYPES.length + 1 // buttons + backplate
+  private pending = TYPES.length + 3 // type buttons + Start + Top + backplate
   private resync: DelayedCallbackEvent
 
   onAwake() {
@@ -122,17 +138,55 @@ export class NextHoldTypePickerUI extends BaseScriptComponent {
       })
     }
 
+    // the problem's start holds and its top hold, for the hold just pinched
+    const fw = this.flagButtonWidth
+    const rowW = 2 * fw + this.buttonGap
+    this.flexChild(content, {w: rowW, h: this.buttonHeight}, (rowSO) => {
+      rowSO.name = "ProblemFlagsRow"
+      const f = rowSO.createComponent(FlexLayout.getTypeName()) as FlexLayout
+      f.autoDiscoverItemsOnStart = false
+      f.onInitialized.add(() => {
+        f.width = rowW
+        f.height = this.buttonHeight
+        f.direction = FlexDirection.Row
+        f.columnGap = this.buttonGap
+        f.justifyContent = FlexJustify.Center
+        f.alignItems = FlexAlign.Center
+      })
+      const flag = (name: string, label: string, ev: Event<void>): Button => {
+        let btn: Button
+        this.flexChild(rowSO, {w: fw, h: this.buttonHeight}, (so) => {
+          so.name = name
+          btn = so.createComponent(Button.getTypeName()) as Button
+          btn.setVariant(BUTTON_VARIANT)
+          btn.size = new vec3(fw, this.buttonHeight, 1)
+          btn.setIsToggleable(true)
+          btn.onInitialized.add(() => this.markInit())
+          btn.onTriggerUp.add(() => {
+            ev.invoke()
+            this.resync.reset(0)
+          })
+          this.addButtonLabel(so, label, fw - 0.5)
+        })
+        return btn
+      }
+      this.startButton = flag("StartButton", "Start", this._onStartPressed)
+      this.topButton = flag("TopButton", "Top", this._onTopPressed)
+    })
+
     this.resync = this.createEvent("DelayedCallbackEvent")
     this.resync.bind(() => this.applyStates())
   }
 
   // ── Main -> UI ────────────────────────────────────────────────────────────
-  /** Show the picker at worldPos (beside the hold), with the hold's current type lit. */
-  showFor(worldPos: vec3, worldRot: quat, currentType: string | null): void {
+  /** Show the picker at worldPos (beside the hold), with the hold's current type and start / top flags lit. */
+  showFor(worldPos: vec3, worldRot: quat, currentType: string | null, isStart = false, isTop = false): void {
     const tr = this.getTransform()
     tr.setWorldPosition(worldPos)
     tr.setWorldRotation(worldRot)
     this.current = currentType
+    this.isStart = isStart
+    this.isTop = isTop
     this.wantVisible = true
     if (this.ready) this.panel.enabled = true
     this.applyStates()
@@ -143,9 +197,19 @@ export class NextHoldTypePickerUI extends BaseScriptComponent {
     if (this.ready) this.panel.enabled = false
   }
 
+  /** Main -> UI after Start / Top: light the flags to match Main's state. */
+  setFlags(isStart: boolean, isTop: boolean): void {
+    this.isStart = isStart
+    this.isTop = isTop
+    this.applyStates()
+  }
+
   isVisible(): boolean {
     return this.wantVisible
   }
+
+  isStartLit(): boolean { return this.startButton ? this.startButton.isOn : false }
+  isTopLit(): boolean { return this.topButton ? this.topButton.isOn : false }
 
   private markInit(): void {
     this.pending--
@@ -161,6 +225,8 @@ export class NextHoldTypePickerUI extends BaseScriptComponent {
       const b = this.buttons[type]
       if (b) b.isOn = type === this.current
     }
+    if (this.startButton) this.startButton.isOn = this.isStart
+    if (this.topButton) this.topButton.isOn = this.isTop
   }
 
   private addButtonLabel(parent: SceneObject, text: string, widthCM: number): void {

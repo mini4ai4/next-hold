@@ -2,7 +2,8 @@
 // "Position markers", "Suggested hold", "Targets ... highlight when aimed at").
 //
 // Owns: runtime-built overlay meshes under the wall (Ring_<id>, Marker_<limb>,
-// SuggestGlow, HoverRing) and their colours. One cloned material per overlay.
+// SuggestGlow, HoverRing, setup mode's Mark_<id> "in your problem" ring and
+// Tag_<id> START / TOP text) and their colours. One cloned material per overlay.
 // Main pushes state in with apply(); this class never scores or decides.
 // Plain class (not a component): Main creates it once in onAwake.
 
@@ -26,6 +27,10 @@ export interface OverlayState {
   position: {[limb: string]: string | null}
   selectedLimb: string | null
   showMarkers: boolean
+  /** setup mode: holds marked as part of "your problem" (thin pale ring); empty outside setup */
+  marks: {[id: string]: boolean}
+  /** setup mode: tag text under a marked hold ("START", "TOP"); absent = no tag */
+  tags: {[id: string]: string}
 }
 
 export interface OverlayColours {
@@ -42,6 +47,11 @@ const MARKER_R = 2.6
 const MARKER_DIM = 0.42     // "small dim marker"
 const MARKER_SELECTED = 0.95
 const HOVER_COLOR = new vec4(0.95, 0.97, 1.0, 1)
+/** setup mode "in your problem" ring: pale blue-white, distinct from the hover ring and the score colours */
+const MARK_COLOR = new vec4(0.62, 0.86, 1.0, 1)
+const TAG_COLOR = new vec4(0.8, 0.93, 1.0, 1)
+/** Text sizes on the overlay canvas (same scale as the UI modules' 110 cm roles) */
+const TAG_SIZE = 44
 /** glow breathing: alpha range of the suggestion's halo */
 const GLOW_MIN = 0.6
 const GLOW_MAX = 1.0
@@ -66,8 +76,12 @@ export class NextHoldWallVisuals {
   private markers: {[limb: string]: {so: SceneObject; mat: Material}} = {}
   private glow: {so: SceneObject; mat: Material; meshes: {[r: string]: RenderMesh}; rmv: RenderMeshVisual}
   private hover: {so: SceneObject; rmv: RenderMeshVisual; meshes: {[r: string]: RenderMesh}}
+  private marks: {[id: string]: {so: SceneObject; mat: Material}} = {}
+  private textGroup: SceneObject
+  private tags: {[id: string]: {so: SceneObject; text: Text}} = {}
   private state: OverlayState | null = null
   private ringMeshes: {[r: string]: RenderMesh} = {}
+  private thinMeshes: {[r: string]: RenderMesh} = {}
 
   constructor(
     private wallRoot: SceneObject,
@@ -86,6 +100,23 @@ export class NextHoldWallVisuals {
       so.so.getTransform().setLocalPosition(this.wallToLocal(h.x, h.y, RING_Z))
       so.so.enabled = false
       this.rings[h.id] = so
+
+      const mark = this.makeVisual("Mark_" + h.id, this.thinRingMesh(r))
+      mark.mat.mainPass.baseColor = MARK_COLOR
+      mark.so.getTransform().setLocalPosition(this.wallToLocal(h.x, h.y, RING_Z))
+      mark.so.enabled = false
+      this.marks[h.id] = mark
+    }
+
+    // text on the wall (setup tags) lives under a world-space canvas, like the UI modules' text
+    this.textGroup = global.scene.createSceneObject("OverlayText")
+    this.textGroup.setParent(this.group)
+    this.textGroup.createComponent("Component.Canvas")
+    for (const h of HOLDS) {
+      const r = HOLD_SIZE[h.type].ringR
+      const t = this.makeText("Tag_" + h.id, this.wallToLocal(h.x, h.y - r - 2.4, RING_Z + 0.2), TAG_SIZE, TAG_COLOR)
+      t.so.enabled = false
+      this.tags[h.id] = t
     }
 
     const disc = new UVGeo()
@@ -116,6 +147,10 @@ export class NextHoldWallVisuals {
       const c = s.rings[h.id]
       ring.so.enabled = !!c
       if (c) ring.mat.mainPass.baseColor = scaled(this.colours[c], h.id === s.glowHoldId ? 1 : RING_DIM)
+      this.marks[h.id].so.enabled = !!s.marks[h.id]
+      const tag = s.tags[h.id]
+      this.tags[h.id].so.enabled = !!tag
+      if (tag) this.tags[h.id].text.text = tag
     }
 
     const glowHold = s.glowHoldId ? this.holdDef(s.glowHoldId) : null
@@ -177,6 +212,17 @@ export class NextHoldWallVisuals {
     return !!r && r.so.enabled
   }
 
+  isMarkVisible(id: string): boolean {
+    const m = this.marks[id]
+    return !!m && m.so.enabled
+  }
+
+  /** the setup tag shown under the hold ("START", "TOP"), or null */
+  tagText(id: string): string | null {
+    const t = this.tags[id]
+    return t && t.so.enabled ? t.text.text : null
+  }
+
   isGlowOn(id: string): boolean {
     return !!this.state && this.state.glowHoldId === id && this.glow.so.enabled
   }
@@ -210,6 +256,30 @@ export class NextHoldWallVisuals {
     const {span, coreAt, coreW} = HOVER_PROFILE
     const rIn = r + 2.4 - (coreAt + coreW / 2)
     return this.cachedAnnulus(cache, rIn, rIn + span, ProfileRow.Hover)
+  }
+
+  /** thin crisp ring (hover profile) with its core centred on radius r */
+  private thinRingMesh(r: number): RenderMesh {
+    const {span, coreAt, coreW} = HOVER_PROFILE
+    const rIn = r - (coreAt + coreW / 2)
+    return this.cachedAnnulus(this.thinMeshes, rIn, rIn + span, ProfileRow.Hover)
+  }
+
+  private makeText(name: string, local: vec3, size: number, color: vec4): {so: SceneObject; text: Text} {
+    const so = global.scene.createSceneObject(name)
+    so.setParent(this.textGroup)
+    so.getTransform().setLocalPosition(local)
+    const t = so.createComponent("Component.Text") as Text
+    t.depthTest = true
+    t.size = size
+    ;(t as Text & {weight?: number}).weight = 700
+    t.textFill.color = color
+    t.horizontalAlignment = HorizontalAlignment.Center
+    t.verticalAlignment = VerticalAlignment.Center
+    t.horizontalOverflow = HorizontalOverflow.Overflow
+    t.verticalOverflow = VerticalOverflow.Overflow
+    t.layoutRect = Rect.create(-6, 6, -1.2, 1.2)
+    return {so, text: t}
   }
 
   private cachedAnnulus(cache: {[k: string]: RenderMesh}, rIn: number, rOut: number, row: ProfileRow): RenderMesh {

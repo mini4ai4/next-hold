@@ -129,7 +129,9 @@ function superellipse(t: number, n: number): [number, number] {
   return [Math.sign(c) * Math.pow(Math.abs(c), e), Math.sign(s) * Math.pow(Math.abs(s), e)];
 }
 
-function sculpt(g: Geo, type: HoldType, tone: RGBA) {
+function sculpt(g: Geo, type: HoldType, tone: RGBA, k: number) {
+  const dimmed = (c: RGBA): RGBA => [c[0] * k, c[1] * k, c[2] * k, c[3]];
+  tone = dimmed(tone);
   const size = HOLD_SIZE[type];
   const sc = SCULPTS[type];
   const hw = size.w / 2, hh = size.h / 2;
@@ -202,8 +204,8 @@ function sculpt(g: Geo, type: HoldType, tone: RGBA) {
   if (sc.bolt) {
     const [bu, bv, br] = sc.bolt;
     const z = surfaceZ(bu, bv, Math.hypot(bu, bv) * 0.6) + 0.12;
-    addFlatDisc(g, [bu * hw, bv * hh, z], br, WASHER);
-    addFlatDisc(g, [bu * hw, bv * hh, z + 0.03], br * 0.5, BOLT);
+    addFlatDisc(g, [bu * hw, bv * hh, z], br, dimmed(WASHER));
+    addFlatDisc(g, [bu * hw, bv * hh, z + 0.03], br * 0.5, dimmed(BOLT));
   }
 }
 
@@ -218,8 +220,9 @@ function addFlatDisc(g: Geo, c: V3, r: number, color: RGBA) {
   for (let i = 0; i < seg; i++) g.tri(ctr, ring + i, ring + i + 1);
 }
 
-export function buildHoldGeo(type: HoldType, tone = 0): Geo {
+/** brightness k scales every vertex colour (1 = the lit hold; lower = a dim hold outside the problem) */
+export function buildHoldGeo(type: HoldType, tone = 0, k = 1): Geo {
   const g = new Geo();
-  sculpt(g, type, HOLD_TONES[tone % HOLD_TONES.length]);
+  sculpt(g, type, HOLD_TONES[tone % HOLD_TONES.length], k);
   return g;
 }

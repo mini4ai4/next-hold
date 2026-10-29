@@ -114,15 +114,22 @@ export class C2PinchMoveScenario extends Scenario {
       ev.results.filter((r) => r.holdId !== sug)[0]
     await moveAndCheck(main, pick.holdId, errs, "move 2")
 
-    // move 3: a move after which a DIFFERENT limb is best (reference: RF -> h18 makes LF best),
-    // so the auto-select visibly switches the toggle row. Limb chosen with a real pinch on Toggle_RF.
+    // move 3: a move after which a DIFFERENT limb is best, so the auto-select visibly switches
+    // the toggle row. The target is a problem hold the reference says leaves another limb best
+    // (it was h18 before the wall had a marked problem; h18 is not in it).
+    // Limb chosen with a real pinch on Toggle_RF.
     await restorePreset(main)
     await pinch("Toggle_RF")
     await frames(3)
     if (main.getSelectedLimb() !== "RF") errs.push(`Toggle_RF pinch: selected ${main.getSelectedLimb()}`)
-    const refBest3 = makeReference().bestMove({...(main.getPosition() as RefPosition), RF: "h18"})
-    if (!refBest3 || refBest3.limb === "RF") errs.push(`setup: reference best after RF->h18 is ${refBest3 ? refBest3.limb : "none"}, wanted a different limb`)
-    await moveAndCheck(main, "h18", errs, "move 3")
+    const pos3 = main.getPosition() as RefPosition
+    const ref3 = makeReference()
+    const t3 = ref3.evaluate("RF", pos3).results.map((r) => r.holdId).filter((id) => {
+      const b = ref3.bestMove({...pos3, RF: id})
+      return b !== null && b.limb !== "RF"
+    })[0]
+    if (!t3) errs.push("setup: no problem hold for RF after which another limb is best")
+    else await moveAndCheck(main, t3, errs, "move 3 (RF -> " + t3 + ")")
 
     expect(errs.length, "criterion 2 mismatches:\n" + errs.join("\n")).toBe(0)
   }

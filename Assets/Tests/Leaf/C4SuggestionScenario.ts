@@ -97,16 +97,27 @@ export class C4SuggestionScenario extends Scenario {
     if (!inView0) errs.push(`setup: open suggestion ${best0.holdId} is not in view per the camera`)
     if (main.isOffViewArrowVisible() || mustFind("OffViewArrowMesh").enabled) errs.push("arrow visible while the suggestion is in view")
 
-    // ── make a low foot hold the suggestion: RF -> h15 (reference then says RF -> rf) ──
-    await pinch("Toggle_RF")
+    // ── make an out-of-view hold the suggestion: one move within the problem after which the
+    //    reference's best move is a hold the camera can't see (before the marked problem this
+    //    was RF -> h15, which is not in the problem) ──
+    let mover = "", dest = ""
+    for (const l of ["RF", "LF", "RH", "LH"]) {
+      for (const r of ref.evaluate(l as any, pos0).results) {
+        const b = ref.bestMove({...pos0, [l]: r.holdId})
+        if (b && !holdInView(b.holdId)) { mover = l; dest = r.holdId; break }
+      }
+      if (mover) break
+    }
+    if (!mover) errs.push("setup: no single move inside the problem leads to an off-view suggestion")
+    await pinch("Toggle_" + mover)
     await frames(2)
-    await pinch("Hold_h15")
+    await pinch("Hold_" + dest)
     await frames(3) // the arrow updates one frame after a change
     const pos1 = main.getPosition() as RefPosition
     const best1 = ref.bestMove(pos1)!
     const sug1 = main.getSuggestion()
-    print(`[C4] after RF->h15: Lens suggests ${sug1 ? sug1.limb + "->" + sug1.holdId : "none"}, reference ${best1.limb}->${best1.holdId}`)
-    if (pos1.RF !== "h15") errs.push(`RF did not move to h15 (${pos1.RF})`)
+    print(`[C4] after ${mover}->${dest}: Lens suggests ${sug1 ? sug1.limb + "->" + sug1.holdId : "none"}, reference ${best1.limb}->${best1.holdId}`)
+    if (pos1[mover] !== dest) errs.push(`${mover} did not move to ${dest} (${pos1[mover]})`)
     if (!sug1 || sug1.holdId !== best1.holdId || sug1.limb !== best1.limb) errs.push(`off-view: Lens suggestion differs from reference`)
     checkGlow(main, best1.holdId, errs, "off-view")
     if (labelText() !== LIMB_WORDS[best1.limb]) errs.push(`off-view label "${labelText()}", want "${LIMB_WORDS[best1.limb]}"`)
@@ -115,14 +126,18 @@ export class C4SuggestionScenario extends Scenario {
     const arrowSO = mustFind("OffViewArrowMesh")
     if (!main.isOffViewArrowVisible() || !arrowSO.enabled) errs.push(`arrow hidden while suggestion ${best1.holdId} is out of view`)
     else {
-      // at the edge nearest the hold: the hold is below the view, so the arrow sits in the lower part of the view
+      // at the edge nearest the hold: the arrow sits on the hold's side of the view
       const camT = mustFind("Camera Object").getTransform()
       const a = camT.getInvertedWorldTransform().multiplyPoint(arrowSO.getTransform().getWorldPosition())
       const h = camT.getInvertedWorldTransform().multiplyPoint(mustFind("Hold_" + best1.holdId).getTransform().getWorldPosition())
       const aInView = camera().isSphereVisible(arrowSO.getTransform().getWorldPosition(), 0.5)
       print(`[C4] arrow camera-local (${a.x.toFixed(1)}, ${a.y.toFixed(1)}, ${a.z.toFixed(1)}), hold (${h.x.toFixed(1)}, ${h.y.toFixed(1)}, ${h.z.toFixed(1)}), arrow in view ${aInView}`)
       if (!aInView) errs.push("arrow itself is outside the view")
-      if (Math.sign(a.y) !== Math.sign(h.y)) errs.push("arrow is not on the hold's (vertical) side of the view")
+      // (the hold may be off the side as well as below, so compare directions in the view plane)
+      const ha = Math.atan2(h.y / -h.z, h.x / -h.z), aa = Math.atan2(a.y / -a.z, a.x / -a.z)
+      let dAng = Math.abs(ha - aa)
+      if (dAng > Math.PI) dAng = 2 * Math.PI - dAng
+      if (dAng > Math.PI / 3) errs.push(`arrow points ${(dAng * 180 / Math.PI).toFixed(0)} deg away from the hold's side of the view`)
     }
 
     expect(errs.length, "criterion 4 mismatches:\n" + errs.join("\n")).toBe(0)

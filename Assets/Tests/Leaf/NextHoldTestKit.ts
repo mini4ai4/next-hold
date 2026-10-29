@@ -11,7 +11,7 @@ import {LeafHandInteractor} from "Leaf.lspkg/Interactors/interactor/LeafTwoHandI
 import {findInteractableByName} from "Leaf.lspkg/Interactors/InteractableUtils"
 import {findSceneObjectByName, findSceneObjectsByName, nextFrame} from "Leaf.lspkg/Utils/common/Utils"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
-import {HOLDS, PRESET_POSITION} from "../../Scripts/Wall/WallLayout"
+import {HOLDS, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP} from "../../Scripts/Wall/WallLayout"
 import {RefColour, RefLimb, RefPosition, RefPt, ReferenceRule, REF_LIMBS} from "./NextHoldReferenceRule"
 
 /** Brief: a 175 cm climber has 77 cm of reach (height x 0.44). Fixed here, not read from the Lens. */
@@ -91,8 +91,26 @@ export function presetTypes(): {[id: string]: string} {
   return out
 }
 
+/** The preset problem ("your problem"): only these holds are scored and ringed outside setup. */
+export function presetProblem(): string[] {
+  return PRESET_PROBLEM.slice()
+}
+
+export function isPresetProblem(id: string): boolean {
+  return PRESET_PROBLEM.indexOf(id) >= 0
+}
+
+/** Scene hold coordinates, limited to the preset problem's holds (the preset position is on them). */
+export function problemHoldCoords(): {[id: string]: RefPt} {
+  const all = sceneHoldCoords()
+  const out: {[id: string]: RefPt} = {}
+  for (const id of PRESET_PROBLEM) out[id] = all[id]
+  return out
+}
+
+/** The reference rule as the Lens must apply it at the preset: over the problem's holds. */
 export function makeReference(): ReferenceRule {
-  return new ReferenceRule(sceneHoldCoords(), presetTypes(), BRIEF_REACH)
+  return new ReferenceRule(problemHoldCoords(), presetTypes(), BRIEF_REACH)
 }
 
 export function presetPosition(): RefPosition {
@@ -164,9 +182,13 @@ export function camera(): Camera {
  * pressHold so the Lens re-runs its auto-select exactly as at open.
  */
 export async function restorePreset(main: NextHoldMain): Promise<void> {
+  restoreProblem(main)
   if (main.getMode() !== "climb") main.pressMode()
   if (main.isAskArmed()) main.pressAsk()
   const target = presetPosition()
+  // a free hold of the problem to park a limb on (the Lens ignores holds outside the problem)
+  const spare = (cur: RefPosition) =>
+    PRESET_PROBLEM.filter((id) => !REF_LIMBS.some((l) => cur[l] === id || target[l] === id))[0]
   for (let round = 0; round < 8; round++) {
     const cur = main.getPosition() as RefPosition
     if (samePosition(cur, target)) break
@@ -185,17 +207,46 @@ export async function restorePreset(main: NextHoldMain): Promise<void> {
       // every wanted hold is taken (e.g. a swap): park one limb on a spare hold
       const l = REF_LIMBS.filter((x) => cur[x] !== target[x])[0]
       main.pressLimb(l as any)
-      main.pressHold("h24")
+      main.pressHold(spare(cur))
     }
   }
   // round-trip one foot so the final action is a move (re-runs auto-select)
   main.pressLimb("LF")
-  main.pressHold("h15")
+  main.pressHold(spare(main.getPosition() as RefPosition))
   main.pressLimb("LF")
   main.pressHold(target.LF as string)
   await frames(3)
   const now = main.getPosition() as RefPosition
   if (!samePosition(now, target)) throw new Error("restorePreset failed: " + fmtPos(now))
+}
+
+/**
+ * Setup only: put "your problem" back to the preset (members, start holds, top
+ * hold, every hold's type) through the setup-mode action API. Leaves the Lens
+ * in setup mode; restorePreset switches back to climb.
+ */
+export function restoreProblem(main: NextHoldMain): void {
+  if (main.getMode() !== "setup") main.pressMode()
+  for (const h of HOLDS) {
+    const want = isPresetProblem(h.id)
+    const wantStart = PRESET_START.indexOf(h.id) >= 0
+    const wantTop = PRESET_TOP === h.id
+    const isIn = main.isInProblem(h.id)
+    const flagsOk = main.getStartHolds().indexOf(h.id) >= 0 === wantStart && (main.getTopHold() === h.id) === wantTop
+    if (isIn && want && flagsOk && main.getHoldType(h.id) === h.type) continue
+    if (!isIn && !want && main.getHoldType(h.id) === h.type) continue
+    if (isIn) main.pressHold(h.id) // out
+    main.pressHold(h.id) // in: the picker opens for it
+    if ((main.getStartHolds().indexOf(h.id) >= 0) !== (want && wantStart)) main.pressStart()
+    if ((main.getTopHold() === h.id) !== (want && wantTop)) main.pressTop()
+    main.pickType(h.type)
+    if (!want) main.pressHold(h.id) // back out
+  }
+  const probOk = main.getProblemHolds().slice().sort().join() === PRESET_PROBLEM.slice().sort().join()
+  const startOk = main.getStartHolds().slice().sort().join() === PRESET_START.slice().sort().join()
+  if (!probOk || !startOk || main.getTopHold() !== PRESET_TOP) {
+    throw new Error(`restoreProblem failed: problem ${main.getProblemHolds().join(",")} start ${main.getStartHolds().join(",")} top ${main.getTopHold()}`)
+  }
 }
 
 export function fail(list: string[], msg: string): void {

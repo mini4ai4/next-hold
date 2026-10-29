@@ -1,9 +1,11 @@
 // Done criterion 3: a hold beyond reach is always red; a jug within 80% of
 // reach, above the centre of mass, with both feet on holds, is green.
 // From the preset: select each limb with a real SIK pinch on Toggle_<limb>
-// and check "far" (and every other hold the reference puts beyond reach) is
-// red for that limb; then for RH check the preconditions of "up" from the
-// wall coordinates and that it renders green.
+// and check every problem hold the reference puts beyond reach is red for that
+// limb (there must be at least one; "far" was this hold before the wall had a
+// marked problem, now it is outside the problem and must show no ring); then
+// for RH check the preconditions of "up" from the wall coordinates and that it
+// renders green.
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
@@ -32,18 +34,21 @@ export class C3ReachAndJugScenario extends Scenario {
       await frames(3)
       if (main.getSelectedLimb() !== limb) errs.push(`Toggle_${limb} pinch: selected ${main.getSelectedLimb()}`)
       if (main.getLitLimb() !== limb) errs.push(`Toggle_${limb} pinch: lit toggle ${main.getLitLimb()}`)
-      const far = ref.score(limb, "far", pos)
-      if (!(far.dist > BRIEF_REACH)) errs.push(`precondition: far is ${far.dist.toFixed(1)} cm from the ${limb} anchor, not beyond ${BRIEF_REACH}`)
-      if (main.getHoldColour("far") !== "red") errs.push(`${limb}: getHoldColour(far) = ${main.getHoldColour("far")}`)
-      if (renderedRingColour("far", main) !== "red") errs.push(`${limb}: Ring_far renders ${renderedRingColour("far", main)}`)
+      // "far" is not in the preset problem any more: it shows no ring at all
+      if (main.getHoldColour("far") !== null || renderedRingColour("far", main) !== null) {
+        errs.push(`${limb}: far is outside the problem but shows ${renderedRingColour("far", main)}`)
+      }
+      // the top hold (h20) is in the problem and beyond reach of every limb from the preset
       let beyond = 0
       for (const r of ref.evaluate(limb, pos).results) {
         if (r.dist <= BRIEF_REACH) continue
         beyond++
         const rc = renderedRingColour(r.holdId, main)
+        if (main.getHoldColour(r.holdId) !== "red") errs.push(`${limb}: getHoldColour(${r.holdId}) = ${main.getHoldColour(r.holdId)} beyond reach`)
         if (rc !== "red") errs.push(`${limb}: ${r.holdId} is ${r.dist.toFixed(0)} cm away (beyond reach) but renders ${rc}`)
       }
-      print(`[C3] ${limb}: far ${far.dist.toFixed(1)} cm (> ${BRIEF_REACH}), red; ${beyond} holds beyond reach, all checked red`)
+      if (beyond === 0) errs.push(`precondition: no problem hold is beyond reach of ${limb}`)
+      print(`[C3] ${limb}: ${beyond} problem holds beyond reach, all checked red`)
     }
 
     // ── a jug in comfortable reach, above the COM, both feet on: green ──

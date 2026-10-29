@@ -5,10 +5,10 @@
 // 1. Re-runs the 11 reference checks from devpost/scoring-reference against the port.
 // 2. Equivalence: port == reference for every hold x every limb on the Lens wall.
 // 3. bestMove(): returns the max-score (limb, hold) across all four limbs.
-// 4. Demo wall layout: the preset shows green, yellow and red from the start.
+// 4. Demo layout: the preset problem shows green, yellow and red from the start.
 import { createRequire } from "node:module";
 import * as P from "../Assets/Scripts/NextHoldScoring.ts";
-import { HOLDS, PRESET_POSITION, CLIMBER_REACH } from "../Assets/Scripts/Wall/WallLayout.ts";
+import { HOLDS, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP, CLIMBER_REACH } from "../Assets/Scripts/Wall/WallLayout.ts";
 
 const require = createRequire(import.meta.url);
 const R = require("../devpost/scoring-reference/scoring.js");
@@ -86,15 +86,24 @@ check("bestMove returns null when nothing is reachable",
   P.bestMove({ holds: { a: { x: 0, y: 0 }, b: { x: 500, y: 500 } }, holdTypes: { a: "jug", b: "jug" },
                position: { LH: "a", RH: null, LF: null, RF: null }, reach: 77 }) === null);
 
-// ---- 4. demo layout ---------------------------------------------------------
-const best = P.bestMove({ holds: wHolds, holdTypes: wTypes, position: wPos, reach: CLIMBER_REACH });
-const sel = P.evaluate({ holds: wHolds, holdTypes: wTypes, position: wPos, limb: best.limb, reach: CLIMBER_REACH });
+// ---- 4. demo layout: the preset problem ("your problem") ---------------------
+// Outside setup the Lens scores only the problem's holds, so the opening view is these.
+const pHolds = {};
+for (const id of PRESET_PROBLEM) pHolds[id] = wHolds[id];
+check("preset problem: 8-10 holds, includes the preset position, start and top",
+  PRESET_PROBLEM.length >= 8 && PRESET_PROBLEM.length <= 10 &&
+  Object.values(PRESET_POSITION).every((id) => PRESET_PROBLEM.includes(id)) &&
+  PRESET_START.every((id) => PRESET_PROBLEM.includes(id)) && PRESET_PROBLEM.includes(PRESET_TOP), PRESET_PROBLEM);
+check("the top hold is the problem's clear top (highest by 30 cm or more)",
+  PRESET_PROBLEM.every((id) => id === PRESET_TOP || wHolds[PRESET_TOP].y - wHolds[id].y >= 30));
+const best = P.bestMove({ holds: pHolds, holdTypes: wTypes, position: wPos, reach: CLIMBER_REACH });
+const sel = P.evaluate({ holds: pHolds, holdTypes: wTypes, position: wPos, limb: best.limb, reach: CLIMBER_REACH });
 const counts = { green: 0, yellow: 0, red: 0 };
 for (const r of sel.results) counts[r.colour]++;
-console.log(`\n  preset: auto-selected ${best.limb}, suggestion ${best.holdId} (${best.score.toFixed(2)}); colours ${JSON.stringify(counts)}`);
-check("preset shows green, yellow and red for the auto-selected limb", counts.green > 0 && counts.yellow > 0 && counts.red > 0, counts);
-const com = P.centreOfMass(wPos, wHolds);
-const greenJug = sel.results.some((r) => wTypes[r.holdId] === "jug" && r.colour === "green" && r.parts.reachFactor === 1 && wHolds[r.holdId].y > com.y);
+console.log(`\n  preset problem: auto-selected ${best.limb}, suggestion ${best.holdId} (${best.score.toFixed(2)}); colours ${JSON.stringify(counts)}`);
+check("preset problem shows green, yellow and red for the auto-selected limb", counts.green > 0 && counts.yellow > 0 && counts.red > 0, counts);
+const com = P.centreOfMass(wPos, pHolds);
+const greenJug = sel.results.some((r) => wTypes[r.holdId] === "jug" && r.colour === "green" && r.parts.reachFactor === 1 && pHolds[r.holdId].y > com.y);
 check("a jug within 80% reach above the COM is green", greenJug);
 check("an out-of-reach hold is red", sel.results.some((r) => r.parts.reachFactor === 0 && r.colour === "red"));
 

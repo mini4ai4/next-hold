@@ -6,6 +6,7 @@ import {C3ReachAndJugScenario} from "./C3ReachAndJugScenario"
 import {C4SuggestionScenario} from "./C4SuggestionScenario"
 import {C5AskWhyScenario} from "./C5AskWhyScenario"
 import {ReachIKScenario} from "./ReachIKScenario"
+import {N1MarkProblemScenario} from "./N1MarkProblemScenario"
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -17,5 +18,6 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "c4-suggestion-label-arrow", typename: C4SuggestionScenario.getTypeName()},
     {id: "c5-ask-why", typename: C5AskWhyScenario.getTypeName()},
     {id: "extra-ik-reach-controls", typename: ReachIKScenario.getTypeName()},
+    {id: "r1-mark-problem", typename: N1MarkProblemScenario.getTypeName()},
   ]
 }
