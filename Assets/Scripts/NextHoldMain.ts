@@ -20,7 +20,7 @@
 // isAskArmed(), isOffViewArrowVisible(), isTypePickerVisible(), getHoldType(id),
 // isInProblem(id), getProblemHolds(), getStartHolds(), getTopHold(), isHoldDim(id),
 // isMarkVisible(id), getTagText(id), getPreview(), getGhostHold(n), getView(),
-// getTorso(), getGroundViewCm(), getGroundSizedCm(), getRingLineWidth(), getFigureMask().
+// getTorso(), getGroundViewCm(), getGroundSizedCm(), getRingLineWidth(), getFigureMask(), isTopped(), getToppedAt().
 // Test hook: setSizingCamera(cam) sizes Ground from another camera's distance.
 // Action API mirrors a pinch: pressHold(id), pressLimb(limb), pressAsk(),
 // pressMode(), pressView(), pressHeight(±1), pickType(type), pressStart(), pressTop(), pressRemove(), pressDone().
@@ -38,7 +38,9 @@ import {
   Evaluation, HoldTypes, Holds, LEG_REACH, LIMBS, Limb, Position, ScoreResult, bestMove, centreOfMass, evaluate, hipOf,
   sequence, shoulderOf,
 } from "./NextHoldScoring"
-import {DESIGN_VIEW_CM, FigureBody, NextHoldWallVisuals, OverlayState, RingColour, WallPt, minReadSize, ringLineWidth} from "./NextHoldWallVisuals"
+import {
+  DESIGN_VIEW_CM, FigureBody, NextHoldWallVisuals, OverlayState, RingColour, TOPPED_TEXT, WallPt, minReadSize, ringLineWidth,
+} from "./NextHoldWallVisuals"
 import {NextHoldControlRowUI} from "./NextHoldControlRowUI"
 import {NextHoldTypePickerUI} from "./NextHoldTypePickerUI"
 import {NextHoldCalloutUI, WHY_HALF_H, whyHalfWidth} from "./NextHoldCalloutUI"
@@ -91,6 +93,12 @@ const LABEL_GAP = 2.4
 /** half the suggestion label's box at its 110 cm size (cm): "R hand" at the label's size */
 const LABEL_HALF_W = 7
 const LABEL_HALF_H = 2
+
+/** session 19, topping out: once a hand is on the problem's top hold the climb is done. Its "TOP" tag
+ *  reads "TOPPED" (green) for TOPPED_SECONDS, then fades out over TOPPED_FADE_SECONDS; meanwhile
+ *  there is no next move (no glow, no 1-2-3, no arrow). A hand off the top hold climbs on as before. */
+export const TOPPED_SECONDS = 2
+export const TOPPED_FADE_SECONDS = 0.6
 
 /** the in-Lens height setting: range and step (cm) */
 export const HEIGHT_MIN_CM = 150
@@ -199,6 +207,10 @@ export class NextHoldMain extends BaseScriptComponent {
    *  cheapest secure route to the top for this body, see NextHoldScoring.sequence) */
   private preview: ScoreResult[] = []
   private pickerHold: string | null = null
+  /** getTime() when a hand last reached the top hold (-1: not topped); the "TOPPED" tag times from it */
+  private toppedAt = -1
+  /** the "TOPPED" tag is still up (it is dropped once it has faded out) */
+  private toppedShown = false
   /** the control row outline last pushed to the stick figure */
   private lastMask: WallPt[] | null = null
   /** the control row's laid-out size it was last placed with ("" = not laid out yet) */
@@ -275,6 +287,7 @@ export class NextHoldMain extends BaseScriptComponent {
       this.visuals.tick(getTime())
       this.ripple.tick(getTime())
       if (!this.ready) return
+      this.tickTopped(getTime())
       // the row lays itself out late (after a start or a refresh): once its real size is known, or
       // whenever it changes, place it again, or in Ground it sits too close and covers a ring
       const size = this.controlRow.getSize()
@@ -341,7 +354,14 @@ export class NextHoldMain extends BaseScriptComponent {
     }
     if (this.isOccupied(id)) return // the reference doesn't score occupied holds
     this.rippleHold(id)
+    const wasTopped = this.isTopped()
     this.position[this.selected] = id
+    // a hand just reached the top hold: the problem is done, "TOPPED" from this frame
+    if (!wasTopped && this.isTopped()) {
+      this.toppedAt = getTime()
+      this.toppedShown = true
+      this.visuals.setToppedAlpha(1)
+    }
     this.callouts.hideWhy()
     this.recompute(true)
   }
@@ -450,6 +470,24 @@ export class NextHoldMain extends BaseScriptComponent {
     this.recompute(false)
   }
 
+  /** A hand is on the problem's top hold, climbing: the problem is done (read API too). */
+  isTopped(): boolean {
+    const top = this.getTopHold()
+    return this.mode === "climb" && top !== null && HAND_LIMBS.some((l) => this.position[l] === top)
+  }
+
+  /** Each frame while "TOPPED" is up: full for TOPPED_SECONDS, then it fades out and is dropped. */
+  private tickTopped(time: number): void {
+    if (!this.toppedShown) return
+    const fade = (time - this.toppedAt - TOPPED_SECONDS) / TOPPED_FADE_SECONDS
+    if (fade < 1) {
+      this.visuals.setToppedAlpha(fade <= 0 ? 1 : 1 - fade)
+      return
+    }
+    this.toppedShown = false
+    this.recompute(false)
+  }
+
   // ── recompute: same frame as the change ──────────────────────────────────
   private recompute(autoSelect: boolean): void {
     const reach = this.reach()
@@ -465,6 +503,11 @@ export class NextHoldMain extends BaseScriptComponent {
     for (const r of this.evaluation.results) this.byHold[r.holdId] = r
 
     const climb = this.mode === "climb"
+    const topped = this.isTopped()
+    if (!topped) {
+      this.toppedAt = -1
+      this.toppedShown = false
+    }
     const rings: {[id: string]: RingColour | null} = {}
     const marks: {[id: string]: boolean} = {}
     const tags: {[id: string]: string} = {}
@@ -472,14 +515,17 @@ export class NextHoldMain extends BaseScriptComponent {
       rings[id] = climb && this.byHold[id] ? this.byHold[id].colour : null
       // outside setup the holds that aren't in the problem stay visible, but dim
       this.wall.setHoldDim(id, climb && !this.problem[id])
-      // climbing: the goal of the sequence is marked "TOP" (Ground only, see pushOverlay)
-      if (climb && id === goalTop) tags[id] = "TOP"
+      // climbing: the goal of the sequence is marked "TOP" (Ground only, see pushOverlay); topped out,
+      // "TOPPED" for a moment (both views), then nothing
+      if (climb && id === goalTop && !topped) tags[id] = "TOP"
+      if (climb && id === goalTop && topped && this.toppedShown) tags[id] = TOPPED_TEXT
       if (climb || !this.problem[id]) continue
       marks[id] = true
       const tag = (this.startFlags[id] ? ["START"] : []).concat(goalTop === id ? ["TOP"] : [])
       if (tag.length) tags[id] = tag.join(" · ")
     }
-    const sug = climb ? this.evaluation.suggestion : null
+    // topped out there is no next move: no glow, no label, no 1-2-3, no arrow (the rings stay)
+    const sug = climb && !topped ? this.evaluation.suggestion : null
     // look-ahead from the same position, in the same frame as the rings
     this.preview = climb && sug
       ? sequence({holds, holdTypes: this.holdTypes, position: this.position, reach, top: goalTop, limb: this.selected})
@@ -533,8 +579,10 @@ export class NextHoldMain extends BaseScriptComponent {
     } else {
       const rings: {[id: string]: RingColour | null} = {}
       if (s.glowHoldId) rings[s.glowHoldId] = s.rings[s.glowHoldId] || null
-      // On wall: one ring and its word; the climbing TOP tag is a Ground thing (setup keeps its tags)
-      const tags = this.mode === "climb" ? {} : s.tags
+      // On wall: one ring and its word; the climbing TOP tag is a Ground thing (setup keeps its tags),
+      // but "TOPPED" is the word when there is no ring left
+      const tags: {[id: string]: string} = this.mode === "climb" ? {} : s.tags
+      if (this.mode === "climb") for (const id of Object.keys(s.tags)) if (s.tags[id] === TOPPED_TEXT) tags[id] = TOPPED_TEXT
       this.visuals.apply({...s, rings, tags, ghosts: [], viewCm: DESIGN_VIEW_CM, labelScale, labelBox})
     }
     // the label's size changed with the view: keep it just below the ring
@@ -969,7 +1017,7 @@ export class NextHoldMain extends BaseScriptComponent {
   /** Hold the limb's dim position marker sits on (null when hidden). */
   getMarkerHold(limb: Limb): string | null { return this.visuals ? this.visuals.markerHold(limb) : null }
   getSuggestion(): {limb: Limb; holdId: string; label: string; score: number} | null {
-    const s = this.mode === "climb" ? this.evaluation.suggestion : null
+    const s = this.mode === "climb" && !this.isTopped() ? this.evaluation.suggestion : null
     return s ? {limb: s.limb, holdId: s.holdId, label: LIMB_LABEL[s.limb], score: s.score} : null
   }
   getEvaluation(): Evaluation { return this.evaluation }
@@ -1016,6 +1064,8 @@ export class NextHoldMain extends BaseScriptComponent {
   /** the ripple's radius and its white band's width right now (cm) */
   getRippleRadius(): number { return this.ripple ? this.ripple.getRadius() : 0 }
   getRippleBandWidth(): number { return this.ripple ? this.ripple.getBandWidth() : 0 }
+  /** getTime() when a hand reached the top hold, or -1 when not topped out */
+  getToppedAt(): number { return this.toppedAt }
 }
 
 /** gap (cm) between a box (centre c, half sizes hw x hh) and a circle; < 0 when they overlap */

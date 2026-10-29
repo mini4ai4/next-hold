@@ -1,4 +1,4 @@
-// DemoAutopilot — plays the demo video's scenes 0-7 (devpost/VIDEO_PLAN.md) by itself, so the
+// DemoAutopilot — plays the demo video's scenes 0-8 (devpost/VIDEO_PLAN.md) by itself, so the
 // take is the real Lens running, smooth and the same every time. OFF unless "Play On Start" is
 // ticked (or a LEAF scenario calls play()): with it off this component binds nothing and changes nothing.
 //
@@ -33,7 +33,7 @@ interface Faded { read: () => number; write: (a: number) => void; base: number; 
 
 @component
 export class DemoAutopilot extends BaseScriptComponent {
-  @ui.label('<span style="color: #60A5FA;">DemoAutopilot – plays VIDEO_PLAN scenes 0-7 for recording (timeline: DemoTimeline.ts)</span>')
+  @ui.label('<span style="color: #60A5FA;">DemoAutopilot – plays VIDEO_PLAN scenes 0-8 for recording (timeline: DemoTimeline.ts)</span>')
   @ui.separator
   @input
   @hint("The NextHold object's NextHoldMain")
@@ -50,7 +50,7 @@ export class DemoAutopilot extends BaseScriptComponent {
 
   @input
   @hint("Start the take here (timeline s) to rehearse or tweak one scene: every action before it runs at once, so the state is the same as in the full take. 0 for recording")
-  @widget(new SliderWidget(0, 130, 0.5))
+  @widget(new SliderWidget(0, 141, 0.5))
   startAt: number = 0
 
   @input

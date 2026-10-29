@@ -123,6 +123,8 @@ export class NextHoldOffViewArrow extends BaseScriptComponent {
     this.target = worldPos
     this.targetKey = key
     this.targetRadius = radiusCm
+    // no next move (topped out, setup): gone in this frame, not at its late update
+    if (!worldPos) this.setVisible(false)
   }
 
   isArrowVisible(): boolean {

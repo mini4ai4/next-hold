@@ -10,6 +10,9 @@
 //   and gone when looking back; 7 the setup picker: open on h12, Crimp, Start, Done, reopened, Removed.
 // Session 18, every frame of the take: On wall the panel's screen box never overlaps the ring's;
 // each height change happens with the −/+ row in the shot; every pinch shows its ripple there.
+// Session 19: scene 4 keeps the whole glow of "up" in the shot with the −/+ row and "2 · LH", and
+// scene 5 the whole glow of lh; the pinch on a hold in scenes 3 and 8 ripples on screen; scene 8
+// follows the plan, each pinch on the hold glowing at its turn, to the top hold and "TOPPED".
 // The view is the Lens's own: the autopilot moves the wearer's camera, so Main measures the real
 // eye distance (no sizing camera). It also checks that idle the autopilot touches nothing, every
 // scene start is logged in order, and stop() hands back tracking, hidden objects and colours.
@@ -25,6 +28,7 @@ import {
   activeRingBox, camera, checkArrowPointsAt, checkRowClearOfRing, checkWhyAgrees, eyeToWallCm, fmtBox, frames, getMain,
   makeReference, mustFind, notOnScreen, restorePreset, screenBoxOf,
 } from "./NextHoldTestKit"
+import {RefLimb, RefPosition} from "./NextHoldReferenceRule"
 
 const SPEED = 8
 
@@ -104,6 +108,17 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
     want(main.isRingGlowing(id), `the glow is not on ${id}`)
     want(!!g && g.x0 >= 0 && g.x1 <= 1 && g.y0 >= 0 && g.y1 <= 1, `the glow of ${id} is cut by the frame (${fmtBox(g)})`)
     print(`[d1] ${key}: glow of ${id} ${fmtBox(g)}`)
+  }
+  /** session 19, scene 8: the glow is step 1 of the plan the test's own search finds, with the label */
+  const followsPlan = (limb: string, hold: string, label: string) => {
+    const sug = main.getSuggestion()
+    want(!!sug && sug.limb === limb && sug.holdId === hold, `glow ${sug ? sug.limb + " on " + sug.holdId : "none"}, want ${limb} on ${hold}`)
+    const ref = makeReference(main.getHeightCm())
+    const plan = ref.sequence(pos as RefPosition, main.getSelectedLimb() as RefLimb)
+    want(!!plan[0] && plan[0].limb === limb && plan[0].holdId === hold,
+      `the test's plan starts ${plan[0] ? plan[0].limb + " on " + plan[0].holdId : "nowhere"}, want ${limb} on ${hold}`)
+    want(main.getLabelText() === label, `label "${main.getLabelText()}", want "${label}"`)
+    glowInShot(hold)
   }
   const badge2 = (hold: string, text: string) => {
     const b = badge(2)
@@ -218,8 +233,38 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
     case "s7-removed":
       want(!main.isTypePickerVisible() && !main.isInProblem("h12"), `picker shown ${main.isTypePickerVisible()}, h12 in ${main.isInProblem("h12")}`)
       break
+    case "s8-plan":
+      // back in climb, at 2.5 m: the plan's next move is LF to lh, and "2 · LH" sits on TOP
+      ground(240, 260)
+      want(main.getMode() === "climb", `mode ${main.getMode()}`)
+      want(pos.RH === "up" && pos.LH === "h09" && pos.LF === "lf" && pos.RF === "rf", `position ${JSON.stringify(pos)}`)
+      followsPlan("LF", "lh", "L foot")
+      badge2("h20", "2 · LH")
+      want(main.getTagText("h20") === "TOP", `h20 tag "${main.getTagText("h20")}", want TOP`)
+      break
+    case "s8-rf":
+      want(pos.LF === "lh", `LF on ${pos.LF}, want lh`)
+      followsPlan("RF", "rh", "R foot")
+      break
+    case "s8-lh":
+      want(pos.RF === "rh", `RF on ${pos.RF}, want rh`)
+      followsPlan("LH", "h20", "L hand")
+      break
+    case "s8-topped": {
+      // a hand on TOP: "TOPPED" in green over it, in the shot, and no next move
+      want(pos.LH === "h20" && main.isTopped(), `LH on ${pos.LH}, topped ${main.isTopped()}`)
+      want(main.getTagText("h20") === "TOPPED", `h20 tag "${main.getTagText("h20")}", want TOPPED`)
+      want(alphaOf("Tag_h20") > 0.95, `TOPPED drawn at alpha ${alphaOf("Tag_h20").toFixed(2)}`)
+      const off = notOnScreen(["Tag_h20"], camera())
+      want(!off.length, `not fully in view: ${off.join(", ")}`)
+      want(!main.getSuggestion() && !mustFind("SuggestGlow").enabled && !main.isLabelVisible() && !badge(2).hold && !main.isOffViewArrowVisible(),
+        `topped but a next move still shows: suggestion ${JSON.stringify(main.getSuggestion())}, glow ${mustFind("SuggestGlow").enabled}, ` +
+        `label ${main.isLabelVisible()}, badge 2 ${badge(2).hold}, arrow ${main.isOffViewArrowVisible()}`)
+      break
+    }
     case "end":
       want(main.getMode() === "climb", `mode ${main.getMode()} at the end`)
+      want(main.isTopped(), "no longer topped at the end")
       break
     default:
       e.push("no check written for this key")
@@ -336,7 +381,7 @@ export class D1DemoAutopilotScenario extends Scenario {
 
     const log = pilot.getSceneLog()
     print(`[d1] scenes ${log.map((l) => `${l.n}@${l.t.toFixed(1)}`).join(" ")}`)
-    if (log.map((l) => l.n).join() !== SCENES.map((s) => s.n).join()) errs.push(`scene log ${log.map((l) => l.n).join(",")}, want 0-7 in order`)
+    if (log.map((l) => l.n).join() !== SCENES.map((s) => s.n).join()) errs.push(`scene log ${log.map((l) => l.n).join(",")}, want 0-${SCENES.length - 1} in order`)
 
     // stopped: everything handed back
     await frames(3)

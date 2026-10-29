@@ -1,4 +1,4 @@
-// DemoTimeline — the demo video's scenes 0-7 (devpost/VIDEO_PLAN.md) as data, for DemoAutopilot.
+// DemoTimeline — the demo video's scenes 0-8 (devpost/VIDEO_PLAN.md) as data, for DemoAutopilot.
 //
 // Everything here is in timeline seconds from the start of the take (scene 0 = 0.0). The autopilot
 // waits START_DELAY seconds after the Lens starts, then plays this; its Time Scale input speeds the
@@ -24,7 +24,7 @@ export type DemoActionName = "pressLimb" | "pressHold" | "pressHeight" | "pressA
 export interface DemoAction { t: number; do: DemoActionName; arg?: string | number }
 export interface DemoCheck { t: number; key: string }
 
-/** VIDEO_PLAN v3 scene starts (s); the take ends at END */
+/** VIDEO_PLAN v4 scene starts (s); the take ends at END */
 export const SCENES: DemoScene[] = [
   {n: 0, start: 0, title: "the lit Ground read from 2.5 m: glow, R hand, 2 · LH, TOP"},
   {n: 1, start: 8, title: "look down at the start, up at the plan"},
@@ -34,8 +34,9 @@ export const SCENES: DemoScene[] = [
   {n: 5, start: 90, title: "175 again; RH to up, LH to h09; LF; ? on h11"},
   {n: 6, start: 105, title: "look away: arrow and chime; look back"},
   {n: 7, start: 117, title: "setup: mark a hold, Crimp, Start, Done, Remove"},
+  {n: 8, start: 130, title: "follow the plan to TOP: LF to lh, RF to rh, LH to TOP; TOPPED"},
 ]
-export const END = 130
+export const END = 141
 
 /** session 18: the take opens on the lit read (the hook in 2 s): the overlays fade in from 1 s to 2 s */
 export const OVERLAYS_FROM = 1
@@ -112,7 +113,10 @@ export const CAMERA: CameraKey[] = [
   // 7: step in and right a little, toward h12 (still Ground: 1.7 m)
   {t: 117, x: FEET_X, y: 0, z: FEET_Z, pitch: 0, yaw: FEET_YAW},
   {t: 120, x: 20, y: 0, z: 45, pitch: -4, yaw: 0},
-  {t: END, x: 20, y: 0, z: 45, pitch: -4, yaw: 0},
+  {t: 130, x: 20, y: 0, z: 45, pitch: -4, yaw: 0},
+  // 8 (session 19): back to 2.5 m and the upper look, where the rest of the climb and TOP are in view
+  {t: 132.5, x: 0, y: 0, z: BACK, pitch: UPPER, yaw: 0},
+  {t: END, x: 0, y: 0, z: BACK, pitch: UPPER, yaw: 0},
 ]
 
 export const ACTIONS: DemoAction[] = [
@@ -163,6 +167,11 @@ export const ACTIONS: DemoAction[] = [
   {t: 125.9, do: "pressHold", arg: "h12"},
   {t: 127.6, do: "pressRemove"},
   {t: 129.3, do: "pressMode"},
+  // 8 (session 19): follow the plan to the end, each pinch on the hold glowing at its turn: LF to
+  // lh, then RF to rh, then LH to the top hold h20 (the "2 · LH" the plan showed): "TOPPED"
+  {t: 133, do: "pressHold", arg: "lh"},
+  {t: 135.3, do: "pressHold", arg: "rh"},
+  {t: 137.6, do: "pressHold", arg: "h20"},
 ]
 
 /** the key states LEAF d1 checks, each just before the next thing happens */
@@ -187,6 +196,10 @@ export const CHECKS: DemoCheck[] = [
   {t: 125.6, key: "s7-done"},
   {t: 127.3, key: "s7-reopened"},
   {t: 129, key: "s7-removed"},
+  {t: 132.8, key: "s8-plan"},
+  {t: 135.1, key: "s8-rf"},
+  {t: 137.4, key: "s8-lh"},
+  {t: 138.2, key: "s8-topped"},
   {t: END, key: "end"},
 ]
 

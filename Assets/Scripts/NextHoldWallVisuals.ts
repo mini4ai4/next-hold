@@ -27,6 +27,7 @@
 import {UVGeo, UV_LAYOUT, addProfileAnnulus} from "./Wall/MeshKit"
 import {HOLDS, HOLD_SIZE, HoldDef} from "./Wall/WallLayout"
 import {GLOW_PROFILE, HOVER_PROFILE, ProfileRow, RING_PROFILE, overlayMaterial, profileV} from "./Wall/ProceduralTextures"
+import {ORDER_RIPPLE} from "./NextHoldPinchRipple"
 
 export type RingColour = "green" | "yellow" | "red"
 
@@ -43,7 +44,8 @@ export interface OverlayState {
   /** setup mode: holds marked as part of "your problem" (thin pale ring); empty outside setup */
   marks: {[id: string]: boolean}
   /** tag text by a hold: in setup under each marked hold ("START", "TOP"); in Ground's climb view
-   *  "TOP" over the problem's top hold. Absent = no tag */
+   *  "TOP" over the problem's top hold, and for a moment "TOPPED" (green) once a hand is on it
+   *  (in either view). Absent = no tag */
   tags: {[id: string]: string}
   /** tags sit above the hold's ring (climb: the top of the problem) instead of under it (setup) */
   tagsAbove?: boolean
@@ -104,6 +106,14 @@ const TAG_SIZE = 44
 const TAG_GAP = 1.8
 /** the climbing "TOP" over the problem's top hold: the goal of the whole sequence, a step larger */
 const TOP_TAG_SIZE = 60
+/** session 19: the top tag once a hand is on the top hold (Main shows it briefly, then fades it): in
+ *  green, larger than "TOP", with a dark outline like the suggestion label's so it reads on the ply */
+export const TOPPED_TEXT = "TOPPED"
+const TOPPED_TAG_SIZE = 96
+const TOPPED_OUTLINE = 0.3
+const TOPPED_OUTLINE_COLOR = new vec4(0.08, 0.1, 0.09, 0.85)
+/** over the pinch ripple, which opens right over the top hold in the top-out pinch */
+export const ORDER_TOPPED = ORDER_RIPPLE + 1
 const TAG_HALF_W_PER_CHAR = 0.6
 const TAG_HALF_H = 0.9
 /** sequence preview: steps 2 and 3 as small, light badges "2 · LH" (they must read on the additive
@@ -307,6 +317,8 @@ export class NextHoldWallVisuals {
   private state: OverlayState | null = null
   private ringMeshes: {[r: string]: RenderMesh} = {}
   private thinMeshes: {[r: string]: RenderMesh} = {}
+  /** the "TOPPED" tag's alpha (Main fades it out) */
+  private toppedAlpha = 1
 
   constructor(
     private wallRoot: SceneObject,
@@ -423,8 +435,19 @@ export class NextHoldWallVisuals {
       t.so.enabled = !!tag
       if (tag) {
         t.text.text = tag
+        const topped = tag === TOPPED_TEXT
+        const tc = topped ? this.colours.green : TAG_COLOR
+        t.text.textFill.color = new vec4(tc.x, tc.y, tc.z, topped ? this.toppedAlpha : tc.w)
+        t.text.outlineSettings.enabled = topped
+        // the top-out pinch's own ripple opens right over it: "TOPPED" draws above it
+        t.text.setRenderOrder(topped ? ORDER_TOPPED : 0)
+        if (topped) {
+          t.text.outlineSettings.size = TOPPED_OUTLINE
+          const o = TOPPED_OUTLINE_COLOR
+          t.text.outlineSettings.fill.color = new vec4(o.x, o.y, o.z, o.w * this.toppedAlpha)
+        }
         // tags grow with the distance like the ring line
-        const tk = Math.max(1, viewCm / DESIGN_VIEW_CM) * (s.tagsAbove ? TOP_TAG_SIZE / TAG_SIZE : 1)
+        const tk = Math.max(1, viewCm / DESIGN_VIEW_CM) * (topped ? TOPPED_TAG_SIZE : s.tagsAbove ? TOP_TAG_SIZE : TAG_SIZE) / TAG_SIZE
         t.text.size = TAG_SIZE * tk
         const r = HOLD_SIZE[h.type].ringR + ringW / 2
         const dy = s.tagsAbove ? r + TAG_GAP * tk : -(r + TAG_GAP * tk)
@@ -745,6 +768,19 @@ export class NextHoldWallVisuals {
   isMarkVisible(id: string): boolean {
     const m = this.marks[id]
     return !!m && m.so.enabled
+  }
+
+  /** The "TOPPED" tag's alpha, 0..1: applied at once to any tag that shows it, and kept for the next apply. */
+  setToppedAlpha(a: number): void {
+    this.toppedAlpha = a
+    for (const id of Object.keys(this.tags)) {
+      const t = this.tags[id]
+      if (!t.so.enabled || t.text.text !== TOPPED_TEXT) continue
+      const c = t.text.textFill.color
+      t.text.textFill.color = new vec4(c.x, c.y, c.z, a)
+      const o = TOPPED_OUTLINE_COLOR
+      t.text.outlineSettings.fill.color = new vec4(o.x, o.y, o.z, o.w * a)
+    }
   }
 
   /** the setup tag shown under the hold ("START", "TOP"), or null */
