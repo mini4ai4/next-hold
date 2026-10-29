@@ -344,8 +344,9 @@ export class NextHoldMain extends BaseScriptComponent {
     this.setView(this.view === "ground" ? "wall" : "ground")
   }
 
-  /** Height − / +: one 5 cm step, kept in 150-200 cm. The wall recolours for the new body in the
-   *  same frame; the selected limb stays (the climber chose it), the position doesn't change. */
+  /** Height − / +: one 5 cm step, kept in 150-200 cm. The wall recolours for the new body and the
+   *  1-2-3 is searched again for it, in the same frame; the selected limb stays (the climber chose
+   *  it), the position doesn't change. */
   pressHeight(step: number): void {
     if (!this.ready || step === 0) return
     const snapped = Math.round(this.heightCm / HEIGHT_STEP_CM) * HEIGHT_STEP_CM
