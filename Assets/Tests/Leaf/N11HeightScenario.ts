@@ -83,6 +83,18 @@ export class N11HeightScenario extends Scenario {
 
     if (!mustFind("HeightDown").enabled || !mustFind("HeightUp").enabled || !mustFind("HeightLabel").enabled) errs.push("the height control is not shown")
     if (main.getHeightCm() !== BRIEF_HEIGHT || main.getHeightLabel() !== "Height 175 cm") errs.push(`at open: height ${main.getHeightCm()}, panel "${main.getHeightLabel()}"`)
+    // session 15: "−", the label and "+" on one line, buttons and glyphs alike (in the row's own plane)
+    {
+      const row = mustFind("HeightRow").getTransform().getInvertedWorldTransform()
+      const ys = ["HeightDown", "HeightLabel", "HeightUp"].map((n) => row.multiplyPoint(mustFind(n).getTransform().getWorldPosition()).y)
+      const glyphs = ["HeightDown", "HeightLabel", "HeightUp"].map((n) => {
+        const label = mustFind(n).getChild(0)
+        return row.multiplyPoint(label.getTransform().getWorldPosition()).y
+      })
+      print(`[r7] height row centres y ${ys.map((y) => y.toFixed(3)).join(" / ")}, glyphs ${glyphs.map((y) => y.toFixed(3)).join(" / ")}`)
+      if (Math.max(...ys) - Math.min(...ys) > 0.05) errs.push(`the height row's − / label / + are not on one line: y ${ys.join(", ")}`)
+      if (Math.max(...glyphs) - Math.min(...glyphs) > 0.05) errs.push(`the height row's glyphs are not on one line: y ${glyphs.join(", ")}`)
+    }
     if (Math.abs(main.getReach() - 77) > 1e-9) errs.push(`reach ${main.getReach()} at 175 cm, want 77`)
     const selected = main.getSelectedLimb()
     if (selected !== "RH") errs.push(`precondition: the preset selects ${selected}, want RH`)
