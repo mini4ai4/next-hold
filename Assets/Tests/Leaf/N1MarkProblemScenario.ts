@@ -1,11 +1,13 @@
-// Review item 1, "Mark your problem": in setup mode a pinch on a hold toggles
-// it in or out of "your problem", the picker's Start and Top buttons set the
-// start holds and the top hold, and every marked hold shows a marked state
+// Review item 1, "Mark your problem": in setup mode a pinch on a hold adds it to
+// "your problem" and opens its picker (a pinch on a marked hold reopens it; Remove
+// takes it out), the picker's Start and Top buttons set the start holds and the
+// top hold, in any order with the type (session 15: the type used to close the
+// picker first), Done closes it, and every marked hold shows a marked state
 // (Mark_<id> ring, START / TOP tag). Outside setup only the problem's holds are
 // scored and ringed; the other holds stay visible but dim, with no ring, and a
 // pinch on one moves nothing.
 // Input path: real SIK pinches on ModeSwitch, Hold_<id>, StartButton,
-// TopButton and TypeButton_<type>. Expected rings come from the test's own
+// TopButton, TypeButton_<type>, DoneButton and RemoveButton. Expected rings come from the test's own
 // port of scoring.js over the expected problem.
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
@@ -96,28 +98,49 @@ export class N1MarkProblemScenario extends Scenario {
     if (!main.isTypePickerVisible() || main.getPickerHold() !== OUTSIDE) errs.push(`picker not open for ${OUTSIDE} (${main.getPickerHold()})`)
     if (main.isStartLit() || main.isTopLit()) errs.push("Start/Top lit for a hold that is neither")
 
+    // session 15, the setup ordering: the type FIRST. It used to close the picker, so Start and Top
+    // then did nothing. Now the picker stays open and they work in any order.
+    await pinch("TypeButton_crimp")
+    await frames(3)
+    if (main.getHoldType(OUTSIDE) !== "crimp") errs.push(`type of ${OUTSIDE} is ${main.getHoldType(OUTSIDE)}, want crimp`)
+    if (!main.isTypePickerVisible() || main.getPickerHold() !== OUTSIDE) errs.push("order: picking a type closed the picker (Start / Top would no longer work)")
+    if (main.getPickerLitType() !== "crimp") errs.push(`order: the picker lights ${main.getPickerLitType()}, want crimp`)
+
     await pinch("StartButton")
     await frames(3)
-    if (main.getStartHolds().indexOf(OUTSIDE) < 0) errs.push(`StartButton: ${OUTSIDE} not a start hold (${main.getStartHolds().join(",")})`)
+    if (main.getStartHolds().indexOf(OUTSIDE) < 0) errs.push(`order: StartButton after the type: ${OUTSIDE} not a start hold (${main.getStartHolds().join(",")})`)
     if (!main.isStartLit()) errs.push("StartButton not lit after pinch")
     if (main.getTagText(OUTSIDE) !== "START") errs.push(`tag on ${OUTSIDE} "${main.getTagText(OUTSIDE)}", want START`)
 
     await pinch("TopButton")
     await frames(3)
-    if (main.getTopHold() !== OUTSIDE) errs.push(`TopButton: top is ${main.getTopHold()}, want ${OUTSIDE}`)
+    if (main.getTopHold() !== OUTSIDE) errs.push(`order: TopButton after the type: top is ${main.getTopHold()}, want ${OUTSIDE}`)
     if (!main.isTopLit()) errs.push("TopButton not lit after pinch")
     if (main.getTagText(OUTSIDE) !== "START · TOP") errs.push(`tag on ${OUTSIDE} "${main.getTagText(OUTSIDE)}", want "START · TOP"`)
     if (main.getTagText(PRESET_TOP) !== null) errs.push(`old top ${PRESET_TOP} still tagged "${main.getTagText(PRESET_TOP)}"`)
 
-    await pinch("TypeButton_crimp")
+    // and a type again after Start / Top: still open, still counts
+    await pinch("TypeButton_pinch")
     await frames(3)
-    if (main.getHoldType(OUTSIDE) !== "crimp") errs.push(`type of ${OUTSIDE} is ${main.getHoldType(OUTSIDE)}, want crimp`)
-    if (main.isTypePickerVisible()) errs.push("picker still open after picking a type")
+    if (main.getHoldType(OUTSIDE) !== "pinch" || !main.isTypePickerVisible()) errs.push(`order: a second type: ${main.getHoldType(OUTSIDE)}, picker open ${main.isTypePickerVisible()}`)
 
-    // ── pinch it again: out of the problem, its start / top no longer count ──
+    await pinch("DoneButton")
+    await frames(3)
+    if (main.isTypePickerVisible()) errs.push("DoneButton did not close the picker")
+    if (!main.isInProblem(OUTSIDE) || main.getTagText(OUTSIDE) !== "START · TOP") errs.push(`after Done: in problem ${main.isInProblem(OUTSIDE)}, tag "${main.getTagText(OUTSIDE)}"`)
+
+    // ── pinch it again: its picker reopens with what was set; Remove takes it out ──
     await pinch("Hold_" + OUTSIDE)
     await frames(3)
-    if (main.isInProblem(OUTSIDE)) errs.push(`second pinch did not take ${OUTSIDE} out of the problem`)
+    if (!main.isInProblem(OUTSIDE)) errs.push(`a pinch on a marked hold took ${OUTSIDE} out; it should reopen its picker`)
+    if (!main.isTypePickerVisible() || main.getPickerHold() !== OUTSIDE) errs.push(`picker did not reopen for ${OUTSIDE}`)
+    if (main.getPickerLitType() !== "pinch" || !main.isStartLit() || !main.isTopLit()) {
+      errs.push(`reopened picker shows ${main.getPickerLitType()}, Start ${main.isStartLit()}, Top ${main.isTopLit()}; want pinch, lit, lit`)
+    }
+    await pinch("RemoveButton")
+    await frames(3)
+    if (main.isTypePickerVisible()) errs.push("RemoveButton did not close the picker")
+    if (main.isInProblem(OUTSIDE)) errs.push(`RemoveButton did not take ${OUTSIDE} out of the problem`)
     if (main.isMarkVisible(OUTSIDE)) errs.push(`Mark_${OUTSIDE} still shown after taking it out`)
     if (main.getTagText(OUTSIDE) !== null) errs.push(`tag "${main.getTagText(OUTSIDE)}" still on ${OUTSIDE}`)
     if (main.getStartHolds().indexOf(OUTSIDE) >= 0) errs.push(`${OUTSIDE} still counts as a start hold`)
@@ -126,7 +149,9 @@ export class N1MarkProblemScenario extends Scenario {
     // ── take a problem hold out, back to climb: rings follow the problem ──
     await pinch("Hold_" + DROP)
     await frames(3)
-    if (main.isInProblem(DROP) || main.isMarkVisible(DROP)) errs.push(`${DROP} still marked after a pinch in setup`)
+    await pinch("RemoveButton")
+    await frames(3)
+    if (main.isInProblem(DROP) || main.isMarkVisible(DROP)) errs.push(`${DROP} still marked after Remove in setup`)
     await pinch("ModeSwitch")
     await frames(3)
     if (main.getMode() !== "climb") errs.push(`ModeSwitch pinch: mode ${main.getMode()}`)

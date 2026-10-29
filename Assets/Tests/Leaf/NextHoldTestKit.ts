@@ -621,12 +621,12 @@ export function restoreProblem(main: NextHoldMain): void {
     const flagsOk = main.getStartHolds().indexOf(h.id) >= 0 === wantStart && (main.getTopHold() === h.id) === wantTop
     if (isIn && want && flagsOk && main.getHoldType(h.id) === h.type) continue
     if (!isIn && !want && main.getHoldType(h.id) === h.type) continue
-    if (isIn) main.pressHold(h.id) // out
-    main.pressHold(h.id) // in: the picker opens for it
+    main.pressHold(h.id) // in (or already in): its picker opens
     if ((main.getStartHolds().indexOf(h.id) >= 0) !== (want && wantStart)) main.pressStart()
     if ((main.getTopHold() === h.id) !== (want && wantTop)) main.pressTop()
     main.pickType(h.type)
-    if (!want) main.pressHold(h.id) // back out
+    if (want) main.pressDone()
+    else main.pressRemove() // back out
   }
   const probOk = main.getProblemHolds().slice().sort().join() === PRESET_PROBLEM.slice().sort().join()
   const startOk = main.getStartHolds().slice().sort().join() === PRESET_START.slice().sort().join()

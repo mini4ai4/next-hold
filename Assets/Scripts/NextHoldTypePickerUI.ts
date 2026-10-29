@@ -1,14 +1,18 @@
 // NextHoldTypePickerUI — setup mode's type picker (brief: "Mark a hold").
 // Big buttons beside the hold just pinched: jug / crimp / pinch / pocket / sloper,
-// and a row under them: Start (toggle: one of the problem's start holds) and
-// Top (the problem's top hold).
+// a row under them: Start (toggle: one of the problem's start holds) and Top (the
+// problem's top hold), and a last row: Remove (take the hold out of the problem)
+// and Done. Type, Start and Top can be pressed in any order; the picker stays open
+// until Done or Remove (session 15: a type used to close it, so Start and Top only
+// worked if pressed first).
 //
 // Owns: the picker panel and its buttons. Passive view, starts hidden.
-// Main -> UI: showFor(), setFlags(), hide().
-// UI -> Main: onTypePicked(type), onStartPressed, onTopPressed.
+// Main -> UI: showFor(), setFlags(), setType(), hide().
+// UI -> Main: onTypePicked(type), onStartPressed, onTopPressed, onRemovePressed, onDonePressed.
 // Must not: change hold types or the problem itself; Main owns them.
 //
-// Stable scene names for tests: TypePicker panel, TypeButton_<type>, StartButton, TopButton.
+// Stable scene names for tests: TypePicker panel, TypeButton_<type>, StartButton, TopButton,
+// RemoveButton, DoneButton.
 
 import {BackPlate} from "SpectaclesUIKit.lspkg/Scripts/BackPlate"
 import {Button} from "SpectaclesUIKit.lspkg/Scripts/Components/Button/Button"
@@ -72,6 +76,10 @@ export class NextHoldTypePickerUI extends BaseScriptComponent {
   get onStartPressed(): PublicApi<void> { return this._onStartPressed.publicApi() }
   private _onTopPressed = new Event<void>()
   get onTopPressed(): PublicApi<void> { return this._onTopPressed.publicApi() }
+  private _onRemovePressed = new Event<void>()
+  get onRemovePressed(): PublicApi<void> { return this._onRemovePressed.publicApi() }
+  private _onDonePressed = new Event<void>()
+  get onDonePressed(): PublicApi<void> { return this._onDonePressed.publicApi() }
 
   private panel: SceneObject
   private buttons: {[type: string]: Button} = {}
@@ -82,7 +90,7 @@ export class NextHoldTypePickerUI extends BaseScriptComponent {
   private isTop = false
   private wantVisible = false
   private ready = false
-  private pending = TYPES.length + 3 // type buttons + Start + Top + backplate
+  private pending = TYPES.length + 5 // type buttons + Start + Top + Remove + Done + backplate
   private resync: DelayedCallbackEvent
 
   onAwake() {
@@ -139,40 +147,17 @@ export class NextHoldTypePickerUI extends BaseScriptComponent {
     }
 
     // the problem's start holds and its top hold, for the hold just pinched
-    const fw = this.flagButtonWidth
-    const rowW = 2 * fw + this.buttonGap
-    this.flexChild(content, {w: rowW, h: this.buttonHeight}, (rowSO) => {
-      rowSO.name = "ProblemFlagsRow"
-      const f = rowSO.createComponent(FlexLayout.getTypeName()) as FlexLayout
-      f.autoDiscoverItemsOnStart = false
-      f.onInitialized.add(() => {
-        f.width = rowW
-        f.height = this.buttonHeight
-        f.direction = FlexDirection.Row
-        f.columnGap = this.buttonGap
-        f.justifyContent = FlexJustify.Center
-        f.alignItems = FlexAlign.Center
-      })
-      const flag = (name: string, label: string, ev: Event<void>): Button => {
-        let btn: Button
-        this.flexChild(rowSO, {w: fw, h: this.buttonHeight}, (so) => {
-          so.name = name
-          btn = so.createComponent(Button.getTypeName()) as Button
-          btn.setVariant(BUTTON_VARIANT)
-          btn.size = new vec3(fw, this.buttonHeight, 1)
-          btn.setIsToggleable(true)
-          btn.onInitialized.add(() => this.markInit())
-          btn.onTriggerUp.add(() => {
-            ev.invoke()
-            this.resync.reset(0)
-          })
-          this.addButtonLabel(so, label, fw - 0.5)
-        })
-        return btn
-      }
-      this.startButton = flag("StartButton", "Start", this._onStartPressed)
-      this.topButton = flag("TopButton", "Top", this._onTopPressed)
-    })
+    const flags = this.twoButtonRow(content, "ProblemFlagsRow", [
+      {name: "StartButton", label: "Start", ev: this._onStartPressed, toggle: true},
+      {name: "TopButton", label: "Top", ev: this._onTopPressed, toggle: true},
+    ])
+    this.startButton = flags[0]
+    this.topButton = flags[1]
+    // take the hold out of the problem, or close the picker
+    this.twoButtonRow(content, "PickerActionsRow", [
+      {name: "RemoveButton", label: "Remove", ev: this._onRemovePressed, toggle: false},
+      {name: "DoneButton", label: "Done", ev: this._onDonePressed, toggle: false},
+    ])
 
     this.resync = this.createEvent("DelayedCallbackEvent")
     this.resync.bind(() => this.applyStates())
@@ -195,6 +180,18 @@ export class NextHoldTypePickerUI extends BaseScriptComponent {
   hide(): void {
     this.wantVisible = false
     if (this.ready) this.panel.enabled = false
+  }
+
+  /** Main -> UI after a type is picked: light it (the picker stays open). */
+  setType(type: string | null): void {
+    this.current = type
+    this.applyStates()
+  }
+
+  /** Read-back for tests: the type button lit. */
+  getLitType(): string | null {
+    for (const t of TYPES) if (this.buttons[t] && this.buttons[t].isOn) return t
+    return null
   }
 
   /** Main -> UI after Start / Top: light the flags to match Main's state. */
@@ -227,6 +224,44 @@ export class NextHoldTypePickerUI extends BaseScriptComponent {
     }
     if (this.startButton) this.startButton.isOn = this.isStart
     if (this.topButton) this.topButton.isOn = this.isTop
+  }
+
+  /** a row of two flag-width buttons under the types */
+  private twoButtonRow(content: SceneObject, rowName: string,
+                       specs: {name: string; label: string; ev: Event<void>; toggle: boolean}[]): Button[] {
+    const fw = this.flagButtonWidth
+    const rowW = 2 * fw + this.buttonGap
+    const out: Button[] = []
+    this.flexChild(content, {w: rowW, h: this.buttonHeight}, (rowSO) => {
+      rowSO.name = rowName
+      const f = rowSO.createComponent(FlexLayout.getTypeName()) as FlexLayout
+      f.autoDiscoverItemsOnStart = false
+      f.onInitialized.add(() => {
+        f.width = rowW
+        f.height = this.buttonHeight
+        f.direction = FlexDirection.Row
+        f.columnGap = this.buttonGap
+        f.justifyContent = FlexJustify.Center
+        f.alignItems = FlexAlign.Center
+      })
+      for (const s of specs) {
+        this.flexChild(rowSO, {w: fw, h: this.buttonHeight}, (so) => {
+          so.name = s.name
+          const btn = so.createComponent(Button.getTypeName()) as Button
+          btn.setVariant(BUTTON_VARIANT)
+          btn.size = new vec3(fw, this.buttonHeight, 1)
+          btn.setIsToggleable(s.toggle)
+          btn.onInitialized.add(() => this.markInit())
+          btn.onTriggerUp.add(() => {
+            s.ev.invoke()
+            this.resync.reset(0)
+          })
+          this.addButtonLabel(so, s.label, fw - 0.5)
+          out.push(btn)
+        })
+      }
+    })
+    return out
   }
 
   private addButtonLabel(parent: SceneObject, text: string, widthCM: number): void {

@@ -23,7 +23,7 @@
 // getTorso(), getGroundViewCm(), getGroundSizedCm(), getRingLineWidth(), getFigureMask().
 // Test hook: setSizingCamera(cam) sizes Ground from another camera's distance.
 // Action API mirrors a pinch: pressHold(id), pressLimb(limb), pressAsk(),
-// pressMode(), pressView(), pressHeight(±1), pickType(type), pressStart(), pressTop().
+// pressMode(), pressView(), pressHeight(±1), pickType(type), pressStart(), pressTop(), pressRemove(), pressDone().
 // The climber's height (150-200 cm, set in the Lens) is state too: every reach is a share of it.
 //
 // View (Ground / On wall) is display only: both views share the same state and
@@ -48,9 +48,9 @@ import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/
 /** half the why-line plate: WHY_W (40 cm) in NextHoldCalloutUI plus its padding */
 const WHY_HALF_W = 21.5
 /** half the type picker: the Start / Top row (2 x 8 cm + gap) + padding wide;
- *  title, five type buttons, the Start / Top row, gaps and padding tall */
+ *  title, five type buttons, the Start / Top and Remove / Done rows, gaps and padding tall */
 const PICKER_HALF_W = 10.5
-const PICKER_HALF_H = 24
+const PICKER_HALF_H = 27.5
 /** half the control row block (four rows of 5 cm buttons + the note + padding), until its layout reports a size */
 const ROW_HALF_W = 15.4
 const ROW_HALF_H = 14.5
@@ -247,6 +247,8 @@ export class NextHoldMain extends BaseScriptComponent {
       this.typePicker.onTypePicked.add((t) => this.pickType(t))
       this.typePicker.onStartPressed.add(() => this.pressStart())
       this.typePicker.onTopPressed.add(() => this.pressTop())
+      this.typePicker.onRemovePressed.add(() => this.pressRemove())
+      this.typePicker.onDonePressed.add(() => this.pressDone())
 
       this.ready = true
       this.updateGroundDistance(true)
@@ -282,25 +284,19 @@ export class NextHoldMain extends BaseScriptComponent {
   pressHold(id: string): void {
     if (!this.ready || !this.holds[id]) return
     if (this.mode === "setup") {
-      // a pinch toggles the hold in or out of "your problem"; a hold just added gets the picker
-      if (this.problem[id]) {
-        delete this.problem[id]
-        if (this.pickerHold === id) {
-          this.pickerHold = null
-          this.typePicker.hide()
-        }
-      } else {
-        this.problem[id] = true
-        this.pickerHold = id
-        const h = this.holds[id]
-        const ringR = this.ringRadius(id)
-        const right = h.x < 160
-        const px = right ? h.x + ringR + PICKER_HALF_W + 1.5 : h.x - ringR - PICKER_HALF_W - 1.5
-        const py = Math.min(275, Math.max(25, h.y))
-        // the picker is ~47 cm tall: keep all five types and Start / Top inside the view, not just its centre
-        this.typePicker.showFor(this.keepInView(this.wall.wallToWorld(px, py, 12), PICKER_HALF_W, PICKER_HALF_H),
-          this.wallRot(), this.holdTypes[id] || null, !!this.startFlags[id], this.topFlag === id)
-      }
+      // a pinch adds the hold to "your problem" and opens its picker; a pinch on a hold that is
+      // already in it reopens its picker (Remove takes it out). Type, Start and Top then work in
+      // any order, and the picker stays until Done.
+      this.problem[id] = true
+      this.pickerHold = id
+      const h = this.holds[id]
+      const ringR = this.ringRadius(id)
+      const right = h.x < 160
+      const px = right ? h.x + ringR + PICKER_HALF_W + 1.5 : h.x - ringR - PICKER_HALF_W - 1.5
+      const py = Math.min(275, Math.max(25, h.y))
+      // the picker is ~54 cm tall: keep all five types, Start / Top and Remove / Done inside the view
+      this.typePicker.showFor(this.keepInView(this.wall.wallToWorld(px, py, 12), PICKER_HALF_W, PICKER_HALF_H),
+        this.wallRot(), this.holdTypes[id] || null, !!this.startFlags[id], this.topFlag === id)
       this.recompute(false)
       return
     }
@@ -372,11 +368,27 @@ export class NextHoldMain extends BaseScriptComponent {
     this.pushOverlay()
   }
 
+  /** Setup: the hold's type. The picker stays open, so Start and Top still work after it. */
   pickType(type: string): void {
     if (!this.ready || this.mode !== "setup" || !this.pickerHold) return
     this.holdTypes[this.pickerHold] = type
+    this.typePicker.setType(type)
+  }
+
+  /** Setup: close the picker; the hold stays in the problem with what was set. */
+  pressDone(): void {
+    if (!this.ready || this.mode !== "setup" || !this.pickerHold) return
     this.pickerHold = null
     this.typePicker.hide()
+  }
+
+  /** Setup: take the picker's hold out of the problem (its start / top flags stop counting) and close it. */
+  pressRemove(): void {
+    if (!this.ready || this.mode !== "setup" || !this.pickerHold) return
+    delete this.problem[this.pickerHold]
+    this.pickerHold = null
+    this.typePicker.hide()
+    this.recompute(false)
   }
 
   /** Setup: toggle the hold just pinched as one of the problem's start holds. */
@@ -444,6 +456,7 @@ export class NextHoldMain extends BaseScriptComponent {
       ghosts: this.preview.map((m) => ({hold: m.holdId, limb: m.limb, colour: m.colour})),
       // the body: the centre of mass the scoring itself uses for this position
       torso: centreOfMass(this.position, holds),
+      body: this.figureBody(holds, reach),
     }
     this.pushOverlay()
 
@@ -456,7 +469,6 @@ export class NextHoldMain extends BaseScriptComponent {
       const h = this.holds[sug.holdId]
       const r = this.ringRadius(sug.holdId)
       this.callouts.showSuggestion(this.labelPos(sug.holdId), this.wallRot(), LIMB_LABEL[sug.limb])
-      body: this.figureBody(holds, reach),
       this.offViewArrow.setTarget(this.wall.wallToWorld(h.x, h.y, 0), sug.limb + ":" + sug.holdId, r)
     } else {
       this.callouts.hideSuggestion()
@@ -653,18 +665,6 @@ export class NextHoldMain extends BaseScriptComponent {
     this.visuals.setHover(id)
   }
 
-  // ── helpers ───────────────────────────────────────────────────────────────
-  private reach(): number { return this.heightCm * 0.44 }
-  /** The holds the rule sees: the problem's, plus any hold a limb is on (the centre of mass needs it). */
-  private scoredHolds(): Holds {
-    const out: Holds = {}
-    for (const id of Object.keys(this.holds)) {
-      if (this.problem[id] || this.isOccupied(id)) out[id] = this.holds[id]
-    }
-    return out
-  }
-  private wallRot(): quat { return this.wall.getTransform().getWorldRotation() }
-  /** Slide a point (in camera space) so a panel halfW x halfH cm around it stays inside the view. */
   /**
    * The stick figure's body, from the scoring's own: shoulders where the hands reach from
    * (shoulderOf), hips where the feet reach from (hipOf), but never closer than FIGURE_TORSO x
@@ -682,6 +682,18 @@ export class NextHoldMain extends BaseScriptComponent {
             legLength: LEG_REACH * reach, headR: FIGURE_HEAD * this.heightCm}
   }
 
+  // ── helpers ───────────────────────────────────────────────────────────────
+  private reach(): number { return this.heightCm * 0.44 }
+  /** The holds the rule sees: the problem's, plus any hold a limb is on (the centre of mass needs it). */
+  private scoredHolds(): Holds {
+    const out: Holds = {}
+    for (const id of Object.keys(this.holds)) {
+      if (this.problem[id] || this.isOccupied(id)) out[id] = this.holds[id]
+    }
+    return out
+  }
+  private wallRot(): quat { return this.wall.getTransform().getWorldRotation() }
+  /** Slide a point (in camera space) so a panel halfW x halfH cm around it stays inside the view. */
   private keepInView(p: vec3, halfW: number, halfH = 0): vec3 {
     const cam = WorldCameraFinderProvider.getInstance()
     const camComp = cam ? cam.getComponent() : null
@@ -754,6 +766,8 @@ export class NextHoldMain extends BaseScriptComponent {
   getFigureMask(): WallPt[] | null { return this.visuals ? this.visuals.getFigureMask() : null }
   /** the torso point of the stick figure, in wall cm (null before the first recompute) */
   getTorso(): {x: number; y: number} | null { return this.overlay && this.overlay.torso ? {...this.overlay.torso} : null }
+  /** the stick figure's body as drawn: shoulders, hips, arm and leg length, head radius (wall cm) */
+  getFigureBody(): FigureBody | null { return this.overlay && this.overlay.body ? this.overlay.body : null }
   getPosition(): Position { return {...this.position} }
   getSelectedLimb(): Limb { return this.selected }
   getReach(): number { return this.reach() }
@@ -766,8 +780,6 @@ export class NextHoldMain extends BaseScriptComponent {
   getHoldWorldPosition(id: string): vec3 | null {
     const h = this.holds[id]
     return h ? this.wall.wallToWorld(h.x, h.y, 0) : null
-  /** the stick figure's body as drawn: shoulders, hips, arm and leg length, head radius (wall cm) */
-  getFigureBody(): FigureBody | null { return this.overlay && this.overlay.body ? this.overlay.body : null }
   }
   /** Ring colour for the selected limb, or null when the hold shows no ring. */
   getHoldColour(id: string): RingColour | null {
@@ -815,6 +827,7 @@ export class NextHoldMain extends BaseScriptComponent {
   }
   /** the hold look-ahead step n (1-based) is shown on (step 1 by the glow), or null when hidden */
   getGhostHold(n: number): string | null { return this.visuals ? this.visuals.ghostHold(n) : null }
+  getPickerLitType(): string | null { return this.typePicker.getLitType() }
   isStartLit(): boolean { return this.typePicker.isStartLit() }
   isTopLit(): boolean { return this.typePicker.isTopLit() }
 }
