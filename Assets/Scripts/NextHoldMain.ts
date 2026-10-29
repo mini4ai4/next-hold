@@ -26,7 +26,9 @@
 // pressMode(), pressView(), pickType(type), pressStart(), pressTop().
 //
 // View (Ground / On wall) is display only: both views share the same state and
-// scoring; switching it re-pushes the overlay in the same frame.
+// scoring; switching it re-pushes the overlay in the same frame. It follows the
+// eye's distance from the wall (On wall under ON_WALL_CM, Ground over GROUND_CM);
+// the view button overrides until the eye next crosses one of those.
 
 import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
 import {ClimbingWall} from "./Wall/ClimbingWall"
@@ -66,6 +68,11 @@ export type View = "ground" | "wall"
 export const GROUND_VIEW_CM = 365
 /** Ground resizes only when the eye's distance from the wall moves by more than this (cm) */
 const GROUND_RESIZE_CM = 2
+/** The view follows the eye's distance from the wall: closer than ON_WALL_CM it switches to On wall,
+ *  further than GROUND_CM to Ground. In between nothing changes (hysteresis), so a climber leaning
+ *  in and out doesn't flicker. The button overrides until the eye next crosses one of the two. */
+export const ON_WALL_CM = 80
+export const GROUND_CM = 120
 
 /** from the ring line's outer edge to the suggestion label's centre at the label's own size, cm
  *  (with the 1.6 cm line: 3.2 cm below the ring's radius, as before) */
@@ -153,6 +160,8 @@ export class NextHoldMain extends BaseScriptComponent {
   private position: Position = {LH: null, RH: null, LF: null, RF: null}
   private mode: Mode = "climb"
   private view: View = "ground"
+  /** which side of the two thresholds the eye was last on; null = it hasn't crossed either yet */
+  private distanceView: View | null = null
   /** the distance Ground is currently sized for: the eye's distance from the wall plane, clamped */
   private groundCm = GROUND_VIEW_CM
   /** tests only: measure the Ground distance from this camera instead of the wearer's */
@@ -223,15 +232,30 @@ export class NextHoldMain extends BaseScriptComponent {
       this.updateGroundDistance(true)
       // The Lens opens in climb mode with the preset position: auto-select the best move.
       this.recompute(true)
+      this.followDistance()
     })
 
     this.createEvent("UpdateEvent").bind(() => {
       this.visuals.tick(getTime())
       if (!this.ready) return
       this.updateFigureMask(false) // the head moves, and the row lays itself out late
+      // walking in or stepping back past a threshold switches the view
+      if (this.followDistance()) return
       // stepping back or in: Ground re-sizes for the new distance
       if (this.view === "ground" && this.updateGroundDistance(false)) this.pushOverlay()
     })
+  }
+
+  /** Switch the view when the eye crosses ON_WALL_CM or GROUND_CM. True if it switched. */
+  private followDistance(): boolean {
+    const d = this.eyeToWallCm()
+    if (d === null) return false
+    const side: View | null = d < ON_WALL_CM ? "wall" : d > GROUND_CM ? "ground" : this.distanceView
+    if (side === this.distanceView || side === null) return false
+    this.distanceView = side
+    if (side === this.view) return false
+    this.setView(side)
+    return true
   }
 
   // ── actions (one pinch each) ──────────────────────────────────────────────
@@ -300,10 +324,15 @@ export class NextHoldMain extends BaseScriptComponent {
     this.recompute(false) // switching back to climb recomputes everything
   }
 
-  /** Ground <-> On wall. Only what is shown changes: no rescoring, same state, same frame. */
+  /** Ground <-> On wall by hand. It holds until the eye next crosses a threshold (followDistance). */
   pressView(): void {
     if (!this.ready) return
-    this.view = this.view === "ground" ? "wall" : "ground"
+    this.setView(this.view === "ground" ? "wall" : "ground")
+  }
+
+  /** Only what is shown changes: no rescoring, same state, same frame. */
+  private setView(view: View): void {
+    this.view = view
     this.controlRow.setView(this.view)
     if (this.view === "ground") this.updateGroundDistance(true)
     this.pushOverlay()
@@ -599,8 +628,11 @@ export class NextHoldMain extends BaseScriptComponent {
    *  Takes effect at once. */
   setSizingCamera(cam: Camera | null): void {
     this.sizingCamera = cam
-    if (this.ready && this.updateGroundDistance(true) && this.view === "ground") this.pushOverlay()
+    if (!this.ready || this.followDistance()) return
+    if (this.updateGroundDistance(true) && this.view === "ground") this.pushOverlay()
   }
+  /** the eye's distance (cm) from the wall plane as the Lens measures it (the sizing camera's, if set) */
+  getEyeToWallCm(): number | null { return this.eyeToWallCm() }
   /** width of the rings' crisp line in the current view (cm) */
   getRingLineWidth(): number { return ringLineWidth(this.view === "ground" ? this.groundCm : DESIGN_VIEW_CM) }
   /** how much larger the suggestion label (and the glow with it) is drawn than at 110 cm */
