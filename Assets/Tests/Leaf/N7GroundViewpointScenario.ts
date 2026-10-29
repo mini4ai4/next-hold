@@ -2,23 +2,29 @@
 // and the whole problem colours for you". From GROUND_VIEW_CM back from the wall
 // (asked for at 300 cm; the whole problem first fits at 365 cm, so the Lens uses
 // that) at eye height, is every hold of the marked problem, its whole ring,
-// inside the view? The id keeps "300" for the review item it answers.
+// inside the view?
 // The preview camera is driven by device tracking, so instead of moving it the
 // test builds a second camera with the same projection (fov, aspect, near, far,
 // read from the live scene camera), puts it that far back from the wall face at
 // the scene camera's eye height and aims it at the middle of the problem.
-// "In view" is strict: the circle through the outer edge of the ring's line, at
-// the width Ground draws it, must lie fully inside all four sides of the view
-// (camera.isSphereVisible is also reported, but it is true for a ring that is
-// only partly in view). A sanity pass first proves the test camera follows its pose.
-// It also finds the smallest distance (1 cm steps) where the whole problem fits.
+// Ground sizes itself from the eye's distance to the wall, so the test hands the
+// Lens this second camera to size from (setSizingCamera) and reads back what
+// renders: ring line, glow, ghost badges and numbers and label must be the sizes
+// for the second camera's own distance (365 cm), and the fit check uses the line
+// width actually drawn. Handing the wearer's camera back must bring the preset
+// sizes back.
+// "In view" is strict: the circle through the outer edge of the ring's line
+// must lie fully inside all four sides of the view (camera.isSphereVisible is
+// also reported, but it is true for a ring that is only partly in view). A sanity
+// pass first proves the test camera follows its pose.
+// It also finds the smallest distance (1 cm steps) where the whole problem fits,
+// with the line Ground would draw from each distance.
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
-import {ringLineWidth} from "../../Scripts/NextHoldWallVisuals"
-import {camera, getMain, mustFind, restorePreset} from "./NextHoldTestKit"
+import {camera, checkGroundSizes, eyeToWallCm, frames, getMain, groundSizesFor, mustFind, renderedLineWidth, restorePreset} from "./NextHoldTestKit"
 
 @component
 export class N7GroundViewpointScenario extends Scenario {
@@ -44,8 +50,11 @@ export class N7GroundViewpointScenario extends Scenario {
 
       const problem = main.getProblemHolds()
       const holds = problem.map((id) => ({id, p: mustFind("Hold_" + id).getTransform().getWorldPosition(), r: HOLD_SIZE[holdById(id)!.type].ringR}))
-      // the ring's outer line edge at distance `back`: Ground widens the line with the distance
-      const radius = (h: {r: number}, back: number) => h.r + ringLineWidth(back) / 2
+      // the ring's outer line edge from distance `back`: Ground widens the line with the distance.
+      // At BACK_CM it is the width the Lens actually draws (read below), elsewhere the rule's.
+      let drawnLine = groundSizesFor(BACK_CM).line
+      const lineAt = (back: number) => back === BACK_CM ? drawnLine : groundSizesFor(back).line
+      const radius = (h: {r: number}, back: number) => h.r + lineAt(back) / 2
       let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9
       for (const h of holds) {
         const r = radius(h, BACK_CM)
@@ -83,9 +92,21 @@ export class N7GroundViewpointScenario extends Scenario {
       print(`[N7] sanity: aim point visible ${ahead}, point behind the eye visible ${behind}`)
       if (!ahead || behind) errs.push(`sanity: isSphereVisible does not follow the test camera (ahead ${ahead}, behind ${behind})`)
 
+      // what Ground draws for an eye at the second camera: size from its distance, read what renders
+      place(BACK_CM)
+      const camCm = eyeToWallCm(cam)
+      if (Math.abs(camCm - BACK_CM) > 0.5) errs.push(`setup: the second camera is ${camCm.toFixed(1)} cm from the wall plane, want ${BACK_CM}`)
+      main.setSizingCamera(cam)
+      await frames(2)
+      const sizedFar = main.getGroundSizedCm()
+      if (Math.abs(sizedFar - groundSizesFor(camCm).D) > 2) errs.push(`Ground sized for ${sizedFar.toFixed(1)} cm, the second camera is ${camCm.toFixed(1)} cm back`)
+      print(`[N7] sized from the second camera (${camCm.toFixed(1)} cm, Lens ${sizedFar.toFixed(1)} cm): ${checkGroundSizes(main, camCm, errs, "second camera")}`)
+      const sug = main.getSuggestion()
+      if (sug) drawnLine = renderedLineWidth(sug.holdId)
+
       const vFov = (2 * aV * 180) / Math.PI, hFov = (2 * aH * 180) / Math.PI
       const floorY = mustFind("ClimbingWall (stand-in)").getTransform().getWorldPosition().y
-      print(`[N7] view ${hFov.toFixed(1)} x ${vFov.toFixed(1)} deg; problem (whole rings, Ground line ${ringLineWidth(BACK_CM).toFixed(2)} cm) spans ${(x1 - x0).toFixed(0)} x ${(y1 - y0).toFixed(0)} cm; eye ${(eyeY - floorY).toFixed(0)} cm above the floor`)
+      print(`[N7] view ${hFov.toFixed(1)} x ${vFov.toFixed(1)} deg; problem (whole rings, drawn Ground line ${drawnLine.toFixed(2)} cm) spans ${(x1 - x0).toFixed(0)} x ${(y1 - y0).toFixed(0)} cm; eye ${(eyeY - floorY).toFixed(0)} cm above the floor`)
 
       place(BACK_CM)
       const seen = fullyIn(BACK_CM)
@@ -106,8 +127,13 @@ export class N7GroundViewpointScenario extends Scenario {
         errs.push(`from ${BACK_CM} cm back ${missing.length} of ${problem.length} problem rings are not fully inside the ${hFov.toFixed(0)} x ${vFov.toFixed(0)} deg view (${missing.join(",")}); the whole problem first fits at ${fits > 0 ? fits + " cm" : "> 800 cm"}`)
       }
     } finally {
+      main.setSizingCamera(null)
       so.destroy()
     }
+    // the wearer's camera again: back to the sizes for where it stands
+    await frames(2)
+    const eyeCm = eyeToWallCm(live)
+    print(`[N7] back on the wearer's camera (${eyeCm.toFixed(1)} cm, Lens ${main.getGroundSizedCm().toFixed(1)} cm): ${checkGroundSizes(main, eyeCm, errs, "wearer's camera again")}`)
     expect(errs.length, "ground viewpoint:\n" + errs.join("\n")).toBe(0)
   }
 }

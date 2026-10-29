@@ -11,7 +11,8 @@ import {LeafHandInteractor} from "Leaf.lspkg/Interactors/interactor/LeafTwoHandI
 import {findInteractableByName} from "Leaf.lspkg/Interactors/InteractableUtils"
 import {findSceneObjectByName, findSceneObjectsByName, nextFrame} from "Leaf.lspkg/Utils/common/Utils"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
-import {HOLDS, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP} from "../../Scripts/Wall/WallLayout"
+import {HOLDS, HOLD_SIZE, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP, holdById} from "../../Scripts/Wall/WallLayout"
+import {GLOW_PROFILE, HOVER_PROFILE, RING_PROFILE} from "../../Scripts/Wall/ProceduralTextures"
 import {RefColour, RefLimb, RefPosition, RefPt, ReferenceRule, REF_LIMBS} from "./NextHoldReferenceRule"
 
 /** Brief: a 175 cm climber has 77 cm of reach (height x 0.44). Fixed here, not read from the Lens. */
@@ -171,6 +172,113 @@ export function camera(): Camera {
   const cam = mustFind("Camera Object").getComponent("Component.Camera") as Camera
   if (!cam) throw new Error("Camera component missing")
   return cam
+}
+
+// ── Ground sizes: what the overlay must measure from distance D ────────────
+
+/** Sizes as drawn for reading at 110 cm (brief / type scale), fixed here, not read from the Lens */
+export const AT_110 = {
+  ringLine: RING_PROFILE.core, // 1.6 cm
+  body: 39, // Body text: the smallest text meant to be read
+  label: 62 * 1.3, // the suggestion label's own size: HeadlineXL x 1.3
+  ghostNumber: 56,
+  ghostR: 3.4,
+}
+export const GROUND_NEAR_CM = 110
+export const GROUND_FAR_CM = 365
+
+/** The camera's distance (cm) from the wall's face plane, along the wall's normal, from the scene itself. */
+export function eyeToWallCm(cam: Camera): number {
+  const wall = mustFind("ClimbingWall (stand-in)").getTransform().getWorldTransform()
+  const o = wall.multiplyPoint(vec3.zero())
+  const n = wall.multiplyPoint(new vec3(0, 0, 1)).sub(o).normalize()
+  return cam.getSceneObject().getTransform().getWorldPosition().sub(o).dot(n)
+}
+
+/** The rule: from D (clamped to 110-365 cm) each element is its 110 cm size x D / 110; text never
+ *  below its own size, and never reading smaller than Body at 110 cm. */
+export function groundSizesFor(distanceCm: number): {D: number; line: number; label: number; ghostNumber: number; ghostR: number; labelScale: number} {
+  const D = Math.min(GROUND_FAR_CM, Math.max(GROUND_NEAR_CM, distanceCm))
+  const need = (AT_110.body * D) / 110
+  const label = Math.max(AT_110.label, need)
+  const ghostNumber = Math.max(AT_110.ghostNumber, need)
+  return {D, line: (AT_110.ringLine * D) / 110, label, ghostNumber, ghostR: (AT_110.ghostR * ghostNumber) / AT_110.ghostNumber, labelScale: label / AT_110.label}
+}
+
+/**
+ * Width (cm) of the crisp line of the rendered Ring_<id>: the ring texture's core runs from
+ * U = inner / total to U = (inner + core) / total, so it is the radius at the second minus the first.
+ */
+export function renderedLineWidth(id: string): number {
+  const mesh = (mustFind("Ring_" + id).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh
+  const pos = mesh.getVertexDataForAttribute("position")
+  const uv = mesh.getVertexDataForAttribute("texture0")
+  const {inner, core, outer} = RING_PROFILE
+  const total = inner + core + outer
+  const radiusAt = (u: number) => {
+    for (let i = 0; i * 2 < uv.length; i++) {
+      if (Math.abs(uv[i * 2] - u) < 1e-4) return Math.hypot(pos[i * 3], pos[i * 3 + 1])
+    }
+    return NaN
+  }
+  return radiusAt((inner + core) / total) - radiusAt(inner / total)
+}
+
+/** outer radius (cm) of the named object's rendered annulus mesh */
+export function renderedOuterRadius(name: string): number {
+  const pos = (mustFind(name).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh.getVertexDataForAttribute("position")
+  let r = 0
+  for (let i = 0; i * 3 < pos.length; i++) r = Math.max(r, Math.hypot(pos[i * 3], pos[i * 3 + 1]))
+  return r
+}
+
+export function textSize(name: string): number {
+  return (mustFind(name).getComponent("Component.Text") as Text).size
+}
+
+/**
+ * Ground: every rendered size against the rule at distance D: each visible ring's line, the
+ * glow's outer edge, each visible ghost badge (ring radius and number) and the suggestion label.
+ * Returns a one-line summary of what was read.
+ */
+export function checkGroundSizes(main: NextHoldMain, distanceCm: number, errs: string[], tag: string): string {
+  const want = groundSizesFor(distanceCm)
+  // the Lens re-sizes only after the eye moves more than 2 cm, and rounds text up to 0.1: allow
+  // what 2 cm does to each size (line 0.03 cm, text 0.7, glow ~0.1 cm, badge 0.04 cm)
+  const slack = (v: number) => (v * 2) / Math.max(want.D, 1) + 0.005
+  const tol = {line: slack(want.line), text: slack(AT_110.body * want.D / 110) + 0.1, glow: 0.12, ghostR: slack(want.ghostR) + 0.01}
+  const near = (got: number, w: number, t: number) => Math.abs(got - w) <= t
+  const lines: number[] = []
+  for (const h of HOLDS) {
+    if (!mustFind("Ring_" + h.id).enabled) continue
+    const w = renderedLineWidth(h.id)
+    lines.push(w)
+    if (!near(w, want.line, tol.line)) errs.push(`${tag}: Ring_${h.id} line ${w.toFixed(3)} cm, want ${want.line.toFixed(3)} for ${want.D.toFixed(1)} cm`)
+  }
+  if (!lines.length) errs.push(`${tag}: no ring is visible to measure`)
+  const sug = main.getSuggestion()
+  let glow = NaN
+  if (sug && mustFind("SuggestGlow").enabled) {
+    glow = renderedOuterRadius("SuggestGlow")
+    const wantGlow = HOLD_SIZE[holdById(sug.holdId)!.type].ringR + want.line / 2 + GLOW_PROFILE.span * want.labelScale
+    if (!near(glow, wantGlow, tol.glow)) errs.push(`${tag}: glow outer edge ${glow.toFixed(2)} cm, want ${wantGlow.toFixed(2)}`)
+  } else errs.push(`${tag}: no suggestion glow to measure`)
+  const ghosts: string[] = []
+  for (let n = 1; n <= 3; n++) {
+    if (!mustFind("Ghost_" + n).enabled) continue
+    const num = textSize("GhostNumber_" + n)
+    // the badge is a thin ring whose crisp core sits on its radius: outer edge = r - (coreAt + coreW / 2) + span
+    const r = renderedOuterRadius("Ghost_" + n) - HOVER_PROFILE.span + HOVER_PROFILE.coreAt + HOVER_PROFILE.coreW / 2
+    ghosts.push(`${num.toFixed(1)}/${r.toFixed(2)}`)
+    if (!near(num, want.ghostNumber, tol.text)) errs.push(`${tag}: ghost ${n} number size ${num.toFixed(2)}, want ${want.ghostNumber.toFixed(2)}`)
+    if (!near(r, want.ghostR, tol.ghostR)) errs.push(`${tag}: ghost ${n} badge radius ${r.toFixed(2)} cm, want ${want.ghostR.toFixed(2)}`)
+  }
+  const label = textSize("SuggestLabel")
+  if (!near(label, want.label, tol.text)) errs.push(`${tag}: suggestion label size ${label.toFixed(2)}, want ${want.label.toFixed(2)}`)
+  if (!near(main.getRingLineWidth(), want.line, tol.line)) errs.push(`${tag}: Main reports a ${main.getRingLineWidth().toFixed(3)} cm line, want ${want.line.toFixed(3)}`)
+  return `D ${want.D.toFixed(1)} cm: line ${Math.min(...lines).toFixed(2)}-${Math.max(...lines).toFixed(2)} (want ${want.line.toFixed(2)}), ` +
+    `glow edge ${glow.toFixed(2)}, ghosts number/radius ${ghosts.join(" ")} (want ${want.ghostNumber.toFixed(1)}/${want.ghostR.toFixed(2)}), ` +
+    `label ${label.toFixed(1)} (want ${want.label.toFixed(1)})`
 }
 
 // ── setup only: bring the Lens back to the demo preset ──────────────────────

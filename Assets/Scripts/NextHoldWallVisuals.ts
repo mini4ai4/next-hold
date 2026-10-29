@@ -7,8 +7,9 @@
 // GhostNumber_1..3, and the stick figure: Figure_LH / RH / LF / RF lines from
 // Figure_Torso to each limb's hold, faded where they pass behind the control
 // row) and their colours. One cloned material per overlay.
-// The ring line and ghost badges are sized for the view distance in the state
-// (viewCm): from further back they grow so they read as they do at 110 cm.
+// The ring line, glow and ghost badges are sized for the view distance in the state
+// (viewCm, in Ground the eye's measured distance): from further back they grow so
+// they read as they do at 110 cm.
 // Main pushes state in with apply(); this class never scores or decides.
 // Plain class (not a component): Main creates it once in onAwake.
 
@@ -483,6 +484,8 @@ export class NextHoldWallVisuals {
       addProfileAnnulus(g, Math.max(0, c0 - inner), c0, SEG, v, [0, 0, 0], 1, 1, 0, 0, inner / total)
       addProfileAnnulus(g, c0, c1, SEG, v, [0, 0, 0], 1, 1, 0, inner / total, (inner + core) / total)
       addProfileAnnulus(g, c1, c1 + outer, SEG, v, [0, 0, 0], 1, 1, 0, (inner + core) / total, 1)
+      // Ground's line width follows the eye's distance: don't let walking about grow the cache without end
+      if (Object.keys(this.ringMeshes).length > 64) this.ringMeshes = {}
       this.ringMeshes[key] = toMesh(g)
     }
     return this.ringMeshes[key]
@@ -555,6 +558,9 @@ export class NextHoldWallVisuals {
   private cachedAnnulus(cache: {[k: string]: RenderMesh}, rIn: number, rOut: number, row: ProfileRow): RenderMesh {
     const key = rIn + "/" + rOut
     if (!cache[key]) {
+      // the glow and the ghost badges resize with Ground's distance: keep the cache bounded
+      const keys = Object.keys(cache)
+      if (keys.length > 64) for (const k of keys) delete cache[k]
       const g = new UVGeo()
       addProfileAnnulus(g, Math.max(0, rIn), rOut, SEG, profileV(row))
       cache[key] = toMesh(g)

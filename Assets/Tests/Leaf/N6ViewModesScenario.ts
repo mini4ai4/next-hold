@@ -6,48 +6,27 @@
 // suggestion, same colours, same position.
 // Input path: real SIK pinches on ViewToggle, Toggle_<limb> and Hold_<id>; the
 // mode switch is read back inside the pinch's own onTriggerEnd (same frame).
-// Readability from the ground: apparent size goes as 1 / distance, so from the
-// Ground distance D the ghost numbers and the suggestion label must be at least
-// Body (size 39) x D / 110, and the rings' crisp line at least its 110 cm width
-// (1.6 cm) x D / 110. The line width is read from the rendered Ring mesh. On wall
-// keeps its own sizes (1.6 cm line, label at its 110 cm size).
+// Readability from where you stand: Ground sizes the ring line, the glow, the
+// ghost badges and numbers and the suggestion label from the eye's actual distance
+// D from the wall plane (clamped to 110-365 cm): each is its 110 cm size x D / 110,
+// text never below its own size. The preset viewpoint is the near case, so Ground
+// must use those sizes there, not the 365 cm ones. The test measures D from the
+// scene and reads every size from what renders. On wall keeps its own sizes
+// (1.6 cm line, label at its 110 cm size).
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLDS, HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
-import {RING_PROFILE} from "../../Scripts/Wall/ProceduralTextures"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
-import {camera, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, renderedRingColour, restorePreset} from "./NextHoldTestKit"
+import {
+  AT_110, GROUND_FAR_CM, camera, checkGroundSizes, eyeToWallCm, fmtPos, frames, getMain, groundSizesFor, makeReference, mustFind,
+  pinch, pinchCapture, renderedLineWidth, renderedRingColour, restorePreset, textSize,
+} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 
-const BODY_SIZE_AT_110 = 39
-const RING_LINE_AT_110 = RING_PROFILE.core
-/** the label's own size: HeadlineXL (62) x 1.3 */
-const LABEL_OWN_SIZE = 62 * 1.3
-
-/**
- * Width (cm) of the crisp line of the rendered Ring_<id>: the ring texture's core runs from
- * U = inner / total to U = (inner + core) / total, so it is the radius at the second minus the first.
- */
-function renderedLineWidth(id: string): number {
-  const mesh = (mustFind("Ring_" + id).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh
-  const pos = mesh.getVertexDataForAttribute("position")
-  const uv = mesh.getVertexDataForAttribute("texture0")
-  const {inner, core, outer} = RING_PROFILE
-  const total = inner + core + outer
-  const radiusAt = (u: number) => {
-    for (let i = 0; i * 2 < uv.length; i++) {
-      if (Math.abs(uv[i * 2] - u) < 1e-4) return Math.hypot(pos[i * 3], pos[i * 3 + 1])
-    }
-    return NaN
-  }
-  return radiusAt((inner + core) / total) - radiusAt(inner / total)
-}
-
-function textSize(name: string): number {
-  return (mustFind(name).getComponent("Component.Text") as Text).size
-}
+const RING_LINE_AT_110 = AT_110.ringLine
+const LABEL_OWN_SIZE = AT_110.label
 
 interface ViewSnap {
   view: string
@@ -152,21 +131,20 @@ export class N6ViewModesScenario extends Scenario {
     const g0 = snap(main)
     checkGround(main, g0, errs, "ground at open")
 
-    // readable from the ground: apparent size at D vs the same thing at 110 cm
-    const D = main.getGroundViewCm()
-    const need = BODY_SIZE_AT_110 * D / 110
-    const needLine = RING_LINE_AT_110 * D / 110
-    for (let n = 1; n <= 3; n++) {
-      if (!g0.ghosts[n - 1]) continue
-      const size = textSize("GhostNumber_" + n)
-      if (size < need) errs.push(`ground: ghost ${n} number size ${size.toFixed(1)} reads smaller than Body at ${D} cm (need ${need.toFixed(1)})`)
-    }
-    const labelSize = textSize("SuggestLabel")
-    if (labelSize < need) errs.push(`ground: suggestion label size ${labelSize.toFixed(1)} < ${need.toFixed(1)}`)
-    const lines = HOLDS.filter((h) => g0.ringOn[h.id]).map((h) => renderedLineWidth(h.id))
-    const thinnest = Math.min(...lines)
-    if (!(thinnest >= needLine - 0.01)) errs.push(`ground: thinnest ring line ${thinnest.toFixed(2)} cm < ${needLine.toFixed(2)} cm`)
-    print(`[N6] ground readability at ${D} cm: ghost number ${textSize("GhostNumber_1").toFixed(1)}, label ${labelSize.toFixed(1)}, need >= ${need.toFixed(1)}; ring line ${thinnest.toFixed(2)} cm (${lines.length} rings), need >= ${needLine.toFixed(2)}`)
+    // readable from where you stand: sized for the eye's real distance from the wall, not for 365 cm
+    const eyeCm = eyeToWallCm(camera())
+    const atEye = groundSizesFor(eyeCm)
+    const far = groundSizesFor(GROUND_FAR_CM)
+    const sizedCm = main.getGroundSizedCm()
+    if (Math.abs(sizedCm - atEye.D) > 2) errs.push(`ground: sized for ${sizedCm.toFixed(1)} cm, but the eye is ${eyeCm.toFixed(1)} cm from the wall`)
+    print(`[N6] ground at the preset viewpoint: eye ${eyeCm.toFixed(1)} cm from the wall, Lens sized for ${sizedCm.toFixed(1)} cm; ${checkGroundSizes(main, eyeCm, errs, "ground at open")}`)
+    // and plainly not the far sizes (5.3 cm line, label 129): the preset is the near case
+    if (!(eyeCm < 200)) errs.push(`setup: the preset viewpoint is ${eyeCm.toFixed(0)} cm back; this check wants the near case`)
+    const sugG = main.getSuggestion()
+    const lineNow = sugG ? renderedLineWidth(sugG.holdId) : NaN
+    const labelNow = textSize("SuggestLabel")
+    if (!(lineNow < (atEye.line + far.line) / 2)) errs.push(`ground at open: ring line ${lineNow.toFixed(2)} cm is nearer the 365 cm width ${far.line.toFixed(2)} than the ${atEye.D.toFixed(0)} cm one ${atEye.line.toFixed(2)}`)
+    if (!(labelNow < (atEye.label + far.label) / 2)) errs.push(`ground at open: label ${labelNow.toFixed(1)} is nearer the 365 cm size ${far.label.toFixed(1)} than ${atEye.label.toFixed(1)}`)
 
     // ── pinch the view switch: On wall, read in the same frame ──
     const toWall = await pinchCapture("ViewToggle", () => snap(main))

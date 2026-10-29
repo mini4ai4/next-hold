@@ -20,7 +20,8 @@
 // isAskArmed(), isOffViewArrowVisible(), isTypePickerVisible(), getHoldType(id),
 // isInProblem(id), getProblemHolds(), getStartHolds(), getTopHold(), isHoldDim(id),
 // isMarkVisible(id), getTagText(id), getPreview(), getGhostHold(n), getView(),
-// getTorso(), getGroundViewCm(), getRingLineWidth(), getFigureMask().
+// getTorso(), getGroundViewCm(), getGroundSizedCm(), getRingLineWidth(), getFigureMask().
+// Test hook: setSizingCamera(cam) sizes Ground from another camera's distance.
 // Action API mirrors a pinch: pressHold(id), pressLimb(limb), pressAsk(),
 // pressMode(), pressView(), pickType(type), pressStart(), pressTop().
 //
@@ -59,9 +60,12 @@ export type View = "ground" | "wall"
  *  back this far. It is the closest distance where every ring of the preset problem, whole, fits
  *  in the ~32 x 37 deg SPECS view (test a2): the problem spans ~235 cm of wall height, so 300 cm
  *  cuts the foot jugs and the top. Text and lines are sized for 110 cm; in Ground the ring line,
- *  the ghost badges and the suggestion label grow so they read from here at least as large as
- *  Body text does at 110 cm. */
+ *  the glow, the ghost badges and the suggestion label are sized for the eye's actual distance
+ *  from the wall plane, kept between DESIGN_VIEW_CM and this, so from anywhere in that range they
+ *  read at least as large as they do at 110 cm (Body text for the label and the numbers). */
 export const GROUND_VIEW_CM = 365
+/** Ground resizes only when the eye's distance from the wall moves by more than this (cm) */
+const GROUND_RESIZE_CM = 2
 
 /** from the ring line's outer edge to the suggestion label's centre at the label's own size, cm
  *  (with the 1.6 cm line: 3.2 cm below the ring's radius, as before) */
@@ -146,6 +150,10 @@ export class NextHoldMain extends BaseScriptComponent {
   private position: Position = {LH: null, RH: null, LF: null, RF: null}
   private mode: Mode = "climb"
   private view: View = "ground"
+  /** the distance Ground is currently sized for: the eye's distance from the wall plane, clamped */
+  private groundCm = GROUND_VIEW_CM
+  /** tests only: measure the Ground distance from this camera instead of the wearer's */
+  private sizingCamera: Camera | null = null
   /** the full overlay for the current state; the view decides how much of it is pushed */
   private overlay: OverlayState | null = null
   private selected: Limb = "RH"
@@ -209,13 +217,17 @@ export class NextHoldMain extends BaseScriptComponent {
       this.typePicker.onTopPressed.add(() => this.pressTop())
 
       this.ready = true
+      this.updateGroundDistance(true)
       // The Lens opens in climb mode with the preset position: auto-select the best move.
       this.recompute(true)
     })
 
     this.createEvent("UpdateEvent").bind(() => {
       this.visuals.tick(getTime())
-      if (this.ready) this.updateFigureMask(false) // the head moves, and the row lays itself out late
+      if (!this.ready) return
+      this.updateFigureMask(false) // the head moves, and the row lays itself out late
+      // stepping back or in: Ground re-sizes for the new distance
+      if (this.view === "ground" && this.updateGroundDistance(false)) this.pushOverlay()
     })
   }
 
@@ -290,6 +302,7 @@ export class NextHoldMain extends BaseScriptComponent {
     if (!this.ready) return
     this.view = this.view === "ground" ? "wall" : "ground"
     this.controlRow.setView(this.view)
+    if (this.view === "ground") this.updateGroundDistance(true)
     this.pushOverlay()
   }
 
@@ -387,10 +400,10 @@ export class NextHoldMain extends BaseScriptComponent {
     const s = this.overlay
     if (!s) return
     const ground = this.view === "ground"
-    this.callouts.setLabelMinSize(ground ? minReadSize(GROUND_VIEW_CM) : 0)
+    this.callouts.setLabelMinSize(ground ? minReadSize(this.groundCm) : 0)
     const labelScale = this.callouts.getLabelScale()
     if (ground) {
-      this.visuals.apply({...s, viewCm: GROUND_VIEW_CM, labelScale})
+      this.visuals.apply({...s, viewCm: this.groundCm, labelScale})
     } else {
       const rings: {[id: string]: RingColour | null} = {}
       if (s.glowHoldId) rings[s.glowHoldId] = s.rings[s.glowHoldId] || null
@@ -404,9 +417,30 @@ export class NextHoldMain extends BaseScriptComponent {
    *  a larger label (Ground) hangs a little lower. Inside the glow's target ring in both views. */
   private labelPos(id: string): vec3 {
     const h = this.holds[id]
-    const lineW = ringLineWidth(this.view === "ground" ? GROUND_VIEW_CM : DESIGN_VIEW_CM)
-    const dy = this.ringRadius(id) + lineW / 2 + LABEL_GAP * this.callouts.getLabelScale()
+    const dy = this.ringRadius(id) + this.getRingLineWidth() / 2 + LABEL_GAP * this.callouts.getLabelScale()
     return this.wall.wallToWorld(h.x, h.y - dy, 3)
+  }
+
+  /** The eye's distance (cm) from the wall plane, along the wall's normal; null without a camera. */
+  private eyeToWallCm(): number | null {
+    const finder = WorldCameraFinderProvider.getInstance()
+    const cam = this.sizingCamera || (finder ? finder.getComponent() : null)
+    if (!cam) return null
+    const o = this.wall.wallToWorld(0, 0, 0)
+    const n = this.wall.wallToWorld(0, 0, 1).sub(o).normalize()
+    return cam.getSceneObject().getTransform().getWorldPosition().sub(o).dot(n)
+  }
+
+  /** Re-measure the distance Ground is sized for, clamped to 110-365 cm. Unless forced it only
+   *  changes when the distance moved by more than GROUND_RESIZE_CM. True if it changed. */
+  private updateGroundDistance(force: boolean): boolean {
+    const d = this.eyeToWallCm()
+    if (d === null) return false
+    const cm = Math.min(GROUND_VIEW_CM, Math.max(DESIGN_VIEW_CM, d))
+    if (!force && Math.abs(cm - this.groundCm) <= GROUND_RESIZE_CM) return false
+    const changed = cm !== this.groundCm
+    this.groundCm = cm
+    return changed
   }
 
   /**
@@ -541,10 +575,18 @@ export class NextHoldMain extends BaseScriptComponent {
   isReady(): boolean { return this.ready }
   getMode(): Mode { return this.mode }
   getView(): View { return this.view }
-  /** how far back the Ground view is drawn to be read from (cm) */
+  /** how far back the whole problem fits in view: the far end of the Ground range (cm) */
   getGroundViewCm(): number { return GROUND_VIEW_CM }
+  /** the distance (cm) Ground is sized for right now: the eye's distance from the wall, clamped */
+  getGroundSizedCm(): number { return this.groundCm }
+  /** Tests only: size Ground from this camera's distance instead of the wearer's (null = the wearer's).
+   *  Takes effect at once. */
+  setSizingCamera(cam: Camera | null): void {
+    this.sizingCamera = cam
+    if (this.ready && this.updateGroundDistance(true) && this.view === "ground") this.pushOverlay()
+  }
   /** width of the rings' crisp line in the current view (cm) */
-  getRingLineWidth(): number { return ringLineWidth(this.view === "ground" ? GROUND_VIEW_CM : DESIGN_VIEW_CM) }
+  getRingLineWidth(): number { return ringLineWidth(this.view === "ground" ? this.groundCm : DESIGN_VIEW_CM) }
   /** how much larger the suggestion label (and the glow with it) is drawn than at 110 cm */
   getLabelScale(): number { return this.callouts.getLabelScale() }
   /** the control row outline (wall cm) the stick figure fades behind, or null */
