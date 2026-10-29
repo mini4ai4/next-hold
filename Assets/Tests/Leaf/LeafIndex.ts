@@ -17,6 +17,7 @@ import {N8StickFigureScenario} from "./N8StickFigureScenario"
 import {N9AutoViewScenario} from "./N9AutoViewScenario"
 import {N10FootReachScenario} from "./N10FootReachScenario"
 import {N11HeightScenario} from "./N11HeightScenario"
+import {D1DemoAutopilotScenario} from "./D1DemoAutopilotScenario"
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -39,5 +40,6 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "a2-ground-scan-250", typename: N7GroundViewpointScenario.getTypeName()},
     {id: "a3-auto-view", typename: N9AutoViewScenario.getTypeName()},
     {id: "b1-stick-figure", typename: N8StickFigureScenario.getTypeName()},
+    {id: "d1-demo-autopilot", typename: D1DemoAutopilotScenario.getTypeName()},
   ]
 }

@@ -1,0 +1,60 @@
+- !<AssetImportMetadata/0b76d925-c47a-40ff-b17c-0ade0ce70534>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> fe2a58b0-7fb8-4e5e-83b3-adccf16c915e
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> fe2a58b0-7fb8-4e5e-83b3-adccf16c915e
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 97c99b3e-8e86-4be8-a85a-381174c1b2b0
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/97c99b3e-8e86-4be8-a85a-381174c1b2b0>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  VersionPrerelease: ""
+  UpdateOrder: 0
+  ComponentUid: 55df6c06-daf1-433e-b321-321625aa86aa
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    hideChrome: false
+    main: false
+    playOnStart: false
+    startAt: false
+    timeScale: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - main: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      playOnStart: false
+      timeScale: !<float> 1.000000
+      startAt: !<float> 0.000000
+      hideChrome: true
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">DemoAutopilot – plays VIDEO_PLAN scenes 0-7 for recording (timeline: DemoTimeline.ts)</span>"}'
+    - '// @ui {"widget":"separator"}'
+    - "// @input AssignableType_1 main {\"hint\":\"The NextHold object's NextHoldMain\"}"
+    - '// @input bool playOnStart {"hint":"OFF in the saved scene. Tick it to play the demo 3 s after the Lens starts (for recording the preview)"}'
+    - '// @input float timeScale = 1 {"hint":"Timeline speed: 1 = real time (the video). LEAF d1 plays it faster; a small value nearly freezes it (for a still)", "widget":"slider", "min":0.05, "max":20, "step":0.05}'
+    - '// @input float startAt {"hint":"Start the take here (timeline s) to rehearse or tweak one scene: every action before it runs at once, so the state is the same as in the full take. 0 for recording", "widget":"slider", "min":0, "max":130, "step":0.5}'
+    - "// @input bool hideChrome = true {\"hint\":\"Hide what isn't the product while playing: the LEAF banner, SIK's cursor and hand visuals, collider wireframes\"}"
