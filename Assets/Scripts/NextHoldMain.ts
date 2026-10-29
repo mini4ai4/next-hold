@@ -182,7 +182,8 @@ export class NextHoldMain extends BaseScriptComponent {
   private askArmed = false
   private evaluation: Evaluation = {results: [], suggestion: null}
   private byHold: {[id: string]: ScoreResult} = {}
-  /** sequence preview: the next 2-3 moves from here (step 1 = the suggestion) */
+  /** sequence preview: the next 2-3 moves from here (step 1 = the suggestion, then the start of the
+   *  cheapest secure route to the top for this body, see NextHoldScoring.sequence) */
   private preview: ScoreResult[] = []
   private pickerHold: string | null = null
   /** the control row outline last pushed to the stick figure */

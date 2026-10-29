@@ -43,7 +43,9 @@ export const HOLDS: HoldDef[] = [
   { id: "low", x: 150, y: 95, type: "sloper" },
   // --- filler so the wall reads as a real problem ---
   { id: "h09", x: 115, y: 190, type: "pinch", spin: -6 },
-  { id: "h10", x: 72, y: 188, type: "pinch", spin: 12 },
+  // a big jug up and left (session 15): a tall climber's left hand reaches it straight from "up"
+  // and skips the pinch h09; from about 180 cm down it is out of reach, so the beta changes with height
+  { id: "h10", x: 72, y: 216, type: "jug", spin: 12 },
   { id: "h11", x: 182, y: 172, type: "pocket" },
   { id: "h12", x: 190, y: 135, type: "pinch", spin: 14 },
   { id: "h13", x: 58, y: 108, type: "pocket" },
@@ -73,7 +75,7 @@ export const PRESET_POSITION: Record<Limb, string | null> = {
  * preset position up to a clear top hold. Only these are scored and ringed
  * outside setup mode; the rest of the wall stays visible but dim.
  */
-export const PRESET_PROBLEM: string[] = ["lf", "rf", "lh", "rh", "low", "h16", "up", "h09", "h11", "h20"];
+export const PRESET_PROBLEM: string[] = ["lf", "rf", "lh", "rh", "h16", "up", "h09", "h10", "h11", "h20"];
 /** the problem's start holds (both hands start here, as in the preset position) */
 export const PRESET_START: string[] = ["lh", "rh"];
 /** the problem's top hold: a jug, clearly the highest hold of the problem */

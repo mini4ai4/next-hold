@@ -144,30 +144,93 @@ export class ReferenceRule {
   }
 
   /**
-   * Sequence preview, per the review: the next 2-3 moves by bestMove from `p`.
-   * Step 1 is `limb`'s suggestion when given (the glowing ring). A move that
-   * puts a limb back on a hold it left in this look-ahead is never chosen; the
-   * best other move is. Ends after a hand reaches the top.
+   * Sequence preview (session 15): step 1 is `limb`'s suggestion when given (the glowing ring),
+   * else bestMove. After it, the cheapest route to a hand on the top over every limb and hold:
+   * only secure moves (score >= 0.4), never a limb back on a hold it left in this look-ahead;
+   * fewest moves first, then the least sum of (1 - score), then the route whose "LIMB>hold" list
+   * sorts first. No top or no route within 8 moves: the steps - 1 secure moves with the highest
+   * total rank (no undo; ties by the same list). Written apart from the Lens's search on purpose.
    */
   sequence(p: RefPosition, limb: RefLimb | null = null, steps = 3): RefResult[] {
-    const out: RefResult[] = []
-    let pos: RefPosition = {...p}
+    const route = this.route(p, limb)
+    if (route) return route.slice(0, steps)
+    const first = limb ? this.evaluate(limb, p).suggestion : this.bestMove(p)
+    if (!first) return []
+    const after = {...p, [first.limb]: first.holdId}
     const left: {[l: string]: string[]} = {LH: [], RH: [], LF: [], RF: []}
-    for (let i = 0; i < steps; i++) {
-      let m: RefResult | null = null
-      for (const l of i === 0 && limb ? [limb] : REF_LIMBS) {
-        for (const r of this.evaluate(l, pos).results) {
-          if (r.score > 0 && left[l].indexOf(r.holdId) < 0 && r.rank > (m ? m.rank : -1)) m = r
+    if (p[first.limb] != null) left[first.limb].push(p[first.limb] as string)
+    return [first].concat(this.plies(after, steps - 1, left).moves)
+  }
+
+  /** The glow and the whole cheapest secure route to the top after it (see sequence); null if none. */
+  route(p: RefPosition, limb: RefLimb | null = null): RefResult[] | null {
+    const first = limb ? this.evaluate(limb, p).suggestion : this.bestMove(p)
+    if (!first) return null
+    const topOut = (m: RefResult) => this.top != null && m.holdId === this.top && (m.limb === "LH" || m.limb === "RH")
+    if (topOut(first)) return [first]
+    if (this.top == null) return null
+    const keyOf = (q: RefPosition) => REF_LIMBS.map((l) => String(q[l])).join("|")
+    const listOf = (ms: RefResult[]) => ms.map((m) => m.limb + ">" + m.holdId)
+    const before = (a: {cost: number; moves: RefResult[]}, b: {cost: number; moves: RefResult[]}) => {
+      if (Math.abs(a.cost - b.cost) > 1e-9) return a.cost < b.cost
+      const x = listOf(a.moves), y = listOf(b.moves)
+      for (let i = 0; i < x.length && i < y.length; i++) if (x[i] !== y[i]) return x[i] < y[i]
+      return x.length < y.length
+    }
+    const left0: {[l: string]: string[]} = {LH: [], RH: [], LF: [], RF: []}
+    if (p[first.limb] != null) left0[first.limb].push(p[first.limb] as string)
+    // open list kept sorted, cheapest first
+    let open: {cost: number; moves: RefResult[]; pos: RefPosition; left: {[l: string]: string[]}}[] =
+      [{cost: 0, moves: [], pos: {...p, [first.limb]: first.holdId}, left: left0}]
+    const seen: {[k: string]: boolean} = {}
+    while (open.length) {
+      const cur = open.shift()!
+      if (cur.moves.length && topOut(cur.moves[cur.moves.length - 1])) return [first].concat(cur.moves)
+      const k = keyOf(cur.pos)
+      if (seen[k]) continue
+      seen[k] = true
+      if (cur.moves.length >= 8) continue
+      for (const l of REF_LIMBS) {
+        for (const r of this.evaluate(l, cur.pos).results) {
+          if (r.score < 0.4 || cur.left[l].indexOf(r.holdId) >= 0) continue
+          const pos = {...cur.pos, [l]: r.holdId}
+          if (seen[keyOf(pos)] && !topOut(r)) continue
+          const from = cur.pos[l]
+          const node = {cost: cur.cost + 10 + (1 - r.score), moves: cur.moves.concat([r]), pos,
+            left: {...cur.left, [l]: from != null ? cur.left[l].concat([from as string]) : cur.left[l]}}
+          let i = 0
+          while (i < open.length && !before(node, open[i])) i++
+          open.splice(i, 0, node)
         }
       }
-      if (!m) break
-      out.push(m)
-      const from = pos[m.limb]
-      if (from != null) left[m.limb].push(from)
-      pos = {...pos, [m.limb]: m.holdId}
-      if (this.top != null && m.holdId === this.top && (m.limb === "LH" || m.limb === "RH")) break
     }
-    return out
+    return null
+  }
+
+  private plies(p: RefPosition, n: number, left: {[l: string]: string[]}): {total: number; moves: RefResult[]} {
+    if (n <= 0) return {total: 0, moves: []}
+    let best: {total: number; moves: RefResult[]} = {total: 0, moves: []}
+    const names = (ms: RefResult[]) => ms.map((m) => m.limb + ">" + m.holdId)
+    for (const l of REF_LIMBS) {
+      for (const r of this.evaluate(l, p).results) {
+        if (r.score < 0.4 || left[l].indexOf(r.holdId) >= 0) continue
+        const from = p[l]
+        const top = this.top != null && r.holdId === this.top && (l === "LH" || l === "RH")
+        const rest = top ? {total: 0, moves: []} : this.plies({...p, [l]: r.holdId}, n - 1,
+          {...left, [l]: from != null ? left[l].concat([from as string]) : left[l]})
+        const cand = {total: r.rank + rest.total, moves: [r].concat(rest.moves)}
+        let better = cand.moves.length > best.moves.length
+        if (cand.moves.length === best.moves.length) {
+          if (cand.total > best.total + 1e-9) better = true
+          else if (Math.abs(cand.total - best.total) <= 1e-9) {
+            const x = names(cand.moves), y = names(best.moves)
+            for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) { better = x[i] < y[i]; break }
+          }
+        }
+        if (better) best = cand
+      }
+    }
+    return best
   }
 
   /** the same rule without the upward goal (to show what the goal changes) */

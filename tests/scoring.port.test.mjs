@@ -7,7 +7,9 @@
 // 2. Equivalence: port == reference for every hold x every limb x several top holds on the Lens wall.
 // 3. bestMove(): returns the max-rank (limb, hold) across all four limbs.
 // 4. Demo layout: the preset problem shows green, yellow and red from the start.
-// 5. sequence(): the 2-3 move look-ahead over bestMove behind the numbered ghost rings.
+// 5. sequence(): the 1-2-3 behind the glow and the "2 · LH" tags, a search over limbs and holds for
+//    the cheapest secure route to the top, checked against a brute force over every route, and
+//    at 155 vs 195 cm (two heights, two betas).
 import { createRequire } from "node:module";
 import * as P from "../Assets/Scripts/NextHoldScoring.ts";
 import { HOLDS, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP, CLIMBER_REACH } from "../Assets/Scripts/Wall/WallLayout.ts";
@@ -184,13 +186,98 @@ const seq = P.sequence({ ...seqArgs, position: wPos });
 console.log(`\n  preset look-ahead: ${seq.map((m, i) => `${i + 1}. ${m.limb} -> ${m.holdId}`).join("  ")}`);
 check("preset look-ahead has 3 moves, step 1 = bestMove", seq.length === 3 &&
   seq[0].limb === presetGoal.limb && seq[0].holdId === presetGoal.holdId, seq.map((m) => m.limb + m.holdId));
-let chainOk = true, chainPos = { ...wPos };
-for (const m of seq) {
-  const b = P.bestMove({ ...seqArgs, position: chainPos });
-  if (!b || b.limb !== m.limb || b.holdId !== m.holdId || b.rank !== m.rank) chainOk = false;
-  chainPos = { ...chainPos, [m.limb]: m.holdId };
+// The search (session 15), checked against a brute force written separately here: every route of
+// secure moves (score >= 0.4, no limb back on a hold it left) from the position after step 1,
+// depth by depth, until one reaches the top. The Lens's route must be the shortest, then the
+// cheapest (sum of 1 - score), then the first by its "LIMB>hold" list.
+function bruteRoute(args, limb) {
+  const first = limb ? P.evaluate({ ...args, limb }).suggestion : P.bestMove(args);
+  const isTop = (m) => m.holdId === args.top && P.HANDS.includes(m.limb);
+  if (isTop(first)) return [first];
+  const start = { ...args.position, [first.limb]: first.holdId };
+  const left0 = { LH: [], RH: [], LF: [], RF: [] };
+  if (args.position[first.limb] != null) left0[first.limb].push(args.position[first.limb]);
+  for (let depth = 1; depth <= 6; depth++) {
+    let best = null;
+    const walk = (pos, left, acc, cost) => {
+      if (acc.length === depth) return;
+      for (const l of P.LIMBS) for (const r of P.evaluate({ ...args, position: pos, limb: l }).results) {
+        if (r.score < 0.4 || left[l].includes(r.holdId)) continue;
+        const next = [...acc, r], c = cost + (1 - r.score);
+        if (isTop(r)) {
+          if (next.length !== depth) continue;
+          const keys = next.map((m) => m.limb + ">" + m.holdId);
+          if (!best || c < best.c - 1e-9 || (Math.abs(c - best.c) <= 1e-9 && keys.join(" ") < best.keys.join(" "))) best = { c, keys, moves: next };
+          continue;
+        }
+        walk({ ...pos, [l]: r.holdId }, { ...left, [l]: [...left[l], pos[l]] }, next, c);
+      }
+    };
+    walk(start, left0, [], 0);
+    if (best) return [first, ...best.moves];
+  }
+  return null;
 }
-check("every step is bestMove from the position the earlier steps leave", chainOk);
+const sameMoves = (a, b) => !!a && !!b && a.length === b.length && a.every((m, i) => m.limb === b[i].limb && m.holdId === b[i].holdId);
+const fmtSeq = (s) => (s || []).map((m) => `${m.limb}->${m.holdId} (${m.colour})`).join(", ");
+const route175 = P.fullRoute({ ...seqArgs, position: wPos, limb: "RH" });
+check("the route is the brute force's: shortest to the top, then most secure (175 cm, from the preset)",
+  sameMoves(route175, bruteRoute({ ...seqArgs, position: wPos }, "RH")), fmtSeq(route175));
+check("the 1-2-3 is the route's first three moves", sameMoves(seq, route175.slice(0, 3)));
+check("every step after the glow is green or yellow for you at its turn", seq.slice(1).every((m) => m.score >= 0.4));
+// two heights, two betas, from the same start
+const at = (h) => ({ ...seqArgs, reach: h * 0.44, position: wPos });
+const s155 = P.sequence({ ...at(155), limb: P.bestMove(at(155)).limb });
+const s195 = P.sequence({ ...at(195), limb: P.bestMove(at(195)).limb });
+console.log(`  155 cm: ${fmtSeq(s155)}\n  195 cm: ${fmtSeq(s195)}`);
+check("155 cm and 195 cm get different 1-2-3s from the same start", s155.length === 3 && s195.length === 3 &&
+  s155.map((m) => m.limb + m.holdId).join() !== s195.map((m) => m.limb + m.holdId).join(), [fmtSeq(s155), fmtSeq(s195)]);
+check("at 155 and 195 cm every step of the 1-2-3 is green or yellow", s155.concat(s195).every((m) => m.colour !== "red"));
+check("195 cm: the left hand skips the pinch h09 for the jug h10; 155 cm: h10 is out of reach, it takes h09",
+  s195[1].limb === "LH" && s195[1].holdId === "h10" && s155[1].limb === "LH" && s155[1].holdId === "h09" &&
+  P.scoreHold({ ...at(155), position: { ...wPos, RH: "up" }, limb: "LH", holdId: "h10" }).colour === "red");
+const r155 = P.fullRoute({ ...at(155), limb: "RH" }), r195 = P.fullRoute({ ...at(195), limb: "RH" });
+console.log(`  to the top: 155 cm ${r155.length} moves, 195 cm ${r195.length} moves`);
+check("the routes at 155 and 195 cm are the brute force's", sameMoves(r155, bruteRoute(at(155), "RH")) && sameMoves(r195, bruteRoute(at(195), "RH")));
+// what the search adds over one best step at a time (the session-14 look-ahead, rebuilt here):
+// after RH -> up, at 175 cm the top is three moves away and the search goes for it, where the
+// greedy chain spends a move on the right foot; at 155 cm the top is out of reach without that
+// foot, and the search keeps it
+function greedyChain(args) {
+  const out = [];
+  let pos = { ...args.position };
+  const left = { LH: [], RH: [], LF: [], RF: [] };
+  for (let i = 0; i < 3; i++) {
+    let m = null;
+    for (const l of i === 0 && args.limb ? [args.limb] : P.LIMBS) {
+      for (const r of P.evaluate({ ...args, position: pos, limb: l }).results) {
+        if (r.score > 0 && !left[l].includes(r.holdId) && r.rank > (m ? m.rank : -1)) m = r;
+      }
+    }
+    if (!m) break;
+    out.push(m);
+    if (pos[m.limb] != null) left[m.limb].push(pos[m.limb]);
+    pos = { ...pos, [m.limb]: m.holdId };
+    if (m.holdId === args.top && P.HANDS.includes(m.limb)) break;
+  }
+  return out;
+}
+const afterUpAt = (h) => ({ ...at(h), position: { ...wPos, RH: "up" } });
+const g175 = greedyChain({ ...afterUpAt(175), limb: "LH" }), q175 = P.sequence({ ...afterUpAt(175), limb: "LH" });
+const q155 = P.sequence({ ...afterUpAt(155), limb: "LH" });
+console.log(`  after RH -> up: 175 cm greedy ${fmtSeq(g175)}\n                  175 cm search ${fmtSeq(q175)}\n                  155 cm search ${fmtSeq(q155)}`);
+check("after RH -> up, 175 cm: the search reaches the top in 3 (LH h09, LF lh, LH h20), the greedy chain moves the right foot instead",
+  q175.map((m) => m.limb + ">" + m.holdId).join(" ") === "LH>h09 LF>lh LH>h20" && g175[2].limb === "RF");
+check("after RH -> up, 155 cm: the top is out of reach without the right foot, so the search brings it up",
+  q155.map((m) => m.limb + ">" + m.holdId).join(" ") === "LH>h09 LF>lh RF>rh");
+let routesOk = true;
+for (const h of [150, 160, 170, 180, 185, 190, 200]) {
+  for (const limb of P.LIMBS) {
+    const got = P.fullRoute({ ...at(h), limb }), want = bruteRoute(at(h), limb);
+    if (!(got === null ? want === null : sameMoves(got, want))) routesOk = false;
+  }
+}
+check("route == brute force for 7 heights x 4 selected limbs", routesOk);
 check("every foot step of the preset look-ahead is a leg move: no high step, within leg reach", (() => {
   let p = { ...wPos };
   for (const m of seq) {

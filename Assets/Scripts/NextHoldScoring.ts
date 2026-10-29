@@ -1,7 +1,8 @@
 // NextHoldScoring — the green / yellow / red rule and the upward goal, ported
 // line-for-line from devpost/scoring-reference/scoring.js. Same constants, same
 // "why" strings. Adds bestMove(): evaluate() for all four limbs, return the
-// single best (limb, hold) by rank.
+// single best (limb, hold) by rank; and sequence(): the 1-2-3, a search over
+// limbs and holds for the cheapest secure route to the top (see below).
 //
 // Owns: pure scoring maths only. No Lens globals, no scene access, so it can
 // be unit-checked outside Lens Studio (tests/scoring.port.test.mjs).
@@ -247,32 +248,177 @@ export function bestMove(a: MoveArgs): ScoreResult | null {
   return best;
 }
 
-// Sequence preview: a small look-ahead over bestMove. Step 1 is the move
-// suggested now (for `limb` if given: the selected limb's best, the glowing
-// ring; otherwise bestMove). Each later step is bestMove from the position the
-// earlier steps leave, leaving out moves that only undo an earlier step (a limb
-// going back to a hold it left in this look-ahead). It ends after a hand
-// reaches the top hold, or when no move is left.
-export function sequence(a: MoveArgs & { limb?: Limb | null; steps?: number }): ScoreResult[] {
-  const steps = a.steps ?? 3;
+// ── Sequence preview (session 15): a search over limbs and holds, not one greedy step at a time ──
+//
+// Step 1 is the move suggested now: the selected limb's best hold when `limb` is given (the
+// glowing ring), otherwise bestMove. From the position it leaves, the Lens searches every limb x
+// every hold for the cheapest route to the top hold, the way a climber reads beta:
+//   - only moves that are green or yellow for you at their turn (score >= SECURE), so every
+//     step after the glow is one you can make;
+//   - fewest moves to a hand on the top first, then the most secure: each move costs
+//     ROUTE_MOVE_COST + (1 - score), and a route of n moves always costs less than any of n + 1;
+//   - equal costs: the route whose moves, as "LIMB>hold" in order, sort first (so any copy of
+//     this search picks the same route, whatever order it lists the holds in).
+// Because reach, the hip and the high step all scale with height, a taller climber can skip a
+// hold a shorter one has to use, and the 1-2-3 changes with it.
+// No top hold, or no secure route within ROUTE_MAX_MOVES: the best ROUTE_FALLBACK_PLIES moves by
+// total rank (score x goal), again over every limb and hold, secure moves only, no undo.
+export const SECURE = 0.4;
+export const ROUTE_MOVE_COST = 10;
+export const ROUTE_MAX_MOVES = 8;
+/** positions the search may expand before it gives up (bounds the work on a large problem) */
+export const ROUTE_MAX_STATES = 6000;
+
+function moveKey(m: ScoreResult): string {
+  return m.limb + ">" + m.holdId;
+}
+
+function positionKey(p: Position): string {
+  return p.LH + "|" + p.RH + "|" + p.LF + "|" + p.RF;
+}
+
+/** lexicographic order of two move lists of the same length */
+function compareMoves(a: string[], b: string[]): number {
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
+  }
+  return a.length - b.length;
+}
+
+function isTopOut(m: ScoreResult, top: string | null | undefined): boolean {
+  return top != null && m.holdId === top && HANDS.indexOf(m.limb) >= 0;
+}
+
+/** every secure move from `position`, over all four limbs */
+function secureMoves(a: MoveArgs, position: Position): ScoreResult[] {
   const out: ScoreResult[] = [];
-  let position: Position = { ...a.position };
-  const left: { [limb: string]: string[] } = { LH: [], RH: [], LF: [], RF: [] };
-  for (let i = 0; i < steps; i++) {
-    // bestMove (same order, same tie rule), without the undo moves
-    let m: ScoreResult | null = null;
-    for (const limb of i === 0 && a.limb ? [a.limb] : LIMBS) {
-      const ev = evaluate({ holds: a.holds, holdTypes: a.holdTypes, position, limb, reach: a.reach, top: a.top });
-      for (const r of ev.results) {
-        if (r.score > 0 && left[limb].indexOf(r.holdId) < 0 && r.rank > (m?.rank ?? -1)) m = r;
-      }
+  for (const limb of LIMBS) {
+    for (const r of evaluate({ holds: a.holds, holdTypes: a.holdTypes, position, limb, reach: a.reach, top: a.top }).results) {
+      if (r.score >= SECURE) out.push(r);
     }
-    if (!m) break;
-    out.push(m);
-    const from = position[m.limb];
-    if (from != null) left[m.limb].push(from);
-    position = { ...position, [m.limb]: m.holdId };
-    if (a.top != null && m.holdId === a.top && HANDS.indexOf(m.limb) >= 0) break;
   }
   return out;
+}
+
+/** left: the holds each limb has left in this look-ahead; a route never puts the limb back on one */
+interface RouteNode { cost: number; keys: string[]; moves: ScoreResult[]; position: Position; left: { [limb: string]: string[] }; }
+
+const NO_LEFT = (): { [limb: string]: string[] } => ({ LH: [], RH: [], LF: [], RF: [] });
+
+function nodeBefore(a: RouteNode, b: RouteNode): boolean {
+  if (Math.abs(a.cost - b.cost) > 1e-9) return a.cost < b.cost;
+  return compareMoves(a.keys, b.keys) < 0;
+}
+
+/** The cheapest secure route from `position` to a hand on the top hold (see above); null if none.
+ *  `left`: holds each limb already left earlier in the look-ahead (step 1's), never gone back to.
+ *  Each position is expanded once, by its cheapest route. */
+export function routeToTop(a: MoveArgs & { left?: { [limb: string]: string[] } }): ScoreResult[] | null {
+  if (a.top == null || !a.holds[a.top]) return null;
+  // binary heap of open nodes, ordered by nodeBefore
+  const heap: RouteNode[] = [{ cost: 0, keys: [], moves: [], position: { ...a.position }, left: a.left ?? NO_LEFT() }];
+  const push = (n: RouteNode) => {
+    heap.push(n);
+    let i = heap.length - 1;
+    while (i > 0) {
+      const up = (i - 1) >> 1;
+      if (!nodeBefore(heap[i], heap[up])) break;
+      [heap[i], heap[up]] = [heap[up], heap[i]];
+      i = up;
+    }
+  };
+  const pop = (): RouteNode => {
+    const first = heap[0];
+    const last = heap.pop() as RouteNode;
+    if (heap.length) {
+      heap[0] = last;
+      let i = 0;
+      for (;;) {
+        const l = 2 * i + 1, r = l + 1;
+        let m = i;
+        if (l < heap.length && nodeBefore(heap[l], heap[m])) m = l;
+        if (r < heap.length && nodeBefore(heap[r], heap[m])) m = r;
+        if (m === i) break;
+        [heap[i], heap[m]] = [heap[m], heap[i]];
+        i = m;
+      }
+    }
+    return first;
+  };
+  const done: { [key: string]: boolean } = {};
+  let expanded = 0;
+  while (heap.length) {
+    const n = pop();
+    const last = n.moves.length ? n.moves[n.moves.length - 1] : null;
+    if (last && isTopOut(last, a.top)) return n.moves;
+    const k = positionKey(n.position);
+    if (done[k]) continue;
+    done[k] = true;
+    if (++expanded > ROUTE_MAX_STATES) return null;
+    if (n.moves.length >= ROUTE_MAX_MOVES) continue;
+    for (const m of secureMoves(a, n.position)) {
+      if (n.left[m.limb].indexOf(m.holdId) >= 0) continue; // no undo
+      const next = { ...n.position, [m.limb]: m.holdId };
+      // a top-out is a goal, not a position to expand: queue it even if the position was seen
+      if (done[positionKey(next)] && !isTopOut(m, a.top)) continue;
+      const from = n.position[m.limb];
+      push({ cost: n.cost + ROUTE_MOVE_COST + (1 - m.score), keys: n.keys.concat([moveKey(m)]),
+             moves: n.moves.concat([m]), position: next,
+             left: { ...n.left, [m.limb]: from != null ? n.left[m.limb].concat([from]) : n.left[m.limb] } });
+    }
+  }
+  return null;
+}
+
+/** No route to the top: the `plies` secure moves with the highest total rank, none undoing an earlier one. */
+function bestPlies(a: MoveArgs, position: Position, plies: number,
+                   left: { [limb: string]: string[] }): { total: number; moves: ScoreResult[]; keys: string[] } {
+  if (plies <= 0) return { total: 0, moves: [], keys: [] };
+  let best: { total: number; moves: ScoreResult[]; keys: string[] } = { total: 0, moves: [], keys: [] };
+  for (const m of secureMoves(a, position)) {
+    if (left[m.limb].indexOf(m.holdId) >= 0) continue;
+    const from = position[m.limb];
+    const nextLeft = { ...left, [m.limb]: from != null ? left[m.limb].concat([from]) : left[m.limb] };
+    const rest = isTopOut(m, a.top) ? { total: 0, moves: [], keys: [] }
+      : bestPlies(a, { ...position, [m.limb]: m.holdId }, plies - 1, nextLeft);
+    const cand = { total: m.rank + rest.total, moves: [m].concat(rest.moves), keys: [moveKey(m)].concat(rest.keys) };
+    const better = cand.moves.length > best.moves.length ||
+      (cand.moves.length === best.moves.length && (cand.total > best.total + 1e-9 ||
+        (Math.abs(cand.total - best.total) <= 1e-9 && compareMoves(cand.keys, best.keys) < 0)));
+    if (better) best = cand;
+  }
+  return best;
+}
+
+/** Step 1 (the glow) and what it leaves: the position after it and the hold its limb left. */
+function firstStep(a: MoveArgs & { limb?: Limb | null }):
+    { first: ScoreResult; after: Position; left: { [limb: string]: string[] } } | null {
+  const first = a.limb
+    ? evaluate({ holds: a.holds, holdTypes: a.holdTypes, position: a.position, limb: a.limb, reach: a.reach, top: a.top }).suggestion
+    : bestMove(a);
+  if (!first) return null;
+  const left = NO_LEFT();
+  const from = a.position[first.limb];
+  if (from != null) left[first.limb].push(from);
+  return { first, after: { ...a.position, [first.limb]: first.holdId }, left };
+}
+
+export function sequence(a: MoveArgs & { limb?: Limb | null; steps?: number }): ScoreResult[] {
+  const steps = a.steps ?? 3;
+  const f = steps > 0 ? firstStep(a) : null;
+  if (!f) return [];
+  if (isTopOut(f.first, a.top) || steps === 1) return [f.first];
+  const route = routeToTop({ ...a, position: f.after, left: f.left });
+  if (route) return [f.first].concat(route).slice(0, steps);
+  return [f.first].concat(bestPlies({ ...a, position: f.after }, f.after, steps - 1, f.left).moves);
+}
+
+/** The whole route the 1-2-3 starts: the glow, then the cheapest secure route to the top. null if
+ *  there is no top hold or no secure route (the 1-2-3 then comes from bestPlies). */
+export function fullRoute(a: MoveArgs & { limb?: Limb | null }): ScoreResult[] | null {
+  const f = firstStep(a);
+  if (!f) return null;
+  if (isTopOut(f.first, a.top)) return [f.first];
+  const route = routeToTop({ ...a, position: f.after, left: f.left });
+  return route ? [f.first].concat(route) : null;
 }
