@@ -4,13 +4,15 @@
 A bouldering coach on your glasses: read the problem for your own body from the mats, then climb with one ring showing the next move.
 
 ## What it does
-You stand on the mats, about two and a half metres back, and look up and down the problem you've marked, the way climbers read a problem before they start. Every hold in it has a ring: green, yellow or red. The rings stay on the holds as you look around, so the whole problem never has to fit in one view. The best next move glows with its label, "R hand", and the two moves after it are small tags on their own holds, "2 · LH" and "3 · RF", for *your* reach. The top hold says "TOP". Holds that aren't part of the problem fade back. That's reading the problem, the thing good climbers do before they touch the wall, worked out for your body.
+You stand on the mats, about two and a half metres back, and look up and down the problem you've marked, the way climbers read a problem before they start. Every hold in it has a ring: green, yellow or red. The rings stay on the holds as you look around, so the whole problem never has to fit in one view. The best next move glows with its label, "R hand", and the two moves after it are small tags on their own holds, "2 · LH" and "3 · LF", for *your* reach. The top hold says "TOP". Holds that aren't part of the problem fade back. That's reading the problem, the thing good climbers do before they touch the wall, worked out for your body.
 
 Then you climb. Up close the glasses see about one hold at a time, so when you come closer than about 80 cm the Lens switches to **On wall** by itself: one ring on the next hold, and its label, "R hand", which stays. Step back past about 1.2 m and the whole problem is there again. If the next hold is out of view, an arrow at the edge and a soft chime point you to it.
 
 The colour isn't a guess about the route. It's worked out from where your body is right now:
 - **Grip:** a jug is easier to hold than a crimp, a crimp easier than a sloper.
-- **Reach:** how far the hold is from the shoulder (or hip) of the limb that would move, against your own reach. Past it, the hold is always red.
+- **Reach:** how far the hold is from the shoulder of the hand, or the hip of the foot, that would move, against your own reach. Past it, the hold is always red.
+
+Feet reach from the hip, not with the arm's reach: a rock-over about 40 cm under your hands is green, and a foot above your hip is a "HIGH STEP" and goes hard. You set your height in the panel (150–200 cm) and every reach rescales; at the demo start that changes the colours (at 150 cm the pinch up and left drops from green to yellow), not yet the 1-2-3.
 - **Balance:** a hand move is better with both feet on and the new hold above your centre of mass; crossing your body costs.
 - **Upward:** among moves that are about as good, the one that takes you higher and closer to the top hold wins.
 
@@ -37,7 +39,7 @@ The preview can't recognise a real wall or track a body, so, as the rules sugges
 On real SPECS, the limb toggles would be body tracking, so climbing itself takes no pinches at all: you move, and the rings follow. Asking "why" would be a look-and-dwell on a ring. Both are our design for the device, and both are "feel unproven" until we can try them on a wall.
 
 ## How we built it
-We planned it with the `plan-lens` skill, which wrote `devpost/design-brief.md`, and built it with CLAD through the Lens Studio MCP, in thirteen sessions logged in `devpost/BUILD_LOG.md`. The scoring rule came first, as a small tested reference in plain JavaScript we wrote before the build (`devpost/scoring-reference/`, now 22 checks). Every change to the rule went into the reference first, and CLAD ported it to TypeScript; the port passes 42 checks, including the best-move search and the three-move look-ahead. Every done criterion in the brief, and every later change, has a LEAF scenario: 15 of 15 pass in the preview. One puts a second camera 2.5 m back, turns it to the lower and then the upper half of the problem, and checks that between the two looks every ring is whole in the glasses' view. Another checks on screen that each next-move tag sits nearest its own hold and names the limb. A third walks a camera in and out and checks the view switches at 80 cm and 1.2 m.
+We planned it with the `plan-lens` skill, which wrote `devpost/design-brief.md`, and built it with CLAD through the Lens Studio MCP, in fourteen sessions logged in `devpost/BUILD_LOG.md`. The scoring rule came first, as a small tested reference in plain JavaScript we wrote before the build (`devpost/scoring-reference/`, now 27 checks). Every change to the rule went into the reference first, and CLAD ported it to TypeScript; the port passes 48 checks, including the best-move search and the three-move look-ahead. Every done criterion in the brief, and every later change, has a LEAF scenario: 17 of 17 pass in the preview. One puts a second camera 2.5 m back, turns it to the lower and then the upper half of the problem, and checks that between the two looks every ring is whole in the glasses' view. Another checks on screen that each next-move tag sits nearest its own hold and names the limb. A third walks a camera in and out and checks the view switches at 80 cm and 1.2 m.
 
 **Logic proven** (tests and preview): the colours match the rule, a move recomputes everything in one frame, an out-of-reach hold is always red, the three-move look-ahead and its limb tags, the suggestion and its label, the "why" line, that two looks from 2.5 m cover the whole problem, and the switch between Ground and On wall by distance.
 **Feel unproven** (only real glasses can tell): whether rings read well mid-climb, real hold detection, hand tracking on a wall, looking up through a narrow view, and whether 80 cm and 1.2 m are the right switch points on a real wall.
@@ -50,7 +52,7 @@ We planned it with the `plan-lens` skill, which wrote `devpost/design-brief.md`,
 - **Writing the rule down first paid off.** Because the reference had its own tests, we could check CLAD's port line by line instead of eyeballing colours.
 
 ## What's next
-Real hold detection and body tracking on SPECS, separate leg reach, and remembering a marked wall so a gym's problems are set up once. Then the honest test: real climbers, a real wall, and whether reading the problem with Next Hold gets them to the top in fewer tries.
+Real hold detection and body tracking on SPECS, a look-ahead that weighs limb choices instead of taking the best move each step, and remembering a marked wall so a gym's problems are set up once. Then the honest test: real climbers, a real wall, and whether reading the problem with Next Hold gets them to the top in fewer tries.
 
 ## Built with
 Lens Studio 5.23.2, CLAD, Lens Studio MCP, Spectacles Interaction Kit, UI Kit, LEAF, TypeScript.

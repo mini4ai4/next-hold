@@ -8,15 +8,16 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
 ## Open it
 1. Open `NextHold.esproj` in Lens Studio 5.23.2 (sign in, so SIK, UI Kit and LEAF load).
 2. Press Preview. Pick a limb (LH, RH, LF, RF), pinch a hold, and every ring recolours. Pinch "?" and then a ring for
-   the reason. "Setup" marks your problem: pinch its holds, then Start, Top and each hold's type.
+   the reason. "Setup" marks your problem: pinch its holds, then Start, Top and each hold's type. "Height − / +"
+   sets your height (150–200 cm); reach follows it, so the colours change for a taller or shorter climber.
 3. Walk back with WASD past 1.2 m and the Lens shows **Ground**: every ring of the problem, the next moves as
-   "2 · LH", "3 · RF", and "TOP". Walk in under 80 cm and it shows **On wall**: one ring and its label. The
+   "2 · LH", "3 · LF", and "TOP". Walk in under 80 cm and it shows **On wall**: one ring and its label. The
    Ground / On wall button overrides until you next cross one of those distances.
 
 ## Tests
-- LEAF: open the LEAF panel and run all fifteen scenarios (one per done criterion in `devpost/design-brief.md`, plus one per review fix).
-- Scoring port: `node tests/scoring.port.test.mjs` (42 checks).
-- Reference rule, written before the build: `node devpost/scoring-reference/scoring.test.js` (22 checks). This is
+- LEAF: open the LEAF panel and run all seventeen scenarios (one per done criterion in `devpost/design-brief.md`, plus one per review fix).
+- Scoring port: `node tests/scoring.port.test.mjs` (48 checks).
+- Reference rule, written before the build: `node devpost/scoring-reference/scoring.test.js` (27 checks). This is
   pre-written design code; CLAD ported it to TypeScript.
 
 ## What's in here
