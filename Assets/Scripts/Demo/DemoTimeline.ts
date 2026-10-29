@@ -113,8 +113,9 @@ export const ACTIONS: DemoAction[] = [
   // 0: RH again as the overlays come in: the Lens shows "R hand" again (in Ground it fades after
   // ~2 s, and it showed while the Lens started, before the take)
   {t: 1.5, do: "pressLimb", arg: "RH"},
-  // 3: pinch RH, then the glowing hold "up"
-  {t: 49, do: "pressLimb", arg: "RH"},
+  // 3: pinch the glowing hold "up" (RH is already the selected limb: its label says "R hand").
+  // Session 19: no RH button pinch first: On wall the panel is tucked under the ring, so its
+  // ripple landed off-frame and the move's input read as a cut
   {t: 50.5, do: "pressHold", arg: "up"},
   // 4: back to the start first (RH down to rh): "2 · LH" names the pinch h09 or the jug h10 only
   // from there, as in r7 and beta-155/195cm.png; from RH on "up" the glow itself sits on them.

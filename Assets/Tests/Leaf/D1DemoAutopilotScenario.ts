@@ -246,6 +246,8 @@ export class D1DemoAutopilotScenario extends Scenario {
     let wallFrames = 0, heightChanges = 0, heightInScene4 = 0
     let lastHeight = main.getHeightLabel()
     const rippleFrom = main.getRippleLog().length
+    let rippleSeen = rippleFrom
+    const rippleShots: string[] = []
     try {
       pilot.play(SPEED)
       if (!pilot.isPlaying()) throw new Error("play() did not start")
@@ -273,6 +275,25 @@ export class D1DemoAutopilotScenario extends Scenario {
           if (tl >= SCENES[4].start && tl < SCENES[5].start) heightInScene4++
           if (off.length) frameErr(`height changed to "${h}" at t=${pilot.getTimelineTime().toFixed(1)} with not in view: ${off.join(", ")}`)
         }
+        // session 19: where each pinch on a hold ripples on screen (its centre and its full start ring);
+        // scenes 3 (the move On wall) and 8 (the climb to TOP) must show it
+        const rl = main.getRippleLog()
+        if (rl.length > rippleSeen) {
+          rippleSeen = rl.length
+          const r = rl[rl.length - 1]
+          if (HOLDS.some((h) => h.id === r.target)) {
+            const tl = pilot.getTimelineTime()
+            const sc = SCENES.filter((s) => s.start <= tl).pop()
+            const at = main.getRippleWorldPosition()!
+            const c = camera().worldSpaceToScreenSpace(at)
+            const rad = main.getRippleRadius()
+            const edge = camera().worldSpaceToScreenSpace(at.add(new vec3(rad, 0, 0)))
+            const rx = Math.abs(edge.x - c.x)
+            const inShot = c.x - rx >= 0 && c.x + rx <= 1 && c.y >= 0 && c.y <= 1
+            rippleShots.push(`${r.target}@${tl.toFixed(1)} (scene ${sc ? sc.n : "?"}) centre ${c.x.toFixed(2)},${c.y.toFixed(2)} ±${rx.toFixed(2)}`)
+            if (sc && (sc.n === 3 || sc.n === 8) && !inShot) frameErr(`the pinch on ${r.target} at t=${tl.toFixed(1)} rippled off screen (centre ${c.x.toFixed(2)},${c.y.toFixed(2)} ±${rx.toFixed(2)})`)
+          }
+        }
       }
       if (pilot.isPlaying()) errs.push(`still playing after 60 s at x${SPEED}`)
     } finally {
@@ -298,7 +319,7 @@ export class D1DemoAutopilotScenario extends Scenario {
     // session 18: every pinch of the take shows the ripple where it lands, in order
     const ripples = main.getRippleLog().slice(rippleFrom).map((r) => r.target)
     const wantRipples = ACTIONS.map(rippleTarget)
-    print(`[d1] ripples: ${ripples.length} of ${wantRipples.length} pinches`)
+    print(`[d1] ripples: ${ripples.length} of ${wantRipples.length} pinches; on holds, on screen at: ${rippleShots.join("; ")}`)
     if (ripples.join() !== wantRipples.join()) errs.push(`ripples ${ripples.join(",")}; want ${wantRipples.join(",")}`)
 
     const log = pilot.getSceneLog()

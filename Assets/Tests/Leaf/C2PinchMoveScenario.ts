@@ -5,12 +5,15 @@
 // post-move state is captured inside the Interactable's onTriggerEnd, in the
 // same frame as the Lens's own handler, with no frame wait.
 // Session 18: a real pinch on a hold, and on a button, shows the pinch ripple there for 300 ms.
+// Session 19: bolder, so it reads in the video: 400 ms, a white band at least twice the ring line
+// over a dark halo, opening out to 1.8 x.
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLDS} from "../../Scripts/Wall/WallLayout"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
+import {RIPPLE_GROW, RIPPLE_SECONDS} from "../../Scripts/NextHoldPinchRipple"
 import {
   fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, planeDistanceToHold,
   renderedRingColour, restorePreset,
@@ -132,17 +135,22 @@ export class C2PinchMoveScenario extends Scenario {
     if (!t3) errs.push("setup: no problem hold for RF after which another limb is best")
     else await moveAndCheck(main, t3, errs, "move 3 (RF -> " + t3 + ")")
 
-    // session 18: a real pinch shows a brief ripple where it lands, a hold or a button, for 300 ms
+    // session 18: a real pinch shows a brief ripple where it lands, a hold or a button, for
+    // RIPPLE_SECONDS (session 19: 400 ms, bolder)
     await restorePreset(main)
-    await sleep(500) // the setup's own ripples are over
+    await sleep(600) // the setup's own ripples are over
     const rid = main.getSuggestion()!.holdId
     // every frame from before the pinch until 1 s after it: when the ripple shows (the simulated
-    // hand's pinch only returns after its release, too late to start sampling then)
-    const samples: {t: number; on: boolean}[] = []
+    // hand's pinch only returns after its release, too late to start sampling then), and how large
+    const samples: {t: number; on: boolean; r: number}[] = []
     let sampling = true
-    const sampler = (async () => { while (sampling) { samples.push({t: getTime(), on: main.isRippleVisible()}); await frames(1) } })()
+    const sampler = (async () => {
+      while (sampling) { samples.push({t: getTime(), on: main.isRippleVisible(), r: main.getRippleRadius()}); await frames(1) }
+    })()
+    const ringLine = main.getRingLineWidth()
     const rp = await pinchCapture("Hold_" + rid, () => ({
       vis: main.isRippleVisible(), at: main.getRippleWorldPosition(), last: main.getRippleLog().slice(-1)[0],
+      r: main.getRippleRadius(), band: main.getRippleBandWidth(),
     }))
     while (getTime() - rp.time < 1) await frames(1)
     sampling = false
@@ -156,8 +164,14 @@ export class C2PinchMoveScenario extends Scenario {
       if (!v.vis) errs.push(`ripple: not shown in the frame ${rid} was pinched`)
       if (!v.last || v.last.target !== rid) errs.push(`ripple: logged on ${v.last ? v.last.target : "nothing"}, want ${rid}`)
       if (!(off >= 0 && off < 0.5)) errs.push(`ripple: centred ${off.toFixed(2)} cm from ${rid}`)
-      // it lasts 300 ms from the pinch: the last frame showing it is before 0.3 s, the first after
-      // it without it at or past 0.3 s (frame times vary in the preview: measured where it changes)
+      // session 19, bold: in the pinch frame a white band at least twice the ring line; while it
+      // shows it opens out toward (1 + RIPPLE_GROW) x
+      const r0 = v.r, rMax = Math.max(...samples.filter((s) => s.on && s.t >= rp.time - 1e-4).map((s) => s.r), r0)
+      print(`[C2] ripple: band ${v.band.toFixed(2)} cm (ring line ${ringLine.toFixed(2)}), radius ${r0.toFixed(1)} -> ${rMax.toFixed(1)} cm`)
+      if (!(v.band >= 2 * ringLine - 1e-3)) errs.push(`ripple: band ${v.band.toFixed(2)} cm, want at least twice the ring line (${(2 * ringLine).toFixed(2)})`)
+      if (!(rMax >= r0 * (1 + 0.8 * RIPPLE_GROW))) errs.push(`ripple: opened from ${r0.toFixed(1)} to only ${rMax.toFixed(1)} cm`)
+      // it lasts RIPPLE_SECONDS from the pinch: the last frame showing it is before then, the first
+      // after it without it at or past then (frame times vary in the preview: measured where it changes)
       const t0 = rp.time
       const after = samples.filter((s) => s.t >= t0 - 1e-4)
       const lastOn = Math.max(0, ...after.filter((s) => s.on).map((s) => s.t - t0))
@@ -165,8 +179,8 @@ export class C2PinchMoveScenario extends Scenario {
       const firstOff = gone ? gone.t - t0 : -1
       const shownFrames = after.filter((s) => s.on).length
       print(`[C2] ripple: shown in ${shownFrames} frames, last at ${(lastOn * 1000).toFixed(0)} ms, gone at ${(firstOff * 1000).toFixed(0)} ms`)
-      if (!(shownFrames >= 2 && lastOn < 0.3 && firstOff >= 0.3 - 1e-3)) {
-        errs.push(`ripple: shown in ${shownFrames} frames, last at ${(lastOn * 1000).toFixed(0)} ms, gone at ${(firstOff * 1000).toFixed(0)} ms (want 300 ms)`)
+      if (!(shownFrames >= 2 && lastOn < RIPPLE_SECONDS && firstOff >= RIPPLE_SECONDS - 1e-3)) {
+        errs.push(`ripple: shown in ${shownFrames} frames, last at ${(lastOn * 1000).toFixed(0)} ms, gone at ${(firstOff * 1000).toFixed(0)} ms (want ${RIPPLE_SECONDS * 1000} ms)`)
       }
     }
     await pinch("Toggle_LF")

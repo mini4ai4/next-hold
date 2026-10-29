@@ -832,7 +832,7 @@ export class NextHoldMain extends BaseScriptComponent {
     const tr = so.getTransform()
     const k = tr.getWorldScale().x
     const out = this.wall.wallToWorld(0, 0, 1).sub(this.wall.wallToWorld(0, 0, 0)).normalize()
-    this.ripple.play(name, tr.getWorldPosition().add(out.uniformScale(2.2 * k)), this.wallRot(), 3.2 * k, 0.9 * k)
+    this.ripple.play(name, tr.getWorldPosition().add(out.uniformScale(2.2 * k)), this.wallRot(), 3.4 * k, 0.7 * k)
   }
 
   private setHover(id: string | null): void {
@@ -1013,6 +1013,9 @@ export class NextHoldMain extends BaseScriptComponent {
   getRippleLog(): RippleEvent[] { return this.ripple ? this.ripple.getLog() : [] }
   isRippleVisible(): boolean { return this.ripple ? this.ripple.isVisible() : false }
   getRippleWorldPosition(): vec3 | null { return this.ripple ? this.ripple.getWorldPosition() : null }
+  /** the ripple's radius and its white band's width right now (cm) */
+  getRippleRadius(): number { return this.ripple ? this.ripple.getRadius() : 0 }
+  getRippleBandWidth(): number { return this.ripple ? this.ripple.getBandWidth() : 0 }
 }
 
 /** gap (cm) between a box (centre c, half sizes hw x hh) and a circle; < 0 when they overlap */
