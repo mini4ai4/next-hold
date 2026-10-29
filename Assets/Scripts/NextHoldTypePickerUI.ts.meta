@@ -31,6 +31,7 @@
     buttonGap: false
     buttonHeight: false
     buttonWidth: false
+    flagButtonWidth: false
     title: false
   ScriptTypesHidden:
     {}
@@ -45,6 +46,7 @@
       buttonHeight: !<float> 5.000000
       buttonGap: !<float> 2.000000
       title: Hold type
+      flagButtonWidth: !<float> 8.000000
   ScriptTypes:
     -
       {}
@@ -56,4 +58,5 @@
     - '// @input float buttonHeight = 5 {"hint":"Height of each type button in cm", "widget":"slider", "min":3, "max":8, "step":0.5}'
     - '// @input float buttonGap = 2 {"hint":"Gap between type buttons in cm", "widget":"slider", "min":1, "max":5, "step":0.25}'
     - '// @input string title = "Hold type" {"hint":"Title above the type buttons"}'
+    - '// @input float flagButtonWidth = 8 {"hint":"Width of the Start and Top buttons in cm", "widget":"slider", "min":6, "max":12, "step":0.5}'
     - '// @ui {"widget":"group_end"}'
