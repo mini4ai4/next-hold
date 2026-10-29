@@ -44,7 +44,9 @@ function checkClimbView(main: NextHoldMain, problem: string[], errs: string[], t
       if ((want[h.id] || null) !== rc) errs.push(`${tag}: Ring_${h.id} renders ${rc}, reference over the problem ${want[h.id] || null}`)
     }
     if (main.isMarkVisible(h.id)) errs.push(`${tag}: Mark_${h.id} shows outside setup`)
-    if (main.getTagText(h.id) !== null) errs.push(`${tag}: tag "${main.getTagText(h.id)}" on ${h.id} outside setup`)
+    // outside setup the only tag is "TOP" on the problem's top hold, and only in Ground
+    const wantTag = main.getView() === "ground" && h.id === main.getTopHold() ? "TOP" : null
+    if (main.getTagText(h.id) !== wantTag) errs.push(`${tag}: tag "${main.getTagText(h.id)}" on ${h.id} outside setup, want ${wantTag ? '"' + wantTag + '"' : "none"}`)
   }
 }
 

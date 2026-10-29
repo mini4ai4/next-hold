@@ -229,14 +229,20 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
     this.applyStates()
   }
 
-  /** Move the row (Main computes the anchor between the hands). */
-  placeAt(worldPos: vec3, worldRot: quat): void {
+  /** Move the row (Main computes where) and size it: scale 1 = its 110 cm size; Ground draws it
+   *  larger from further back so it reads the same. */
+  placeAt(worldPos: vec3, worldRot: quat, scale = 1): void {
     const tr = this.getTransform()
     tr.setWorldPosition(worldPos)
     tr.setWorldRotation(worldRot)
+    tr.setWorldScale(vec3.one().uniformScale(scale))
   }
 
-  /** The whole block (both rows of buttons and the note) in cm, as laid out; null before the first layout. */
+  /** How much larger the row is drawn than its 110 cm size. */
+  getScale(): number { return this.getTransform().getWorldScale().x }
+
+  /** The whole block (both rows of buttons and the note) in cm at its 110 cm size (scale 1), as laid
+   *  out; null before the first layout. */
   getSize(): vec2 | null {
     const s = this.backPlate ? this.backPlate.size : null
     return s && s.x > 0 && s.y > 0 ? s : null

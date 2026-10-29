@@ -175,8 +175,12 @@ export class N8StickFigureScenario extends Scenario {
     // ── at the preset ──
     const s0 = snap(main)
     check(s0, errs, "preset")
-    // at the preset the torso point is below the row and both hand lines pass behind it
-    if (checkFade(main, errs, "preset") === 0) errs.push("preset: no figure line passes behind the control row; the fade check proves nothing")
+    // Ground puts the row beside the problem, clear of the figure; On wall puts it below the hands,
+    // where the torso point is below the row and both hand lines pass behind it
+    checkFade(main, errs, "ground, preset")
+    await pinch("ViewToggle")
+    await frames(3)
+    if (checkFade(main, errs, "on wall, preset") === 0) errs.push("on wall, preset: no figure line passes behind the control row; the fade check proves nothing")
 
     // thin and light: every channel bright on the additive display, not opaque
     for (const n of ["Figure_Torso", ...REF_LIMBS.map((l) => "Figure_" + l)]) {
@@ -205,17 +209,18 @@ export class N8StickFigureScenario extends Scenario {
       if (planeD(before, after) < 1) errs.push(`pinch frame: Figure_${sug.limb} end did not move`)
     }
 
-    // ── a foot this time, and in the On wall view (the figure shows in both) ──
+    // ── a foot this time, and back in Ground (the figure shows in both) ──
     await pinch("ViewToggle")
     await frames(2)
+    if (main.getView() !== "ground") errs.push(`setup: view ${main.getView()} after the second ViewToggle, want ground`)
     await pinch("Toggle_LF")
     await frames(2)
     const lfSug = main.getSuggestion()
     if (lfSug && lfSug.limb === "LF") {
       const got2 = await pinchCapture("Hold_" + lfSug.holdId, () => snap(main))
       if (!got2.fired || !got2.value) errs.push(`Hold_${lfSug.holdId} pinch did not fire`)
-      else check(got2.value, errs, `on wall, pinch frame, LF -> ${lfSug.holdId}`)
-      checkFade(main, errs, "on wall, after the foot move")
+      else check(got2.value, errs, `ground, pinch frame, LF -> ${lfSug.holdId}`)
+      checkFade(main, errs, "ground, after the foot move")
     } else {
       errs.push(`setup: no LF suggestion after Toggle_LF (${lfSug ? lfSug.limb + "->" + lfSug.holdId : "none"})`)
     }

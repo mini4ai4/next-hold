@@ -195,10 +195,12 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     this.setLabelOpacity(0)
   }
 
-  showWhy(worldPos: vec3, worldRot: quat, text: string, holdId: string): void {
+  /** Show the why-line at worldPos; scale 1 = its 110 cm size (Ground draws it larger from further back). */
+  showWhy(worldPos: vec3, worldRot: quat, text: string, holdId: string, scale = 1): void {
     const tr = this.whyRoot.getTransform()
     tr.setWorldPosition(worldPos)
     tr.setWorldRotation(worldRot)
+    tr.setWorldScale(vec3.one().uniformScale(scale))
     this.whyText.text = text
     this.whyHoldId = holdId
     this.whyWanted = true
@@ -218,6 +220,7 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
   isWhyVisible(): boolean { return this.whyWanted }
   getWhyText(): string { return this.whyWanted && this.whyText ? this.whyText.text : "" }
   getWhyHoldId(): string | null { return this.whyHoldId }
+  getWhyScale(): number { return this.whyRoot ? this.whyRoot.getTransform().getWorldScale().x : 1 }
 
   private tickLabel(): void {
     if (this.labelSticky && this.labelActive) {

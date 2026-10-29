@@ -52,6 +52,8 @@ const PICKER_HALF_H = 24
 /** half the control row block (three rows of 5 cm buttons + the note + padding), until its layout reports a size */
 const ROW_HALF_W = 15.4
 const ROW_HALF_H = 11.6
+/** Ground: gap (cm) between the problem's outermost ring and the control row beside it */
+const ROW_SIDE_GAP = 4
 
 export type Mode = "climb" | "setup"
 /** What is shown, never what is scored. "ground": standing back at the base, every ring of the
@@ -386,6 +388,8 @@ export class NextHoldMain extends BaseScriptComponent {
       rings[id] = climb && this.byHold[id] ? this.byHold[id].colour : null
       // outside setup the holds that aren't in the problem stay visible, but dim
       this.wall.setHoldDim(id, climb && !this.problem[id])
+      // climbing: the goal of the sequence is marked "TOP" (Ground only, see pushOverlay)
+      if (climb && id === goalTop) tags[id] = "TOP"
       if (climb || !this.problem[id]) continue
       marks[id] = true
       const tag = (this.startFlags[id] ? ["START"] : []).concat(goalTop === id ? ["TOP"] : [])
@@ -404,6 +408,7 @@ export class NextHoldMain extends BaseScriptComponent {
       showMarkers: true,
       marks,
       tags,
+      tagsAbove: climb,
       ghosts: this.preview.map((m) => ({hold: m.holdId, limb: m.limb})),
       // the body: the centre of mass the scoring itself uses for this position
       torso: centreOfMass(this.position, holds),
@@ -413,7 +418,6 @@ export class NextHoldMain extends BaseScriptComponent {
     this.controlRow.setSelectedLimb(this.selected)
     this.controlRow.setMode(this.mode)
     this.controlRow.setView(this.view)
-    this.placeControlRow()
     this.updateFigureMask(true)
 
     if (sug) {
@@ -442,10 +446,22 @@ export class NextHoldMain extends BaseScriptComponent {
     } else {
       const rings: {[id: string]: RingColour | null} = {}
       if (s.glowHoldId) rings[s.glowHoldId] = s.rings[s.glowHoldId] || null
-      this.visuals.apply({...s, rings, ghosts: [], viewCm: DESIGN_VIEW_CM, labelScale, labelBox})
+      // On wall: one ring and its word; the climbing TOP tag is a Ground thing (setup keeps its tags)
+      const tags = this.mode === "climb" ? {} : s.tags
+      this.visuals.apply({...s, rings, tags, ghosts: [], viewCm: DESIGN_VIEW_CM, labelScale, labelBox})
     }
     // the label's size changed with the view: keep it just below the ring
     if (s.glowHoldId) this.callouts.moveSuggestion(this.labelPos(s.glowHoldId), this.wallRot())
+    // the panels follow the view: beside the problem and sized for the distance in Ground
+    this.placeControlRow()
+    const whyId = this.callouts.getWhyHoldId()
+    if (this.callouts.isWhyVisible() && whyId && this.byHold[whyId]) this.showWhyFor(whyId, this.byHold[whyId])
+  }
+
+  /** How much larger the panels (control row, why-line) are drawn than at 110 cm: in Ground they
+   *  grow with the eye's distance like the ring line, so they read as they do at 110 cm. */
+  private panelScale(): number {
+    return this.view === "ground" ? Math.max(1, this.groundCm / DESIGN_VIEW_CM) : 1
   }
 
   /** Centred just below the suggested ring's line, between the hold and the climber's eye line;
@@ -525,8 +541,30 @@ export class NextHoldMain extends BaseScriptComponent {
     return out
   }
 
-  /** Centred between the two hand holds, below the lower one; slides when a hand moves. */
+  /**
+   * On wall (and up close): centred between the two hand holds, below the lower one, and kept in
+   * view; it slides when a hand moves. In Ground: beside the problem, level with its start holds, on
+   * the side nearer the eye, and as large as the distance needs, so it never covers the problem.
+   * From the near end of Ground it may sit outside a straight-ahead view: you turn your head to it,
+   * as you turn it to read the problem. It is kept in view vertically and never slides over the problem.
+   */
   private placeControlRow(): void {
+    const k = this.panelScale()
+    const size = this.controlRow.getSize()
+    const halfW = (size ? size.x / 2 : ROW_HALF_W) * k
+    const halfH = (size ? size.y / 2 : ROW_HALF_H) * k
+    if (this.view === "ground") {
+      const box = this.problemBox()
+      const starts = this.getStartHolds()
+      const level = starts.length ? starts : HAND_LIMBS.map((l) => this.position[l]).filter((id) => id != null && this.holds[id]) as string[]
+      const y = level.length ? level.reduce((s, id) => s + this.holds[id].y, 0) / level.length : 150
+      const eyeX = this.eyeWallX()
+      const right = eyeX === null || box.x1 - eyeX <= eyeX - box.x0
+      const x = right ? box.x1 + ROW_SIDE_GAP + halfW : box.x0 - ROW_SIDE_GAP - halfW
+      const p = this.toWall(this.keepInView(this.wall.wallToWorld(x, y, 10), halfW, halfH))
+      this.controlRow.placeAt(this.wall.wallToWorld(x, Math.max(halfH + 2, p.y), 10), this.wallRot(), k)
+      return
+    }
     const hands = HAND_LIMBS.map((l) => this.position[l]).filter((id) => id != null && this.holds[id]) as string[]
     let x = 120, y = 120
     if (hands.length > 0) {
@@ -537,19 +575,42 @@ export class NextHoldMain extends BaseScriptComponent {
     y = Math.max(12, y)
     // keep the whole block inside the view, both rows and the note under them, not just its
     // centre: at the preset the LF / RF / Climb row and the note fell below the narrow view
-    const size = this.controlRow.getSize()
-    const halfW = size ? size.x / 2 : ROW_HALF_W
-    const halfH = size ? size.y / 2 : ROW_HALF_H
-    this.controlRow.placeAt(this.keepInView(this.wall.wallToWorld(x, y, 10), halfW, halfH), this.wallRot())
+    this.controlRow.placeAt(this.keepInView(this.wall.wallToWorld(x, y, 10), halfW, halfH), this.wallRot(), k)
+  }
+
+  /** The problem's outline on the wall (cm): every problem hold's ring, its line included. */
+  private problemBox(): {x0: number; x1: number; y0: number; y1: number} {
+    const r = (id: string) => this.ringRadius(id) + this.getRingLineWidth() / 2
+    const ids = this.getProblemHolds()
+    if (!ids.length) return {x0: 120, x1: 120, y0: 150, y1: 150}
+    return {
+      x0: Math.min(...ids.map((id) => this.holds[id].x - r(id))), x1: Math.max(...ids.map((id) => this.holds[id].x + r(id))),
+      y0: Math.min(...ids.map((id) => this.holds[id].y - r(id))), y1: Math.max(...ids.map((id) => this.holds[id].y + r(id))),
+    }
+  }
+
+  /** a world point in wall cm (x from the wall's left edge, y up from the floor) */
+  private toWall(p: vec3): WallPt {
+    const l = this.wall.getTransform().getInvertedWorldTransform().multiplyPoint(p)
+    return {x: l.x - this.wall.wallToLocal(0, 0).x, y: l.y}
+  }
+
+  /** where the wearer's eye is across the wall (wall cm), or null without a camera */
+  private eyeWallX(): number | null {
+    const finder = WorldCameraFinderProvider.getInstance()
+    const cam = finder ? finder.getComponent() : null
+    return cam ? this.toWall(cam.getSceneObject().getTransform().getWorldPosition()).x : null
   }
 
   private showWhyFor(id: string, r: ScoreResult): void {
     const h = this.holds[id]
     const ringR = this.ringRadius(id)
+    const k = this.panelScale()
     // toward the middle of the view: a hold above the eye line gets its line below, and the other way round
     // (a fixed 265 cm cut-off put the line off the top of the narrow SPECS view for the holds you look up at)
-    const y = this.isAboveViewCentre(this.wall.wallToWorld(h.x, h.y, 0)) ? h.y - ringR - 5 : h.y + ringR + 5
-    this.callouts.showWhy(this.keepInView(this.wall.wallToWorld(h.x, y, 10), WHY_HALF_W), this.wallRot(), r.why, id)
+    const dy = ringR + this.getRingLineWidth() / 2 + 4.2 * k
+    const y = this.isAboveViewCentre(this.wall.wallToWorld(h.x, h.y, 0)) ? h.y - dy : h.y + dy
+    this.callouts.showWhy(this.keepInView(this.wall.wallToWorld(h.x, y, 10), WHY_HALF_W * k), this.wallRot(), r.why, id, k)
   }
 
   private setHover(id: string | null): void {
@@ -674,6 +735,9 @@ export class NextHoldMain extends BaseScriptComponent {
   isWhyVisible(): boolean { return this.callouts.isWhyVisible() }
   getWhyText(): string { return this.callouts.getWhyText() }
   getWhyHoldId(): string | null { return this.callouts.getWhyHoldId() }
+  /** how much larger the why-line and the control row are drawn than at 110 cm */
+  getWhyScale(): number { return this.callouts.getWhyScale() }
+  getRowScale(): number { return this.controlRow.getScale() }
   isAskArmed(): boolean { return this.askArmed }
   isAskLit(): boolean { return this.controlRow.isAskLit() }
   getViewLabel(): string { return this.controlRow.getViewLabel() }

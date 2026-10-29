@@ -38,8 +38,11 @@ export interface OverlayState {
   showMarkers: boolean
   /** setup mode: holds marked as part of "your problem" (thin pale ring); empty outside setup */
   marks: {[id: string]: boolean}
-  /** setup mode: tag text under a marked hold ("START", "TOP"); absent = no tag */
+  /** tag text by a hold: in setup under each marked hold ("START", "TOP"); in Ground's climb view
+   *  "TOP" over the problem's top hold. Absent = no tag */
   tags: {[id: string]: string}
+  /** tags sit above the hold's ring (climb: the top of the problem) instead of under it (setup) */
+  tagsAbove?: boolean
   /** sequence preview: the next moves in order, each a hold and the limb that moves there. Step 1
    *  is the suggestion (its glow and label show it); steps 2 and 3 get a badge "2 · LH" pinned on
    *  their hold's ring. Empty = none */
@@ -79,6 +82,13 @@ const MARK_COLOR = new vec4(0.62, 0.86, 1.0, 1)
 const TAG_COLOR = new vec4(0.8, 0.93, 1.0, 1)
 /** Text sizes on the overlay canvas (same scale as the UI modules' 110 cm roles) */
 const TAG_SIZE = 44
+/** from the ring line's outer edge to the tag's centre (cm at 110 cm), and half the tag's box per
+ *  letter and in height ("TOP" at TAG_SIZE is about 3.4 x 1.6 cm) */
+const TAG_GAP = 1.8
+/** the climbing "TOP" over the problem's top hold: the goal of the whole sequence, a step larger */
+const TOP_TAG_SIZE = 60
+const TAG_HALF_W_PER_CHAR = 0.6
+const TAG_HALF_H = 0.9
 /** sequence preview: steps 2 and 3 as small, light badges "2 · LH" (they must read on the additive
  *  display). Step 1 has no badge: the glowing suggestion with its label already is step 1. */
 const GHOST_COUNT = 3
@@ -359,8 +369,17 @@ export class NextHoldWallVisuals {
       }
       this.marks[h.id].so.enabled = !!s.marks[h.id]
       const tag = s.tags[h.id]
-      this.tags[h.id].so.enabled = !!tag
-      if (tag) this.tags[h.id].text.text = tag
+      const t = this.tags[h.id]
+      t.so.enabled = !!tag
+      if (tag) {
+        t.text.text = tag
+        // tags grow with the distance like the ring line
+        const tk = Math.max(1, viewCm / DESIGN_VIEW_CM) * (s.tagsAbove ? TOP_TAG_SIZE / TAG_SIZE : 1)
+        t.text.size = TAG_SIZE * tk
+        const r = HOLD_SIZE[h.type].ringR + ringW / 2
+        const dy = s.tagsAbove ? r + TAG_GAP * tk : -(r + TAG_GAP * tk)
+        t.so.getTransform().setLocalPosition(this.wallToLocal(h.x, h.y + dy, RING_Z + 0.2))
+      }
     }
 
     const glowHold = s.glowHoldId ? this.holdDef(s.glowHoldId) : null
@@ -379,6 +398,15 @@ export class NextHoldWallVisuals {
     const glowClear = glowOn ? HOLD_SIZE[glowHold!.type].ringR + ringW / 2 + GLOW_CLEAR * gs : 0
     const steps = s.ghosts.slice(0, GHOST_COUNT)
     const label = s.labelBox || null
+    // boxes the badges keep clear of: the label and any tag on the wall ("TOP")
+    const boxes = label ? [label] : []
+    for (const id of Object.keys(s.tags)) {
+      const th = this.holdDef(id)
+      if (!th || !s.tags[id]) continue
+      const p = this.tags[id].so.getTransform().getLocalPosition()
+      const tk = this.tags[id].text.size / TAG_SIZE
+      boxes.push({x: th.x, y: p.y, hw: s.tags[id].length * TAG_HALF_W_PER_CHAR * tk, hh: TAG_HALF_H * tk})
+    }
     const at: GhostAt[] = []
     for (let i = 0; i < this.ghosts.length; i++) {
       const g = this.ghosts[i]
@@ -402,7 +430,7 @@ export class NextHoldWallVisuals {
         let m = 1e9
         if (c.x - badgeL - badgeR < 0 || c.x + badgeL + badgeR > 240) m = Math.min(m, -1)
         if (glowOn && !onGlow) m = Math.min(m, pillDistance(c, badgeL, badgeR, glowHold!) - glowClear - GHOST_GLOW_GAP)
-        if (label) m = Math.min(m, pillBoxDistance(c, badgeL, badgeR, label) - GHOST_GLOW_GAP)
+        for (const b of boxes) m = Math.min(m, pillBoxDistance(c, badgeL, badgeR, b) - GHOST_GLOW_GAP)
         for (const p of at) m = Math.min(m, pillPillDistance(p, c, badgeL, badgeR) - GHOST_GLOW_GAP)
         for (const o of HOLDS) {
           if (o.id === h.id) continue
