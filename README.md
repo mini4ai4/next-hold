@@ -11,7 +11,7 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    the reason. "Setup" retypes a hold.
 
 ## Tests
-- LEAF: open the LEAF panel and run all eleven scenarios (one per done criterion in `devpost/design-brief.md`, plus one per review fix).
+- LEAF: open the LEAF panel and run all fourteen scenarios (one per done criterion in `devpost/design-brief.md`, plus one per review fix).
 - Scoring port: `node tests/scoring.port.test.mjs` (42 checks).
 - Reference rule, written before the build: `node devpost/scoring-reference/scoring.test.js` (22 checks). This is
   pre-written design code; CLAD ported it to TypeScript.

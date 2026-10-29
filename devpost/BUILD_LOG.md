@@ -14,8 +14,11 @@ Lens Studio MCP. Times and costs are from each session's own log.
 | 6 | 27 Oct | Visual pass: the wall disappeared on an additive display | Lit birch-ply wall, shaped holds, glowing rings; light colours that survive additive blending. **6 of 6 pass** | 159 | 28.8 min | $9.04 |
 | 7 | 28–29 Oct | Five fixes from a strict review: mark your problem, upward goal, sequence preview, why-line wording, control row in view | Changed the plain-JS reference first (11→22 checks), then the port (18→42). Committed items 1–4 with a LEAF scenario each. Stopped before the last run when Lens Studio froze on a plugin permission dialog | — | 37.5 min | $11.54 |
 | 8 | 29 Oct | Finish session 7 | Found that the compile failure came from a preview-helper package auto-updated to a newer SIK than the lens uses; parked it (not deleted). Committed item 5. Caught that C4's setup no longer found an off-view suggestion in one move after the scoring changes, and widened it to three. **11 of 11 pass**; checked that r5 fails with the old placement | — | 7.5 min | $2.82 |
+| 9 | 29 Oct | Two viewing modes (Ground / On wall) and a stick figure, from the review's distance flaw | One button switches what is shown, same state, same frame. A thin light figure joins the limbs at the centre of mass. Its own 180 cm viewpoint check **failed honestly**: only 6 of 10 holds fit | — | 18.0 min | $7.82 |
+| 10 | 29 Oct | Find where the whole problem fits | Made the check strict (whole rings inside the view) and scanned in 1 cm steps: **3.65 m**, not 3 m. Sized Ground for that distance; the figure fades where it passes behind the control row. **14 of 14 pass** | — | 17.8 min | $6.70 |
+| 11 | 29 Oct | Ground looked huge at the preset 125 cm | Ground now sizes itself from the real camera-to-wall distance every frame (110–365 cm), so rings look the same wherever you stand. **14 of 14 pass** | — | 10.6 min | $4.55 |
 
-Sessions 3 and 4 are the ones we learned most from: the field of view, not the scoring, decides the design.
+Sessions 3, 4 and 9–10 are the ones we learned most from: the field of view, not the scoring, decides the design. On the wall the view holds about one hold; to see the whole problem you step back 3.65 m.
 
 ## LEAF, last full run (29 Oct)
 
@@ -32,6 +35,9 @@ Sessions 3 and 4 are the ones we learned most from: the field of view, not the s
 | `r3-sequence-preview` | The next three moves show as small numbered ghost rings, updated the same frame | pass |
 | `r4-why-wording` | The why-line names the hold type in capitals ("PINCH HOLD"), never as a gesture | pass |
 | `r5-control-row-in-view` | Both rows of the control panel and the safety note sit inside the view | pass |
+| `a1-view-modes` | On wall leaves exactly one ring (the suggestion); Ground restores every ring with unchanged colours; sizes match the real distance | pass |
+| `a2-ground-viewpoint-365` | From 3.65 m back every whole ring of the problem is inside the view | pass |
+| `b1-stick-figure` | After a limb moves, the figure's ends sit on the limbs in the same frame | pass |
 
 `node tests/scoring.port.test.mjs` → `42 passed, 0 failed`. The plain-JavaScript reference: `node devpost/scoring-reference/scoring.test.js` → 22 of 22.
 
