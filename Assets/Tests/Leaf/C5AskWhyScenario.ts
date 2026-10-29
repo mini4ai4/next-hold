@@ -2,12 +2,14 @@
 // that hold's "why" line without moving any limb; it's one-shot.
 // Input path: real SIK pinches on AskButton and Hold_<id>. The expected why
 // string comes from the test's own port of scoring.js.
+// Session 18: on a hold under a step tag the ring wears the step's colour, so "?" explains that
+// step's score; the line covers no ring and its nearest ring on screen is the asked hold's.
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {
-  fmtPos, frames, getMain, makeReference, mustFind, pinch, restorePreset, samePosition,
+  camera, checkWhyAgrees, expectedWhy, fmtPos, frames, getMain, makeReference, mustFind, pinch, restorePreset, samePosition,
 } from "./NextHoldTestKit"
 import {REF_LIMBS, RefPosition} from "./NextHoldReferenceRule"
 
@@ -53,13 +55,17 @@ export class C5AskWhyScenario extends Scenario {
     for (const l of REF_LIMBS) markers0[l] = main.getMarkerHold(l as any)
 
     // ── pinch the ringed hold ──
+    // session 18: "?" explains the score the ring shows: the selected limb's, or the step's under a step tag
+    const want = expectedWhy(main, target.holdId)
+    const wantWhy = want ? want.why : target.why
     await pinch("Hold_" + target.holdId)
     await frames(3)
     const pos1 = main.getPosition() as RefPosition
-    print(`[C5] asked ${target.holdId} for ${sel0}: Lens why "${whyText()}", reference "${target.why}"; position ${fmtPos(pos1)}`)
+    print(`[C5] asked ${target.holdId} for ${sel0}: Lens why "${whyText()}", reference "${wantWhy}" (${want ? want.from : "selected"}); position ${fmtPos(pos1)}`)
     if (!main.isWhyVisible() || !mustFind("WhyLine").enabled) errs.push("why line not shown")
-    if (whyText() !== target.why) errs.push(`why text "${whyText()}" != reference "${target.why}"`)
-    if (main.getWhyText() !== target.why) errs.push(`getWhyText "${main.getWhyText()}"`)
+    if (whyText() !== wantWhy) errs.push(`why text "${whyText()}" != reference "${wantWhy}"`)
+    if (main.getWhyText() !== wantWhy) errs.push(`getWhyText "${main.getWhyText()}"`)
+    print(`[C5] ${checkWhyAgrees(camera(), main, errs, "asked " + target.holdId)}`)
     if (main.getWhyHoldId() !== target.holdId) errs.push(`why is for ${main.getWhyHoldId()}, want ${target.holdId}`)
     if (!samePosition(pos1, pos0)) errs.push(`a limb moved: ${fmtPos(pos1)} (was ${fmtPos(pos0)})`)
     for (const l of REF_LIMBS) if (main.getMarkerHold(l as any) !== markers0[l]) errs.push(`Marker_${l} moved to ${main.getMarkerHold(l as any)}`)
@@ -74,6 +80,23 @@ export class C5AskWhyScenario extends Scenario {
     const pos2 = main.getPosition() as RefPosition
     if (pos2[sel0] !== target.holdId) errs.push(`next pinch after the why did not move ${sel0} to ${target.holdId} (${fmtPos(pos2)})`)
     if (main.isWhyVisible()) errs.push("why line still shown after a move")
+
+    // session 18: a hold under a step tag. At the preset "2 · LH" sits on h09 while RH is selected:
+    // its ring wears LH's colour at that step, so "?" on it explains LH's move there, not RH's
+    await restorePreset(main)
+    await frames(3)
+    const tagged = [2, 3].map((n) => main.getGhostHold(n)).filter((id) => id && main.isRingVisible(id) && !main.isRingGlowing(id))[0]
+    if (!tagged) errs.push("setup: no tagged hold with its own ring at the preset")
+    else {
+      const wantT = expectedWhy(main, tagged)
+      await pinch("AskButton")
+      await frames(2)
+      await pinch("Hold_" + tagged)
+      await frames(3)
+      print(`[C5] tagged ${tagged} (${wantT ? wantT.from : "-"}): ${checkWhyAgrees(camera(), main, errs, "tagged " + tagged)}`)
+      if (!wantT || wantT.from.indexOf("step") !== 0) errs.push(`tagged ${tagged}: the reference does not see it as a step's hold (${wantT ? wantT.from : "none"})`)
+    }
+    await restorePreset(main)
 
     expect(errs.length, "criterion 5 mismatches:\n" + errs.join("\n")).toBe(0)
   }

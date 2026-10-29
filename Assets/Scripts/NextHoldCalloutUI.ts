@@ -35,6 +35,23 @@ const LABEL_OUTLINE = 0.3
 const LABEL_OUTLINE_COLOR = new vec4(0.08, 0.1, 0.09, 0.85)
 const WHY_W = 40
 const WHY_SCALE = 1.5
+/** the why-line's capitals run about this wide per character at their size (cm; "POCKET HOLD · HIGH
+ *  STEP" measured 22.4 cm for 23 characters), and the plate's padding either side */
+const WHY_CHAR_W = 1.0
+const WHY_MIN_W = 12
+const WHY_PAD_X = 1.4
+/** half the why plate's height: the 3 cm text line and 1 cm padding above and below */
+export const WHY_HALF_H = 2.5
+
+/** the why-line text's width (cm, at its 110 cm size): as wide as its words, at most WHY_W (longer lines shrink) */
+function whyTextWidth(text: string): number {
+  return Math.min(WHY_W, Math.max(WHY_MIN_W, text.length * WHY_CHAR_W + 1))
+}
+
+/** half the why plate's width (cm, at its 110 cm size) for this text */
+export function whyHalfWidth(text: string): number {
+  return whyTextWidth(text) / 2 + WHY_PAD_X
+}
 
 @component
 export class NextHoldCalloutUI extends BaseScriptComponent {
@@ -67,6 +84,7 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
   private whyRoot: SceneObject
   private whyText: Text
   private whyPlate: BackPlate
+  private whyItem: FlexItem
 
   private labelBaseSize = 0
   /** set by Main per view: from further back the label must not read smaller than Body at 110 cm */
@@ -119,13 +137,14 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     flex.justifyContent = FlexJustify.Center
     flex.paddingTop = 1.0
     flex.paddingBottom = 1.0
-    flex.paddingLeft = 1.4
-    flex.paddingRight = 1.4
+    flex.paddingLeft = WHY_PAD_X
+    flex.paddingRight = WHY_PAD_X
     flex.onLayoutComplete.add((r) => {
       this.whyPlate.size = new vec2(r.containerWidth, r.containerHeight)
     })
     const textSO = this.obj(content, "WhyText", new vec3(0, 0, 0.02))
     const item = textSO.createComponent(FlexItem.getTypeName()) as FlexItem
+    this.whyItem = item
     item.overrideWidth = WHY_W
     item.overrideHeight = 3
     this.whyText = textSO.createComponent("Component.Text") as Text
@@ -201,6 +220,11 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     tr.setWorldPosition(worldPos)
     tr.setWorldRotation(worldRot)
     tr.setWorldScale(vec3.one().uniformScale(scale))
+    // the plate fits the words: a 40 cm plate drawn 2.3x from 2.5 m slid across other holds' rings
+    const w = whyTextWidth(text)
+    this.whyItem.overrideWidth = w
+    this.whyText.layoutRect = Rect.create(-w / 2, w / 2, -1.5, 1.5)
+    this.whyPlate.size = new vec2(w + 2 * WHY_PAD_X, 2 * WHY_HALF_H)
     this.whyText.text = text
     this.whyHoldId = holdId
     this.whyWanted = true
@@ -221,6 +245,8 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
   getWhyText(): string { return this.whyWanted && this.whyText ? this.whyText.text : "" }
   getWhyHoldId(): string | null { return this.whyHoldId }
   getWhyScale(): number { return this.whyRoot ? this.whyRoot.getTransform().getWorldScale().x : 1 }
+  /** the why plate's size (cm, at its 110 cm size) */
+  getWhyPlateSize(): vec2 { return this.whyPlate ? this.whyPlate.size : vec2.zero() }
 
   private tickLabel(): void {
     if (this.labelSticky && this.labelActive) {

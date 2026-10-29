@@ -295,6 +295,8 @@ export class NextHoldWallVisuals {
   /** path 1 joins the glow (step 1) to badge 2, path 2 badge 2 to badge 3 */
   private ghostPaths: {so: SceneObject; rmv: RenderMeshVisual}[] = []
   private dotMeshes: {[k: string]: RenderMesh} = {}
+  /** the label's, the tags' and the badges' boxes as last drawn (wall cm) */
+  private textBoxes: {x: number; y: number; hw: number; hh: number}[] = []
   /** figure lines by name: "LH_Upper", "LH_Lower", ..., "Spine", "Shoulders", "Hips" */
   private figure: {[name: string]: {so: SceneObject; rmv: RenderMeshVisual}} = {}
   private head: {so: SceneObject; mat: Material; rmv: RenderMeshVisual}
@@ -522,6 +524,8 @@ export class NextHoldWallVisuals {
       }
     }
     this.applyGhostPath(at, gk, ringW, glowOn ? glowHold! : null, glowClear, label)
+    // what a why-line must not cover besides the rings: the label, the tags and the badges
+    this.textBoxes = boxes.concat(at.map((a) => ({x: a.x, y: a.y, hw: a.L + a.R, hh: a.R})))
 
     this.applyFigure(s)
 
@@ -758,6 +762,11 @@ export class NextHoldWallVisuals {
     if (n === 1) return this.glow.so.enabled && s!.glowHoldId === step.hold ? step.hold : null
     const g = this.ghosts[n - 2]
     return g && g.ring.so.enabled ? step.hold : null
+  }
+
+  /** the suggestion label's, the tags' and the badges' boxes as last drawn (wall cm, centre and half sizes) */
+  getTextBoxes(): {x: number; y: number; hw: number; hh: number}[] {
+    return this.textBoxes.map((b) => ({...b}))
   }
 
   isGlowOn(id: string): boolean {

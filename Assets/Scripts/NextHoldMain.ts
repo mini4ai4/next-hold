@@ -41,14 +41,12 @@ import {
 import {DESIGN_VIEW_CM, FigureBody, NextHoldWallVisuals, OverlayState, RingColour, WallPt, minReadSize, ringLineWidth} from "./NextHoldWallVisuals"
 import {NextHoldControlRowUI} from "./NextHoldControlRowUI"
 import {NextHoldTypePickerUI} from "./NextHoldTypePickerUI"
-import {NextHoldCalloutUI} from "./NextHoldCalloutUI"
+import {NextHoldCalloutUI, WHY_HALF_H, whyHalfWidth} from "./NextHoldCalloutUI"
 import {NextHoldOffViewArrow} from "./NextHoldOffViewArrow"
 import {NextHoldPinchRipple, RippleEvent} from "./NextHoldPinchRipple"
 import {GLOW_PROFILE} from "./Wall/ProceduralTextures"
 import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/CameraProvider/WorldCameraFinderProvider"
 
-/** half the why-line plate: WHY_W (40 cm) in NextHoldCalloutUI plus its padding */
-const WHY_HALF_W = 21.5
 /** how far in front of the wall face the control row and the why-line stand (cm) */
 const PANEL_Z = 10
 /** On wall: gap (cm, as the eye sees it on the wall) between the suggested ring's glow and the control row */
@@ -333,7 +331,7 @@ export class NextHoldMain extends BaseScriptComponent {
     if (!this.problem[id]) return // outside setup only the problem's holds are targets
     // climb mode
     if (this.askArmed) {
-      const r = this.byHold[id]
+      const r = this.shownScore(id)
       if (!r) return // no ring on an occupied hold: stay armed, wait for a ring
       this.askArmed = false
       this.controlRow.setAskArmed(false)
@@ -544,7 +542,26 @@ export class NextHoldMain extends BaseScriptComponent {
     // the panels follow the view: beside the problem and sized for the distance in Ground
     this.placeControlRow()
     const whyId = this.callouts.getWhyHoldId()
-    if (this.callouts.isWhyVisible() && whyId && this.byHold[whyId]) this.showWhyFor(whyId, this.byHold[whyId])
+    const whyScore = whyId ? this.shownScore(whyId) : null
+    if (this.callouts.isWhyVisible() && whyId && whyScore) this.showWhyFor(whyId, whyScore)
+  }
+
+  /**
+   * The score a hold's ring shows, which is the one "?" explains: the selected limb's, except under a
+   * step tag in Ground (not on the glowing hold), where the ring wears the earliest such step's colour
+   * (session 16), so the why-line explains that step's move. Asked about otherwise, "POCKET HOLD ·
+   * HIGH STEP" could sit on a green ring. Null when the hold has no ring.
+   */
+  private shownScore(id: string): ScoreResult | null {
+    const own = this.byHold[id]
+    if (!own) return null
+    if (this.view === "ground" && this.overlay && this.overlay.glowHoldId !== id) {
+      for (let n = 2; n <= 3; n++) {
+        const step = this.preview[n - 1]
+        if (step && step.holdId === id && this.visuals.ghostHold(n) === id) return step
+      }
+    }
+    return own
   }
 
   /** How much larger the panels (control row, why-line) are drawn than at 110 cm: in Ground they
@@ -737,15 +754,63 @@ export class NextHoldMain extends BaseScriptComponent {
     return cam ? this.toWall(cam.getSceneObject().getTransform().getWorldPosition()).x : null
   }
 
+  /**
+   * The why-line sits against the asked hold's ring, as the eye sees it: below or above it (toward
+   * the middle of the view first), else to its right or left. Each place is slid into view, and the
+   * first that covers no ring, label, tag or badge, and whose nearest ring is still the asked one,
+   * wins (else the clearest). From 2.5 m it is drawn 2.3x: slid into view below h11 it lay across
+   * rh's green ring and read as that hold's caption.
+   */
   private showWhyFor(id: string, r: ScoreResult): void {
     const h = this.holds[id]
-    const ringR = this.ringRadius(id)
     const k = this.panelScale()
-    // toward the middle of the view: a hold above the eye line gets its line below, and the other way round
-    // (a fixed 265 cm cut-off put the line off the top of the narrow SPECS view for the holds you look up at)
-    const dy = ringR + this.getRingLineWidth() / 2 + 4.2 * k
-    const y = this.isAboveViewCentre(this.wall.wallToWorld(h.x, h.y, 0)) ? h.y - dy : h.y + dy
-    this.callouts.showWhy(this.keepInView(this.wall.wallToWorld(h.x, y, 10), WHY_HALF_W * k), this.wallRot(), r.why, id, k)
+    const halfW = whyHalfWidth(r.why) * k, halfH = WHY_HALF_H * k
+    const eye = this.eyeOnWall()
+    const s = this.seenScale(eye, PANEL_Z)
+    const hw = halfW * s, hh = halfH * s
+    const own = this.shownRingRadius(id)
+    const d = own + WHY_RING_GAP
+    const others = this.getHoldIds().filter((o) => o !== id && this.isRingVisible(o))
+      .map((o) => ({x: this.holds[o].x, y: this.holds[o].y, r: this.shownRingRadius(o)}))
+    const texts = this.visuals.getTextBoxes()
+    // and the control row, as the eye sees it on the wall
+    const row = this.rowOutlineOnWall()
+    if (row) {
+      const xs = row.map((p) => p.x), ys = row.map((p) => p.y)
+      const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys)
+      texts.push({x: (x0 + x1) / 2, y: (y0 + y1) / 2, hw: (x1 - x0) / 2, hh: (y1 - y0) / 2})
+    }
+    const ys = this.isAboveViewCentre(this.wall.wallToWorld(h.x, h.y, 0)) ? [h.y - d - hh, h.y + d + hh] : [h.y + d + hh, h.y - d - hh]
+    // below / above, centred, then slid along the ring away from a neighbour (still under or over it)
+    const cands: WallPt[] = []
+    for (const y of ys) for (const dx of [0, -0.5, 0.5, -0.9, 0.9]) cands.push({x: h.x + dx * hw, y})
+    cands.push({x: h.x + d + hw, y: h.y}, {x: h.x - d - hw, y: h.y})
+    let best: {p: WallPt; clear: number} | null = null
+    for (const c of cands) {
+      const q = this.unproject(c, eye, s)
+      const p = this.toWall(this.keepInView(this.wall.wallToWorld(q.x, q.y, PANEL_Z), halfW, halfH))
+      // back to where it is seen on the wall, to measure against the rings there
+      const v = eye ? {x: eye.x + (p.x - eye.x) * s, y: eye.y + (p.y - eye.y) * s} : p
+      const ownGap = boxCircleGap(v, hw, hh, h.x, h.y, own)
+      let clear = ownGap
+      let nearest = true
+      for (const o of others) {
+        const g = boxCircleGap(v, hw, hh, o.x, o.y, o.r)
+        clear = Math.min(clear, g - WHY_RING_GAP)
+        // the asked ring must be clearly the nearest, not by a hair: a glow's bloom reaches far
+        if (g < ownGap + WHY_RING_GAP) nearest = false
+      }
+      for (const b of texts) clear = Math.min(clear, boxBoxGap(v, hw, hh, b) - WHY_RING_GAP)
+      if (!nearest) clear = Math.min(clear, -0.5)
+      if (clear >= 0) { best = {p, clear}; break }
+      if (!best || clear > best.clear) best = {p, clear}
+    }
+    this.callouts.showWhy(this.wall.wallToWorld(best!.p.x, best!.p.y, PANEL_Z), this.wallRot(), r.why, id, k)
+  }
+
+  /** a hold's ring as drawn, its line (and its glow, if it glows) included (wall cm) */
+  private shownRingRadius(id: string): number {
+    return this.isRingGlowing(id) ? this.glowRadius(id) : this.ringRadius(id) + this.getRingLineWidth() / 2
   }
 
   // ── pinch ripple ──────────────────────────────────────────────────────────
@@ -942,10 +1007,23 @@ export class NextHoldMain extends BaseScriptComponent {
   getPickerLitType(): string | null { return this.typePicker.getLitType() }
   isStartLit(): boolean { return this.typePicker.isStartLit() }
   isTopLit(): boolean { return this.typePicker.isTopLit() }
+  /** the why plate's size (cm, at its 110 cm size; drawn getWhyScale() x that) */
+  getWhyPlateSize(): vec2 { return this.callouts.getWhyPlateSize() }
   /** every pinch ripple played (newest last): the hold id or button name it landed on, and when */
   getRippleLog(): RippleEvent[] { return this.ripple ? this.ripple.getLog() : [] }
   isRippleVisible(): boolean { return this.ripple ? this.ripple.isVisible() : false }
   getRippleWorldPosition(): vec3 | null { return this.ripple ? this.ripple.getWorldPosition() : null }
+}
+
+/** gap (cm) between a box (centre c, half sizes hw x hh) and a circle; < 0 when they overlap */
+function boxCircleGap(c: WallPt, hw: number, hh: number, x: number, y: number, r: number): number {
+  return Math.hypot(Math.max(0, Math.abs(x - c.x) - hw), Math.max(0, Math.abs(y - c.y) - hh)) - r
+}
+
+/** gap (cm) between two boxes; < 0 when they overlap */
+function boxBoxGap(c: WallPt, hw: number, hh: number, b: {x: number; y: number; hw: number; hh: number}): number {
+  const dx = Math.abs(b.x - c.x) - hw - b.hw, dy = Math.abs(b.y - c.y) - hh - b.hh
+  return dx > 0 || dy > 0 ? Math.hypot(Math.max(0, dx), Math.max(0, dy)) : Math.max(dx, dy)
 }
 
 /** the first SceneObject called `name` under root (root included), enabled or not */
