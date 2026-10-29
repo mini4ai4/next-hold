@@ -12,10 +12,12 @@ Lens Studio MCP. Times and costs are from each session's own log.
 | 4 | 27 Oct | Fit both hands at 100–110 cm | Showed it can't be done: the SPECS display is about 49 × 66 cm at 100 cm and the hands are 60 cm apart. Changed nothing | 25 | 5.4 min | $1.48 |
 | 5 | 27 Oct | Frame the right hand, the suggestion and the control row | Moved only the wall root to (−10.5, −166, −125), about 115 cm, the closest distance where they all fit. **6 of 6 pass** | 44 | 8.0 min | $2.39 |
 | 6 | 27 Oct | Visual pass: the wall disappeared on an additive display | Lit birch-ply wall, shaped holds, glowing rings; light colours that survive additive blending. **6 of 6 pass** | 159 | 28.8 min | $9.04 |
+| 7 | 28–29 Oct | Five fixes from a strict review: mark your problem, upward goal, sequence preview, why-line wording, control row in view | Changed the plain-JS reference first (11→22 checks), then the port (18→42). Committed items 1–4 with a LEAF scenario each. Stopped before the last run when Lens Studio froze on a plugin permission dialog | — | 37.5 min | $11.54 |
+| 8 | 29 Oct | Finish session 7 | Found that the compile failure came from a preview-helper package auto-updated to a newer SIK than the lens uses; parked it (not deleted). Committed item 5. Caught that C4's setup no longer found an off-view suggestion in one move after the scoring changes, and widened it to three. **11 of 11 pass**; checked that r5 fails with the old placement | — | 7.5 min | $2.82 |
 
 Sessions 3 and 4 are the ones we learned most from: the field of view, not the scoring, decides the design.
 
-## LEAF, last full run (27 Oct, 16:23)
+## LEAF, last full run (29 Oct)
 
 | Scenario | Done criterion | Result |
 |---|---|---|
@@ -25,8 +27,13 @@ Sessions 3 and 4 are the ones we learned most from: the field of view, not the s
 | `c4-suggestion-label-arrow` | The suggestion glows with a short label; off-view, an edge arrow and a chime | pass |
 | `c5-ask-why` | "?" then a ring gives the reason in plain words | pass |
 | `extra-ik-reach-controls` | The reach model and the controls stay consistent | pass |
+| `r1-mark-problem` | Setup marks which holds are in your problem, with a start and a top; the rest dim | pass |
+| `r2-upward-goal` | Among similar moves, the one that gets you higher and nearer the top ranks better | pass |
+| `r3-sequence-preview` | The next three moves show as small numbered ghost rings, updated the same frame | pass |
+| `r4-why-wording` | The why-line names the hold type in capitals ("PINCH HOLD"), never as a gesture | pass |
+| `r5-control-row-in-view` | Both rows of the control panel and the safety note sit inside the view | pass |
 
-`node tests/scoring.port.test.mjs` → `18 passed, 0 failed`. The plain-JavaScript reference: `node devpost/scoring-reference/scoring.test.js` → 11 of 11.
+`node tests/scoring.port.test.mjs` → `42 passed, 0 failed`. The plain-JavaScript reference: `node devpost/scoring-reference/scoring.test.js` → 22 of 22.
 
 The LEAF tests drive real SIK pinches, read state in the same frame, check the rendered ring colour against an
 independent copy of the reference rule, and check off-view with `camera.isSphereVisible`.
