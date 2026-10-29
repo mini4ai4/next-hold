@@ -4,7 +4,9 @@
 // small badges pinned on their own hold's ring, naming the limb: "2 · LH", "3 · LF".
 // They update in the same frame as the main rings. Each badge's outline wears its
 // step's colour; a step onto a hold a limb is on now gets a ring in that colour, so
-// no ring on the wall is white (session 15, item 3).
+// no ring on the wall is white (session 15, item 3). Session 16: the ring of a hold
+// a tag sits on wears the tag's colour too, so no tag disagrees with its ring (also
+// forced: a green tag on a hold whose score ring is red).
 // Attribution (strict review 29.10): on screen the ring nearest each badge is its
 // own hold's, by at least 2 cm, and its text names the limb that moves in that
 // step. Every badge stays readable: no glow ring and no other badge covers it,
@@ -20,7 +22,7 @@ import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {
-  BADGE_STEPS, camera, checkBadgeAttribution, checkGhostNumbersClear, checkStepColours, fmtPos, frames, ghostBadge, ghostPathDots, getMain,
+  BADGE_STEPS, camera, checkBadgeAttribution, checkGhostNumbersClear, checkStepColours, classifyColour, fmtPos, frames, ghostBadge, ghostPathDots, getMain,
   makeReference, mustFind, pinch, pinchCapture, renderedRingColour, restorePreset,
 } from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
@@ -145,6 +147,19 @@ export class N3SequencePreviewScenario extends Scenario {
       if (dots.length < 3) errs.push(`${tag}: GhostPath_2 has ${dots.length} dots`)
       else if (Math.max(...r) - Math.min(...r) > 0.3 || Math.min(...r) < edge) errs.push(`${tag}: GhostPath_2 is not an arc around Hold_${third}: dots ${Math.min(...r).toFixed(2)}-${Math.max(...r).toFixed(2)} cm from it (ring edge ${edge.toFixed(2)})`)
       print(`[N3] ${tag}: badges ${gap.toFixed(1)} cm apart, arc of ${dots.length} dots; ${checkBadgeAttribution(camera(), main, want, errs, tag)}; ${checkGhostNumbersClear(camera(), errs, tag, main)}`)
+
+      // session 16, the judge's picture: a green "2 · LH" on a hold whose score ring (the selected
+      // limb's, from here) is red. The ring under the tag must take the tag's green
+      const red = problem.filter((id) => id !== sug.holdId && mustFind("Ring_" + id).enabled && main.getHoldColour(id) === "red")[0]
+      if (!red) errs.push("precondition: no red ring at the preset to put a green tag on")
+      else {
+        want = [{limb: sug.limb, holdId: sug.holdId}, {limb: "LH", holdId: red}]
+        vis.apply({...vis.state, ghosts: [{hold: sug.holdId, limb: sug.limb, colour: "green"}, {hold: red, limb: "LH", colour: "green"}]})
+        tag = `green tag on ${red} (score red)`
+        const c = classifyColour((mustFind("Ring_" + red).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4, main)
+        if (c !== "green") errs.push(`${tag}: Ring_${red} renders ${c} under the green tag`)
+        print(`[N3] ${tag}: Ring_${red} renders ${c}; ${checkBadgeAttribution(camera(), main, want, errs, tag)}`)
+      }
 
       // step 2 on the glowing hold (two limbs onto it in a row): badge 2 sits on the glow's outer ring
       want = [{limb: sug.limb, holdId: sug.holdId}, {limb: "LH", holdId: sug.holdId}, {limb: "RF", holdId: third}]

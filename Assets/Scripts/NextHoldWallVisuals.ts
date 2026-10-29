@@ -6,7 +6,8 @@
 // Tag_<id> START / TOP text, the sequence preview's badges for steps 2 and 3
 // (Ghost_2..3 pill outlines with their GhostNumber_2..3 text "2 · LH", pinned on
 // the hold's ring; GhostHoldRing_2..3 when that hold has no ring of its own because
-// a limb is on it now; the pill and that ring wear the step's own green / yellow / red),
+// a limb is on it now; the pill, that ring and the hold's own ring under a tag all wear the
+// step's own green / yellow / red, so a tag never sits on a ring of another colour),
 // the dotted GhostPath_1 (glow -> badge 2) and GhostPath_2 (badge 2 -> 3),
 // and the stick figure: Figure_Head, Figure_Spine / Shoulders / Hips and two
 // segments per limb, Figure_<limb>_Upper / _Lower, bent at the elbow or knee and
@@ -30,7 +31,8 @@ import {GLOW_PROFILE, HOVER_PROFILE, ProfileRow, RING_PROFILE, overlayMaterial, 
 export type RingColour = "green" | "yellow" | "red"
 
 export interface OverlayState {
-  /** ring colour per hold id; null/absent = no ring (occupied, or setup mode) */
+  /** ring colour per hold id (the selected limb's score); null/absent = no ring (occupied, or setup
+   *  mode). A hold under a step 2 / 3 tag is drawn in that step's colour instead (see apply) */
   rings: {[id: string]: RingColour | null}
   /** hold whose ring glows (the suggestion), or null */
   glowHoldId: string | null
@@ -75,7 +77,7 @@ export interface FigureBody {
 }
 
 /** one step of the look-ahead: the hold, the limb that moves onto it, and how secure that move is
- *  for you at its turn (its tag, and the ring it puts on a hold a limb is on now, wear this colour) */
+ *  for you at its turn (its tag and the ring of the hold it sits on wear this colour) */
 export interface GhostStep {hold: string; limb: string; colour: RingColour}
 
 export interface OverlayColours {
@@ -454,6 +456,8 @@ export class NextHoldWallVisuals {
       boxes.push({x: th.x, y: p.y, hw: s.tags[id].length * TAG_HALF_W_PER_CHAR * tk, hh: TAG_HALF_H * tk})
     }
     const at: GhostAt[] = []
+    // holds whose ring already shows a step's colour (the earlier step keeps it)
+    const stepRinged: {[id: string]: boolean} = {}
     for (let i = 0; i < this.ghosts.length; i++) {
       const g = this.ghosts[i]
       const step = steps[i + 1]
@@ -501,6 +505,13 @@ export class NextHoldWallVisuals {
       g.label.text.text = (i + 2) + " · " + step.limb
       g.ring.so.getTransform().setLocalPosition(this.wallToLocal(best.x, best.y, RING_Z + 0.15))
       g.label.so.getTransform().setLocalPosition(this.wallToLocal(best.x, best.y, RING_Z + 0.3))
+      if (ownRing && !onGlow && !stepRinged[h.id]) {
+        // a hold with a tag on it wears the tag's colour: how secure that move is at its turn, not
+        // what the selected limb could do from here (a red ring under a green "2 · LH" read as a
+        // contradiction). The score itself is unchanged; only the ring under the tag shows the step.
+        this.rings[h.id].mat.mainPass.baseColor = scaled(this.colours[step.colour], RING_DIM)
+      }
+      stepRinged[h.id] = true
       if (!ownRing && !onGlow) {
         // a limb is on this hold now, so it has no ring of its own: it gets an ordinary ring in
         // the colour of the step that moves onto it (never white)

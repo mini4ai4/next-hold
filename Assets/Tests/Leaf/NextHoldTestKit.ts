@@ -131,13 +131,40 @@ export function fmtPos(p: RefPosition): string {
 
 // ── what is actually rendered ────────────────────────────────────────────────
 
-/** Colour of the rendered Ring_<id> material, classified against the Lens's three ring colours; null if the ring object is off. */
+/**
+ * Session 16: holds a step 2 / 3 tag sits on (its badge shows) that are not the glowing hold, with
+ * that step's colour from the Lens's look-ahead (r3 and r7 check the look-ahead against the test's
+ * own search). Their ring wears the step's colour, not the selected limb's score. The earlier step
+ * keeps a hold.
+ */
+export function taggedHolds(main: NextHoldMain): {[id: string]: RefColour} {
+  const out: {[id: string]: RefColour} = {}
+  const preview = main.getPreview()
+  const sug = main.getSuggestion()
+  for (const n of BADGE_STEPS) {
+    const step = preview[n - 1]
+    if (!step || main.getGhostHold(n) !== step.holdId || (sug && sug.holdId === step.holdId)) continue
+    if (!out[step.holdId]) out[step.holdId] = step.colour as RefColour
+  }
+  return out
+}
+
+/**
+ * Colour of the rendered Ring_<id> material, classified against the Lens's three ring colours; null
+ * if the ring object is off. Rings are the selected limb's score, except under a step tag
+ * (taggedHolds), where the ring renders in the step's colour: there this returns the Lens's score
+ * colour for the hold when the ring shows the step's colour (callers check it against the rule; C1
+ * also checks the state directly), else the colour it renders. That a tagged ring really shows its
+ * step's colour is checked by checkTagRingsAgree (in checkBadgeAttribution: r3, r7, a2).
+ */
 export function renderedRingColour(id: string, main: NextHoldMain): RefColour | null {
   const so = mustFind("Ring_" + id)
   if (!so.enabled) return null
   const rmv = so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual
-  const c = rmv.mainMaterial.mainPass.baseColor as vec4
-  return classifyColour(c, main)
+  const c = classifyColour(rmv.mainMaterial.mainPass.baseColor as vec4, main)
+  const step = taggedHolds(main)[id]
+  if (step) return c === step ? (main.getHoldColour(id) as RefColour | null) : c
+  return c
 }
 
 export function classifyColour(c: vec4, main: NextHoldMain): RefColour {
@@ -395,7 +422,37 @@ export function checkBadgeAttribution(cam: Camera, main: NextHoldMain, want: {li
     if (d[0].id !== step.holdId) errs.push(`${tag}: badge ${n} (${step.holdId}) is nearest the ring of ${d[0].id} on screen (${(d[0].d * cmPer).toFixed(1)} cm), not its own`)
     else if (second.d - d[0].d < margin) errs.push(`${tag}: badge ${n}'s own ring ${step.holdId} is only ${((second.d - d[0].d) * cmPer).toFixed(1)} cm nearer than ${second.id}'s on screen, want >= ${marginCm}`)
   }
-  return `badges: ${out.join("; ") || "none"}`
+  return `badges: ${out.join("; ") || "none"}; ${checkTagRingsAgree(main, errs, tag)}`
+}
+
+/** classified colour of the named overlay's material */
+function overlayColour(name: string, main: NextHoldMain): RefColour {
+  const c = (mustFind(name).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4
+  return classifyColour(c, main)
+}
+
+/**
+ * Session 16, the red ring under a green "2 · LH": no hold may show a step tag whose colour
+ * disagrees with the ring it sits on. For every shown badge, the ring on its hold, as rendered
+ * (the glow if the hold glows, its own Ring_<id>, or the GhostHoldRing on a hold a limb is on now),
+ * must be the badge outline's colour, and there must be one. Returns a summary.
+ */
+export function checkTagRingsAgree(main: NextHoldMain, errs: string[], tag: string): string {
+  const out: string[] = []
+  for (const n of BADGE_STEPS) {
+    if (!mustFind("Ghost_" + n).enabled) continue
+    const id = main.getGhostHold(n)
+    if (!id) { errs.push(`${tag}: badge ${n} shows but names no hold`); continue }
+    const badge = overlayColour("Ghost_" + n, main)
+    let ring: RefColour | null = null, what = ""
+    if (main.isRingGlowing(id)) { ring = overlayColour("SuggestGlow", main); what = "glow" }
+    else if (mustFind("Ring_" + id).enabled) { ring = overlayColour("Ring_" + id, main); what = "ring" }
+    else if (mustFind("GhostHoldRing_" + n).enabled) { ring = overlayColour("GhostHoldRing_" + n, main); what = "occupied-hold ring" }
+    if (!ring) errs.push(`${tag}: badge ${n} on ${id} sits on no ring`)
+    else if (ring !== badge) errs.push(`${tag}: badge ${n} on ${id} is ${badge} but its ${what} is ${ring}`)
+    out.push(`${n} on ${id}: tag ${badge}, ${what} ${ring}`)
+  }
+  return `tag vs ring: ${out.join(", ") || "no tags"}`
 }
 
 /** A ring colour, not white: the weakest channel well below the strongest (white is ~0.9 of it,
