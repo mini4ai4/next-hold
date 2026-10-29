@@ -4,7 +4,7 @@
 // Owns: runtime-built overlay meshes under the wall (Ring_<id>, Marker_<limb>,
 // SuggestGlow, HoverRing, setup mode's Mark_<id> "in your problem" ring and
 // Tag_<id> START / TOP text, the sequence preview's Ghost_1..3 rings with their
-// GhostNumber_1..3, and the stick figure: Figure_LH / RH / LF / RF lines from
+// GhostNumber_1..3 joined by the dotted GhostPath_1..2, and the stick figure: Figure_LH / RH / LF / RF lines from
 // Figure_Torso to each limb's hold, faded where they pass behind the control
 // row) and their colours. One cloned material per overlay.
 // The ring line, glow and ghost badges are sized for the view distance in the state
@@ -76,6 +76,25 @@ const GHOST_NUMBER_COLOR = new vec4(0.95, 0.98, 1.0, 1)
 const GHOST_NUMBER_SIZE = 56
 /** a ghost sits as a badge on the hold's upper side; a second ghost on the same hold takes the next angle */
 const GHOST_ANGLES_DEG = [45, 135, 90]
+/** on the glowing hold the badges sit on its lower sides, just outside the glow: pushed out along the
+ *  upper angles they left the top of the view, since the suggestion is usually the highest thing in it */
+const GHOST_GLOW_ANGLES_DEG = [-35, -145, -90]
+/** the glow's outer ring and the faint halo just past it, in the glow profile's cm (x its scale):
+ *  a badge whose circle reaches inside this has the ring running through its number */
+export const GLOW_CLEAR = GLOW_PROFILE.ringAt + GLOW_PROFILE.ringW + 1.0
+/** gap (cm) between a badge's circle and the glow it has been moved clear of */
+const GHOST_GLOW_GAP = 0.5
+/** sequence path: a thin, light dotted line ghost 1 -> 2 -> 3, under the badges */
+const GHOST_PATH_COLOR = new vec4(0.86, 0.93, 1.0, 0.7)
+const GHOST_DOT_R = 0.32
+const GHOST_DOT_STEP = 1.5
+/** the path stops this far (cm) outside each badge's ring line */
+const GHOST_PATH_GAP = 0.8
+/** Overlays write no depth, so their draw order is set here, not left to the engine's sort:
+ *  glow and rings first, then the sequence path, the badges, and the numbers on top of all of them */
+export const ORDER_PATH = 1
+export const ORDER_GHOST = 2
+export const ORDER_GHOST_NUMBER = 3
 /** stick figure: thin light lines on the wall plane, under the rings and the markers */
 const FIGURE_COLOR = new vec4(0.95, 0.94, 0.88, 0.8)
 const FIGURE_Z = 0.25
@@ -162,6 +181,20 @@ export function clipConvex(poly: WallPt[], a: WallPt, b: WallPt, margin: number)
   return {t0, t1}
 }
 
+/** a placed ghost badge: its centre, the hold it belongs to, and its angle (rad) and distance from that hold */
+interface GhostAt {x: number; y: number; hold: HoldDef; a: number; d: number}
+
+/**
+ * Distance along the ray from p in unit direction (ux, uy), at least d, at which the point is
+ * at least r from centre c: d itself if that point is already clear, else the ray's exit from the circle.
+ */
+export function clearOfCircle(p: WallPt, ux: number, uy: number, d: number, c: WallPt, r: number): number {
+  const wx = p.x - c.x, wy = p.y - c.y
+  if (Math.hypot(wx + d * ux, wy + d * uy) >= r) return d
+  const b = wx * ux + wy * uy
+  return Math.max(d, -b + Math.sqrt(Math.max(0, b * b - (wx * wx + wy * wy) + r * r)))
+}
+
 export class NextHoldWallVisuals {
   private group: SceneObject
   private rings: {[id: string]: {so: SceneObject; mat: Material}} = {}
@@ -172,6 +205,9 @@ export class NextHoldWallVisuals {
   private textGroup: SceneObject
   private tags: {[id: string]: {so: SceneObject; text: Text}} = {}
   private ghosts: {ring: {so: SceneObject; mat: Material}; label: {so: SceneObject; text: Text}}[] = []
+  /** path n joins ghost n to ghost n + 1 */
+  private ghostPaths: {so: SceneObject; rmv: RenderMeshVisual}[] = []
+  private dotMeshes: {[k: string]: RenderMesh} = {}
   private figure: {[limb: string]: {so: SceneObject; rmv: RenderMeshVisual}} = {}
   private torso: {so: SceneObject; mat: Material}
   /** the control row's outline on the wall as seen from the eye (wall cm), or null */
@@ -206,8 +242,8 @@ export class NextHoldWallVisuals {
       this.marks[h.id] = mark
     }
 
-    // the glow is built before the text so it renders under it: ghost 1 always sits on the
-    // glow's target ring, and drawn later the ring ran through ghost 1's number
+    // the glow sits under the ghosts by render order (see ORDER_*), not by hierarchy: overlays
+    // write no depth, and the engine's own sort put the glow's ring over ghost 1's number
     const glowMeshes: {[r: string]: RenderMesh} = {}
     const glowVis = this.makeVisual("SuggestGlow", this.glowMesh(glowMeshes, 10))
     glowVis.so.enabled = false
@@ -224,12 +260,22 @@ export class NextHoldWallVisuals {
       this.tags[h.id] = t
     }
 
+    for (let n = 1; n < GHOST_COUNT; n++) {
+      const p = this.makeVisual("GhostPath_" + n, this.dotsMesh([{x: 0, y: 0}], 1))
+      p.mat.mainPass.baseColor = GHOST_PATH_COLOR
+      p.so.enabled = false
+      const rmv = p.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual
+      rmv.setRenderOrder(ORDER_PATH)
+      this.ghostPaths.push({so: p.so, rmv})
+    }
     for (let n = 1; n <= GHOST_COUNT; n++) {
       const ring = this.makeVisual("Ghost_" + n, this.thinRingMesh(GHOST_R))
       ring.mat.mainPass.baseColor = GHOST_COLOR
       ring.so.enabled = false
+      ;(ring.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).setRenderOrder(ORDER_GHOST)
       const label = this.makeText("GhostNumber_" + n, vec3.zero(), GHOST_NUMBER_SIZE, GHOST_NUMBER_COLOR)
       label.text.text = "" + n
+      label.text.setRenderOrder(ORDER_GHOST_NUMBER)
       label.so.enabled = false
       this.ghosts.push({ring, label})
     }
@@ -284,37 +330,66 @@ export class NextHoldWallVisuals {
       if (tag) this.tags[h.id].text.text = tag
     }
 
-    // ghost n: a small numbered ring on the upper side of the n-th look-ahead hold,
-    // on the radius of the suggestion glow's outer ring so it reads as a badge on it.
+    const glowHold = s.glowHoldId ? this.holdDef(s.glowHoldId) : null
+    const glowColour = s.glowHoldId ? s.rings[s.glowHoldId] : null
+
+    // ghost n: a small numbered ring beside the n-th look-ahead hold, just outside its ring line.
+    // No glow ring may run through a number: on the glowing hold the badges sit just outside the
+    // glow's outer ring, and a badge on another hold that would overlap the glow moves out along
+    // its angle until it clears it. Two ghosts on one hold (a match) take two sides, the later one
+    // on the side of the hold that comes next, so the dotted path runs on without doubling back.
     // From further back the badge grows until its number reads at least as large as Body at 110 cm.
     const onHold: {[id: string]: number} = {}
     const gk = Math.max(GHOST_NUMBER_SIZE, minReadSize(viewCm)) / GHOST_NUMBER_SIZE
+    const badgeR = GHOST_R * gk
+    const glowOn = !!glowHold && !!glowColour
+    const glowClear = glowOn ? HOLD_SIZE[glowHold!.type].ringR + ringW / 2 + GLOW_CLEAR * gs : 0
+    const holds = s.ghosts.slice(0, GHOST_COUNT).map((id) => this.holdDef(id))
+    const at: GhostAt[] = []
     for (let i = 0; i < GHOST_COUNT; i++) {
       const g = this.ghosts[i]
-      const id = i < s.ghosts.length ? s.ghosts[i] : null
-      const h = id ? this.holdDef(id) : null
+      const h = i < holds.length ? holds[i] : null
       g.ring.so.enabled = !!h
       g.label.so.enabled = !!h
       if (!h) continue
       const k = onHold[h.id] || 0
       onHold[h.id] = k + 1
-      let deg = GHOST_ANGLES_DEG[k % GHOST_ANGLES_DEG.length]
-      if (h.x > 205) deg = 180 - deg // keep a badge near the right edge on the wall
-      const a = (deg * Math.PI) / 180
-      // on the glow's target ring, but never so close that a grown badge runs over the ring line
+      const onGlow = glowOn && h.id === glowHold!.id
+      const angles = onGlow ? GHOST_GLOW_ANGLES_DEG : GHOST_ANGLES_DEG
+      let deg = angles[k % angles.length]
+      // later badges on a hold go left; mirror when the next hold is to the right. Near the
+      // right edge always mirror, to keep the badge on the wall.
+      const group = holds.filter((q) => q && q.id === h.id).length
+      const next = holds.find((q, j) => j > i && q && q.id !== h.id)
+      if (h.x > 205 || (group > 1 && next && next.x > h.x)) deg = 180 - deg
+      // where the glow's target ring would be, but never so close that a grown badge runs over the ring line
       const edge = HOLD_SIZE[h.type].ringR + ringW / 2
-      const d = Math.max(edge + (GLOW_PROFILE.ringAt + GLOW_PROFILE.ringW / 2) * gs, edge + GHOST_R * gk + 0.5)
-      const x = h.x + d * Math.cos(a), y = h.y + d * Math.sin(a)
-      ;(g.ring.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.thinRingMesh(GHOST_R * gk)
+      const d0 = Math.max(edge + (GLOW_PROFILE.ringAt + GLOW_PROFILE.ringW / 2) * gs, edge + badgeR + 0.5)
+      const clearR = glowClear + badgeR + GHOST_GLOW_GAP
+      // a badge on a hold next to the glow or another badge first tries the hold's other sides (pushed
+      // out along its own angle it can leave the view); only if no side is clear does it move out
+      if (!onGlow && group === 1) {
+        const free = [deg, 180 - deg, 90, 0, 180, -45, -135, -90].find((c) => {
+          const ca = (c * Math.PI) / 180, cx = h.x + d0 * Math.cos(ca), cy = h.y + d0 * Math.sin(ca)
+          if (glowOn && clearOfCircle(h, Math.cos(ca), Math.sin(ca), d0, glowHold!, clearR) !== d0) return false
+          return at.every((p) => Math.hypot(p.x - cx, p.y - cy) >= 2 * badgeR + GHOST_GLOW_GAP)
+        })
+        if (free !== undefined) deg = free
+      }
+      const a = (deg * Math.PI) / 180
+      const ux = Math.cos(a), uy = Math.sin(a)
+      const d = glowOn ? clearOfCircle(h, ux, uy, d0, glowHold!, clearR) : d0
+      const x = h.x + d * ux, y = h.y + d * uy
+      at.push({x, y, hold: h, a, d})
+      ;(g.ring.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.thinRingMesh(badgeR)
       g.label.text.size = GHOST_NUMBER_SIZE * gk
       g.ring.so.getTransform().setLocalPosition(this.wallToLocal(x, y, RING_Z + 0.15))
       g.label.so.getTransform().setLocalPosition(this.wallToLocal(x, y, RING_Z + 0.3))
     }
+    this.applyGhostPath(at, badgeR, gk, ringW)
 
     this.applyFigure(s)
 
-    const glowHold = s.glowHoldId ? this.holdDef(s.glowHoldId) : null
-    const glowColour = s.glowHoldId ? s.rings[s.glowHoldId] : null
     if (glowHold && glowColour) {
       const r = HOLD_SIZE[glowHold.type].ringR
       this.glow.rmv.mesh = this.glowMesh(this.glow.meshes, r, ringW, gs)
@@ -337,6 +412,55 @@ export class NextHoldWallVisuals {
       m.so.getTransform().setLocalPosition(this.wallToLocal(h.x, h.y, HOLD_SIZE[h.type].d * 1.4 + 1 + nudge))
       const k = limb === s.selectedLimb ? MARKER_SELECTED : MARKER_DIM
       m.mat.mainPass.baseColor = new vec4(k, k, k, 1)
+    }
+  }
+
+  /**
+   * Sequence path: dots from each badge to the next (1 -> 2 -> 3), stopping short of both badges'
+   * circles so it never runs under a number. Between two holds it is a straight line; two badges
+   * on one hold are joined by an arc around the hold the short way, so a match reads as one step
+   * on the same hold rather than a line across it. Dots grow with the ring line (k).
+   */
+  private applyGhostPath(at: GhostAt[], badgeR: number, k: number, ringW: number): void {
+    const trim = badgeR + GHOST_PATH_GAP
+    const step = GHOST_DOT_STEP * k
+    for (let i = 0; i < this.ghostPaths.length; i++) {
+      const p = this.ghostPaths[i]
+      const a = at[i], b = at[i + 1]
+      p.so.enabled = false
+      if (!a || !b) continue
+      const tr = p.so.getTransform()
+      let pts: WallPt[]
+      if (a.hold.id === b.hold.id) {
+        const r = (a.d + b.d) / 2
+        let da = b.a - a.a
+        while (da > Math.PI) da -= 2 * Math.PI
+        while (da <= -Math.PI) da += 2 * Math.PI
+        const cut = trim / r, sweep = Math.abs(da) - 2 * cut
+        if (sweep * r <= step) continue
+        const n = Math.max(2, Math.round((sweep * r) / step) + 1), dir = Math.sign(da)
+        pts = []
+        for (let j = 0; j < n; j++) {
+          const t = a.a + dir * (cut + (sweep * j) / (n - 1))
+          pts.push({x: a.hold.x + r * Math.cos(t), y: a.hold.y + r * Math.sin(t)})
+        }
+      } else {
+        const full = Math.hypot(b.x - a.x, b.y - a.y), len = full - 2 * trim
+        if (len <= step) continue
+        const ux = (b.x - a.x) / full, uy = (b.y - a.y) / full
+        const n = Math.max(2, Math.round(len / step) + 1)
+        pts = []
+        for (let j = 0; j < n; j++) {
+          const t = trim + (len * j) / (n - 1)
+          pts.push({x: a.x + ux * t, y: a.y + uy * t})
+        }
+      }
+      // no dots over a hold: the line passes under it, inside its ring's outer line edge
+      pts = pts.filter((q) => !HOLDS.some((h) => Math.hypot(q.x - h.x, q.y - h.y) < HOLD_SIZE[h.type].ringR + ringW / 2))
+      if (!pts.length) continue
+      tr.setLocalPosition(this.wallToLocal(a.hold.x, a.hold.y, RING_Z + 0.1))
+      p.rmv.mesh = this.dotsMesh(pts.map((q) => ({x: q.x - a.hold.x, y: q.y - a.hold.y})), k)
+      p.so.enabled = true
     }
   }
 
@@ -529,6 +653,19 @@ export class NextHoldWallVisuals {
     if (Object.keys(this.lineMeshes).length > 64) this.lineMeshes = {}
     this.lineMeshes[key] = toMesh(g)
     return this.lineMeshes[key]
+  }
+
+  /** One dot at each point (local cm), k times its 110 cm size: the marker profile's solid centre (U 0..0.34). */
+  private dotsMesh(pts: WallPt[], k: number): RenderMesh {
+    const key = k.toFixed(2) + ":" + pts.map((p) => p.x.toFixed(1) + "," + p.y.toFixed(1)).join(";")
+    if (this.dotMeshes[key]) return this.dotMeshes[key]
+    const g = new UVGeo()
+    const v = profileV(ProfileRow.Marker)
+    for (const p of pts) addProfileAnnulus(g, 0, GHOST_DOT_R * k, 12, v, [p.x, p.y, 0], 1, 1, 0, 0, 0.34)
+    // the path follows the badges about as Ground re-sizes: don't let walking about grow the cache without end
+    if (Object.keys(this.dotMeshes).length > 64) this.dotMeshes = {}
+    this.dotMeshes[key] = toMesh(g)
+    return this.dotMeshes[key]
   }
 
   /** thin crisp ring (hover profile) with its core centred on radius r */

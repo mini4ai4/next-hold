@@ -12,7 +12,8 @@
 // renders: ring line, glow, ghost badges and numbers and label must be the sizes
 // for the second camera's own distance (365 cm), and the fit check uses the line
 // width actually drawn. Handing the wearer's camera back must bring the preset
-// sizes back.
+// sizes back. From there no glow ring or other badge may cover a ghost number
+// on the second camera's screen.
 // "In view" is strict: the circle through the outer edge of the ring's line
 // must lie fully inside all four sides of the view (camera.isSphereVisible is
 // also reported, but it is true for a ring that is only partly in view). A sanity
@@ -24,7 +25,7 @@ import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
-import {camera, checkGroundSizes, eyeToWallCm, frames, getMain, groundSizesFor, mustFind, renderedLineWidth, restorePreset} from "./NextHoldTestKit"
+import {camera, checkGhostNumbersClear, checkGroundSizes, eyeToWallCm, frames, getMain, groundSizesFor, mustFind, renderedLineWidth, restorePreset} from "./NextHoldTestKit"
 
 @component
 export class N7GroundViewpointScenario extends Scenario {
@@ -103,6 +104,8 @@ export class N7GroundViewpointScenario extends Scenario {
       print(`[N7] sized from the second camera (${camCm.toFixed(1)} cm, Lens ${sizedFar.toFixed(1)} cm): ${checkGroundSizes(main, camCm, errs, "second camera")}`)
       const sug = main.getSuggestion()
       if (sug) drawnLine = renderedLineWidth(sug.holdId)
+      // from there too, no glow ring covers a ghost number on the second camera's screen
+      print(`[N7] ${BACK_CM} cm back: ${checkGhostNumbersClear(cam, errs, BACK_CM + " cm back")}`)
 
       const vFov = (2 * aV * 180) / Math.PI, hFov = (2 * aH * 180) / Math.PI
       const floorY = mustFind("ClimbingWall (stand-in)").getTransform().getWorldPosition().y

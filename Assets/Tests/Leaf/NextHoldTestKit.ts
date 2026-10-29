@@ -281,6 +281,127 @@ export function checkGroundSizes(main: NextHoldMain, distanceCm: number, errs: s
     `label ${label.toFixed(1)} (want ${want.label.toFixed(1)})`
 }
 
+// ── ghost numbers vs the glow, and the dotted sequence path ─────────────────
+
+/** inner radius (cm) of the named object's rendered annulus mesh */
+export function renderedInnerRadius(name: string): number {
+  const pos = (mustFind(name).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh.getVertexDataForAttribute("position")
+  let r = 1e9
+  for (let i = 0; i * 3 < pos.length; i++) r = Math.min(r, Math.hypot(pos[i * 3], pos[i * 3 + 1]))
+  return r
+}
+
+/** radius (cm) of ghost n's badge as rendered: its thin ring's crisp core */
+export function ghostBadgeRadius(n: number): number {
+  return renderedOuterRadius("Ghost_" + n) - HOVER_PROFILE.span + HOVER_PROFILE.coreAt + HOVER_PROFILE.coreW / 2
+}
+
+/** Even-odd point-in-polygon on screen points. */
+function inPoly(poly: vec2[], p: vec2): boolean {
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j]
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside
+  }
+  return inside
+}
+
+/**
+ * Every shown ghost number must be readable: no glow ring may cover it on screen, as `cam` sees it.
+ * The glow's outer ring is read from the rendered SuggestGlow mesh: its inner edge plus
+ * (ringAt + ringW) of the glow profile at the mesh's own scale, plus 1 profile cm for the ring's
+ * soft halo. That circle is projected to the screen as a polygon, and so is the circle of each
+ * badge's ring around its number: no point of the badge circle (so no part of the number inside
+ * it) may fall inside the glow's outer ring. Also: no two badges overlap, the numbers draw after
+ * the glow and the badges (render order), and no dot of the sequence path sits under a badge.
+ * Returns a summary line.
+ */
+export function checkGhostNumbersClear(cam: Camera, errs: string[], tag: string): string {
+  const glowSo = mustFind("SuggestGlow")
+  const out: string[] = []
+  const glowOn = glowSo.enabled
+  let poly: vec2[] = []
+  let glowInv: mat4 | null = null
+  let glowW: mat4 | null = null
+  let ringOuter = 0
+  if (glowOn) {
+    const rIn = renderedInnerRadius("SuggestGlow"), rOut = renderedOuterRadius("SuggestGlow")
+    const k = (rOut - rIn) / GLOW_PROFILE.span
+    ringOuter = rIn + (GLOW_PROFILE.ringAt + GLOW_PROFILE.ringW + 1.0) * k
+    glowW = glowSo.getTransform().getWorldTransform()
+    glowInv = glowSo.getTransform().getInvertedWorldTransform()
+    for (let i = 0; i < 64; i++) {
+      const t = (i / 64) * Math.PI * 2
+      poly.push(cam.worldSpaceToScreenSpace(glowW.multiplyPoint(new vec3(ringOuter * Math.cos(t), ringOuter * Math.sin(t), 0))))
+    }
+  }
+  const glowOrder = (glowSo.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).getRenderOrder()
+  const badges: {c: vec3; r: number}[] = []
+  for (let n = 1; n <= 3; n++) {
+    const numSo = mustFind("GhostNumber_" + n)
+    if (!numSo.enabled) continue
+    const num = numSo.getComponent("Component.Text") as Text
+    const ringOrder = (mustFind("Ghost_" + n).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).getRenderOrder()
+    if (!(num.getRenderOrder() > glowOrder && num.getRenderOrder() > ringOrder)) {
+      errs.push(`${tag}: ghost ${n} number render order ${num.getRenderOrder()} is not above the glow (${glowOrder}) and its badge (${ringOrder})`)
+    }
+    const c = numSo.getTransform().getWorldPosition()
+    const rb = ghostBadgeRadius(n)
+    badges.push({c, r: rb})
+    if (!glowOn) { out.push(`${n}: no glow`); continue }
+    const l = glowInv!.multiplyPoint(c)
+    const centre = Math.hypot(l.x, l.y)
+    let covered = 0
+    const screen: vec2[] = [cam.worldSpaceToScreenSpace(c)]
+    for (let i = 0; i < 24; i++) {
+      const t = (i / 24) * Math.PI * 2
+      screen.push(cam.worldSpaceToScreenSpace(glowW!.multiplyPoint(new vec3(l.x + rb * Math.cos(t), l.y + rb * Math.sin(t), 0))))
+    }
+    for (const p of screen) if (inPoly(poly, p)) covered++
+    if (covered) errs.push(`${tag}: ghost ${n}'s number is covered by the glow: ${covered} of ${screen.length} points of its badge (centre + circle r ${rb.toFixed(2)} cm) are inside the glow's outer ring (r ${ringOuter.toFixed(2)} cm, number ${centre.toFixed(2)} cm from the glow centre)`)
+    out.push(`${n}: ${(centre - rb - ringOuter).toFixed(2)} cm clear`)
+  }
+  // nor may another badge's ring run through a number: badge circles must not overlap
+  for (let i = 0; i < badges.length; i++) {
+    for (let j = i + 1; j < badges.length; j++) {
+      const gap = Math.hypot(badges[i].c.x - badges[j].c.x, badges[i].c.y - badges[j].c.y)
+      if (gap < badges[i].r + badges[j].r) errs.push(`${tag}: ghost ${i + 1} and ghost ${j + 1} badges overlap (${gap.toFixed(2)} cm apart, radii ${badges[i].r.toFixed(2)} + ${badges[j].r.toFixed(2)})`)
+    }
+  }
+  let dots = 0
+  for (let n = 1; n <= 2; n++) {
+    for (const d of ghostPathDots(n)) {
+      dots++
+      for (let b = 0; b < badges.length; b++) {
+        const gap = Math.hypot(d.x - badges[b].c.x, d.y - badges[b].c.y)
+        if (gap < badges[b].r) errs.push(`${tag}: GhostPath_${n} has a dot ${gap.toFixed(2)} cm from ghost ${b + 1}'s number, inside its badge (r ${badges[b].r.toFixed(2)})`)
+      }
+    }
+  }
+  return `numbers vs glow: ${out.join(", ") || "no ghosts"}; path ${dots} dots`
+}
+
+/** The dot centres (wall-plane world x, y) of GhostPath_n's rendered mesh, or [] if it is hidden.
+ *  Each dot's centre is a vertex at U = 0, the solid middle of the marker profile. */
+export function ghostPathDots(n: number): vec2[] {
+  const p = mustFind("GhostPath_" + n)
+  if (!p.enabled) return []
+  const m = (p.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh
+  const pos = m.getVertexDataForAttribute("position"), uv = m.getVertexDataForAttribute("texture0")
+  const w = p.getTransform().getWorldTransform()
+  const out: vec2[] = []
+  const seen: {[k: string]: boolean} = {}
+  for (let i = 0; i * 2 < uv.length; i++) {
+    if (uv[i * 2] > 1e-4) continue
+    const key = pos[i * 3].toFixed(2) + "," + pos[i * 3 + 1].toFixed(2)
+    if (seen[key]) continue
+    seen[key] = true
+    const d = w.multiplyPoint(new vec3(pos[i * 3], pos[i * 3 + 1], 0))
+    out.push(new vec2(d.x, d.y))
+  }
+  return out
+}
+
 // ── setup only: bring the Lens back to the demo preset ──────────────────────
 
 /**

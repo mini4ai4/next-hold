@@ -13,6 +13,7 @@ import {BackPlate} from "SpectaclesUIKit.lspkg/Scripts/BackPlate"
 import {FlexLayout} from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexLayout"
 import {FlexItem} from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexItem"
 import {FlexAlign, FlexDirection, FlexJustify} from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexTypes"
+import {ORDER_GHOST_NUMBER} from "./NextHoldWallVisuals"
 
 // ── Typography ───────────────────────────────────────────────────────────────
 const FONT_SIZE_SCALE = 1.0
@@ -96,6 +97,8 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     this.labelText.outlineSettings.enabled = true
     this.labelText.outlineSettings.size = LABEL_OUTLINE
     this.labelText.outlineSettings.fill.color = LABEL_OUTLINE_COLOR
+    // drawn over the wall overlays, like the ghost numbers: the dotted sequence path can pass under it
+    this.labelText.setRenderOrder(ORDER_GHOST_NUMBER)
     this.labelRoot.enabled = false
 
     // ── WhyLine: a dark plate behind the text so it reads over the wall ──

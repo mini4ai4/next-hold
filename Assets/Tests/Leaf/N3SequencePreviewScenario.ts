@@ -2,6 +2,9 @@
 // next 2-3 moves; they show as small numbered ghost rings (1, 2, 3) on those
 // holds, light-coloured for the additive display, and they update in the same
 // frame as the main rings.
+// Every number stays readable: no glow ring and no other badge covers it on
+// screen, and a dotted path joins 1 -> 2 -> 3 under the badges (an arc around
+// the hold when two moves share one, checked on a forced match).
 // Input path: real SIK pinches on Hold_<id>, Toggle_<limb>, ModeSwitch. The
 // expected look-ahead comes from the test's own port (NextHoldReferenceRule).
 
@@ -11,7 +14,7 @@ import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
 import {GLOW_PROFILE} from "../../Scripts/Wall/ProceduralTextures"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
-import {fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, planeDistanceToHold, renderedRingColour, restorePreset} from "./NextHoldTestKit"
+import {camera, checkGhostNumbersClear, fmtPos, frames, ghostBadgeRadius, ghostPathDots, getMain, makeReference, mustFind, pinch, pinchCapture, planeDistanceToHold, renderedRingColour, restorePreset} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 
 interface GhostSnap {
@@ -51,13 +54,22 @@ function checkGhosts(main: NextHoldMain, s: GhostSnap, errs: string[], tag: stri
     if (g.on !== !!w || g.numberOn !== !!w) errs.push(`${tag}: ghost ${n} ring/number enabled ${g.on}/${g.numberOn}, want ${!!w}`)
     if (w && g.number !== "" + n) errs.push(`${tag}: ghost ${n} reads "${g.number}"`)
     if (w) {
-      // a badge on the hold: outside its ring's line, within the glow's outer edge, both as
-      // drawn in this view (Ground draws them larger to read from further back)
+      // a badge beside the hold: its circle outside the ring's line, and no further out than one
+      // badge past the glow's outer ring (where a badge that overlapped the glow is moved to),
+      // all as drawn in this view (Ground draws them larger to read from further back)
+      const rb = ghostBadgeRadius(n)
       const edge = HOLD_SIZE[holdById(w)!.type].ringR + main.getRingLineWidth() / 2
-      const glowOut = edge + GLOW_PROFILE.span * main.getLabelScale()
-      if (g.dist < edge || g.dist > glowOut) errs.push(`${tag}: ghost ${n} is ${g.dist.toFixed(1)} cm from Hold_${w} (ring line edge ${edge.toFixed(1)}, glow edge ${glowOut.toFixed(1)})`)
+      const far = edge + (GLOW_PROFILE.ringAt + GLOW_PROFILE.ringW + 1.0) * main.getLabelScale() + 2 * rb + 1
+      if (g.dist < edge + rb || g.dist > far) errs.push(`${tag}: ghost ${n} is ${g.dist.toFixed(1)} cm from Hold_${w} (want ${(edge + rb).toFixed(1)}-${far.toFixed(1)})`)
     }
   }
+  // the sequence path: a dotted line from each shown ghost to the next, none past the last
+  for (let n = 1; n <= 2; n++) {
+    const want = n < ids.length && n < 3
+    const on = mustFind("GhostPath_" + n).enabled
+    if (on !== want) errs.push(`${tag}: GhostPath_${n} (ghost ${n} -> ${n + 1}) enabled ${on}, want ${want}`)
+  }
+  print(`[N3] ${tag}: ${checkGhostNumbersClear(camera(), errs, tag)}`)
   return ids
 }
 
@@ -114,6 +126,29 @@ export class N3SequencePreviewScenario extends Scenario {
     await frames(3)
     for (let n = 1; n <= 3; n++) {
       if (mustFind("Ghost_" + n).enabled || mustFind("GhostNumber_" + n).enabled) errs.push(`ghost ${n} shows in setup mode`)
+    }
+
+    // ── a match: moves 1 and 2 on the same (glowing) hold. The look-ahead rarely gives one from the
+    // preset, so the overlay is handed that state directly (test setup, read in the same call) ──
+    await restorePreset(main)
+    {
+      const vis = (main as any).visuals
+      const sug = main.getSuggestion()!.holdId
+      const third = main.getGhostHold(2) !== sug ? main.getGhostHold(2)! : main.getGhostHold(3)!
+      vis.apply({...vis.state, ghosts: [sug, sug, third]})
+      const tag = `match ${sug},${sug},${third}`
+      const hold = mustFind("Hold_" + sug).getTransform().getWorldPosition()
+      const rb = ghostBadgeRadius(1)
+      const c1 = mustFind("GhostNumber_1").getTransform().getWorldPosition(), c2 = mustFind("GhostNumber_2").getTransform().getWorldPosition()
+      const apart = Math.hypot(c1.x - c2.x, c1.y - c2.y)
+      if (apart < 2 * rb) errs.push(`${tag}: badges 1 and 2 overlap (${apart.toFixed(1)} cm apart, badge r ${rb.toFixed(2)})`)
+      // the path between them is an arc around the hold: every dot the same distance from it, outside its ring
+      const dots = ghostPathDots(1)
+      const r = dots.map((d) => Math.hypot(d.x - hold.x, d.y - hold.y))
+      const edge = HOLD_SIZE[holdById(sug)!.type].ringR + main.getRingLineWidth() / 2
+      if (dots.length < 3) errs.push(`${tag}: GhostPath_1 has ${dots.length} dots`)
+      else if (Math.max(...r) - Math.min(...r) > 0.3 || Math.min(...r) < edge) errs.push(`${tag}: GhostPath_1 is not an arc around Hold_${sug}: dots ${Math.min(...r).toFixed(2)}-${Math.max(...r).toFixed(2)} cm from it (ring edge ${edge.toFixed(2)})`)
+      print(`[N3] ${tag}: badges ${apart.toFixed(1)} cm apart, arc of ${dots.length} dots at ${dots.length ? Math.min(...r).toFixed(2) : "-"} cm; ${checkGhostNumbersClear(camera(), errs, tag)}`)
     }
 
     await restorePreset(main)
