@@ -56,10 +56,10 @@ export type Mode = "climb" | "setup"
  *  problem and the ghosts 1-2-3. "wall": face ~40 cm from the wall, only the suggested ring. */
 export type View = "ground" | "wall"
 
-/** Ground view: how far back from the wall the climber stands (cm). Bouldering mats let you step
- *  back this far. It is the closest distance where every ring of the preset problem, whole, fits
- *  in the ~32 x 37 deg SPECS view (test a2): the problem spans ~235 cm of wall height, so 300 cm
- *  cuts the foot jugs and the top. Text and lines are sized for 110 cm; in Ground the ring line,
+/** Ground view: the far end of the distance range Ground sizes itself for (cm). Climbers read a
+ *  problem from about 2-3 m back, looking up and down it: the rings stay on the holds, so the whole
+ *  problem never has to fit in one view (test a2: from 250 cm a look at the lower half and one at
+ *  the upper half cover every ring). Text and lines are sized for 110 cm; in Ground the ring line,
  *  the glow, the ghost badges and the suggestion label are sized for the eye's actual distance
  *  from the wall plane, kept between DESIGN_VIEW_CM and this, so from anywhere in that range they
  *  read at least as large as they do at 110 cm (Body text for the label and the numbers). */

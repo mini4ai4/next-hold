@@ -31,7 +31,7 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "r4-why-wording", typename: N4WhyWordingScenario.getTypeName()},
     {id: "r5-control-row-in-view", typename: N5ControlRowInViewScenario.getTypeName()},
     {id: "a1-view-modes", typename: N6ViewModesScenario.getTypeName()},
-    {id: "a2-ground-viewpoint-365", typename: N7GroundViewpointScenario.getTypeName()},
+    {id: "a2-ground-scan-250", typename: N7GroundViewpointScenario.getTypeName()},
     {id: "b1-stick-figure", typename: N8StickFigureScenario.getTypeName()},
   ]
 }
