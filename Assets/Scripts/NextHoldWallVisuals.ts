@@ -148,7 +148,7 @@ const FIGURE_LINE_SCALE = 0.55
 export const FIGURE_LIMB_PARTS = ["Upper", "Lower"]
 export const FIGURE_BODY_LINES = ["Spine", "Shoulders", "Hips"]
 /** the head's alpha is a step below the lines' (it is a filled disc) */
-const FIGURE_HEAD_ALPHA = 0.4
+const FIGURE_HEAD_ALPHA = 0.32
 /** where the figure passes behind the control row it fades out: fully faded from GAP cm
  *  outside the panel's outline (as seen from the eye) inward, ramping back up over RAMP cm */
 const FIGURE_FADE_GAP = 1.5

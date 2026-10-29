@@ -91,9 +91,9 @@ export const HEIGHT_MAX_CM = 200
 export const HEIGHT_STEP_CM = 5
 
 /** stick figure: the shortest spine (shoulders to hips) as a share of reach (42 cm at 175 cm), and
- *  the head's radius as a share of height (6 cm at 175 cm) */
+ *  the head's radius as a share of height (4.5 cm at 175 cm: a small mark, not a blob) */
 export const FIGURE_TORSO = 0.55
-export const FIGURE_HEAD = 0.034
+export const FIGURE_HEAD = 0.026
 
 const LIMB_LABEL: {[l: string]: string} ={LH: "L hand", RH: "R hand", LF: "L foot", RF: "R foot"}
 const HAND_LIMBS: Limb[] = ["LH", "RH"]
@@ -194,6 +194,8 @@ export class NextHoldMain extends BaseScriptComponent {
   private pickerHold: string | null = null
   /** the control row outline last pushed to the stick figure */
   private lastMask: WallPt[] | null = null
+  /** the control row's laid-out size it was last placed with ("" = not laid out yet) */
+  private placedRowSize = "-"
   private hovered: string | null = null
   private visuals: NextHoldWallVisuals
   private ready = false
@@ -260,6 +262,14 @@ export class NextHoldMain extends BaseScriptComponent {
     this.createEvent("UpdateEvent").bind(() => {
       this.visuals.tick(getTime())
       if (!this.ready) return
+      // the row lays itself out late (after a start or a refresh): once its real size is known, or
+      // whenever it changes, place it again, or in Ground it sits too close and covers a ring
+      const size = this.controlRow.getSize()
+      const sizeKey = size ? size.x.toFixed(2) + "x" + size.y.toFixed(2) : ""
+      if (sizeKey !== this.placedRowSize) {
+        this.placedRowSize = sizeKey
+        this.placeControlRow()
+      }
       this.updateFigureMask(false) // the head moves, and the row lays itself out late
       // walking in or stepping back past a threshold switches the view
       if (this.followDistance()) return
