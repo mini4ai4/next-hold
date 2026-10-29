@@ -56,7 +56,8 @@ function snap(main: NextHoldMain): ViewSnap {
   }
   for (let n = 1; n <= 3; n++) {
     s.ghosts.push(main.getGhostHold(n))
-    s.ghostObjs.push(mustFind("Ghost_" + n).enabled || mustFind("GhostNumber_" + n).enabled)
+    // step 1 is shown by the glow itself; steps 2 and 3 by their badges
+    s.ghostObjs.push(n === 1 ? s.glow : mustFind("Ghost_" + n).enabled || mustFind("GhostNumber_" + n).enabled)
   }
   return s
 }
@@ -99,7 +100,7 @@ function checkOnWall(main: NextHoldMain, s: ViewSnap, errs: string[], tag: strin
     if (s.rendered[sug.holdId] !== s.state[sug.holdId]) errs.push(`${tag}: suggested ring renders ${s.rendered[sug.holdId]}, state ${s.state[sug.holdId]}`)
     if (!s.glow || !main.isRingGlowing(sug.holdId)) errs.push(`${tag}: suggestion ${sug.holdId} not glowing`)
   }
-  for (let n = 1; n <= 3; n++) if (s.ghosts[n - 1] !== null || s.ghostObjs[n - 1]) errs.push(`${tag}: ghost ${n} still shows`)
+  for (let n = 2; n <= 3; n++) if (s.ghosts[n - 1] !== null || s.ghostObjs[n - 1]) errs.push(`${tag}: badge ${n} still shows`)
   for (const h of HOLDS) if (main.isInProblem(h.id) === s.dim[h.id]) errs.push(`${tag}: ${h.id} dim=${s.dim[h.id]} but in problem=${main.isInProblem(h.id)}`)
   print(`[N6] ${tag}: ${s.pos}, suggestion ${s.suggestion}, visible rings [${on.join(",")}]`)
 }

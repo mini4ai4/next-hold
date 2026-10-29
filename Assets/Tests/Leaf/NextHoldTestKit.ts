@@ -181,9 +181,11 @@ export const AT_110 = {
   ringLine: RING_PROFILE.core, // 1.6 cm
   body: 39, // Body text: the smallest text meant to be read
   label: 62 * 1.3, // the suggestion label's own size: HeadlineXL x 1.3
-  ghostNumber: 56,
-  ghostR: 3.4,
+  ghostNumber: 64, // badge text "2 · LH"
+  ghostR: 2.6, // half the badge pill's height
 }
+/** badges exist for look-ahead steps 2 and 3; step 1 is the glowing suggestion itself */
+export const BADGE_STEPS = [2, 3]
 export const GROUND_NEAR_CM = 110
 export const GROUND_FAR_CM = 365
 
@@ -264,11 +266,11 @@ export function checkGroundSizes(main: NextHoldMain, distanceCm: number, errs: s
     if (!near(glow, wantGlow, tol.glow)) errs.push(`${tag}: glow outer edge ${glow.toFixed(2)} cm, want ${wantGlow.toFixed(2)}`)
   } else errs.push(`${tag}: no suggestion glow to measure`)
   const ghosts: string[] = []
-  for (let n = 1; n <= 3; n++) {
+  for (const n of BADGE_STEPS) {
     if (!mustFind("Ghost_" + n).enabled) continue
     const num = textSize("GhostNumber_" + n)
-    // the badge is a thin ring whose crisp core sits on its radius: outer edge = r - (coreAt + coreW / 2) + span
-    const r = renderedOuterRadius("Ghost_" + n) - HOVER_PROFILE.span + HOVER_PROFILE.coreAt + HOVER_PROFILE.coreW / 2
+    // the badge is a pill whose thin crisp line runs at half its height from the centre line
+    const r = ghostBadge(n).R
     ghosts.push(`${num.toFixed(1)}/${r.toFixed(2)}`)
     if (!near(num, want.ghostNumber, tol.text)) errs.push(`${tag}: ghost ${n} number size ${num.toFixed(2)}, want ${want.ghostNumber.toFixed(2)}`)
     if (!near(r, want.ghostR, tol.ghostR)) errs.push(`${tag}: ghost ${n} badge radius ${r.toFixed(2)} cm, want ${want.ghostR.toFixed(2)}`)
@@ -291,9 +293,107 @@ export function renderedInnerRadius(name: string): number {
   return r
 }
 
-/** radius (cm) of ghost n's badge as rendered: its thin ring's crisp core */
-export function ghostBadgeRadius(n: number): number {
-  return renderedOuterRadius("Ghost_" + n) - HOVER_PROFILE.span + HOVER_PROFILE.coreAt + HOVER_PROFILE.coreW / 2
+/**
+ * Badge n's pill as rendered (wall-plane world cm): centre, half straight length L and end radius R
+ * of its crisp line. The mesh's line runs (coreAt + coreW / 2) inside and (span - that) outside the
+ * core path, so the core is the mesh's half extents minus the outer part.
+ */
+export function ghostBadge(n: number): {c: vec3; L: number; R: number} {
+  const so = mustFind("Ghost_" + n)
+  const pos = (so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh.getVertexDataForAttribute("position")
+  let mx = 0, my = 0
+  for (let i = 0; i * 3 < pos.length; i++) { mx = Math.max(mx, Math.abs(pos[i * 3])); my = Math.max(my, Math.abs(pos[i * 3 + 1])) }
+  const out = HOVER_PROFILE.span - (HOVER_PROFILE.coreAt + HOVER_PROFILE.coreW / 2)
+  const R = my - out
+  return {c: so.getTransform().getWorldPosition(), L: Math.max(0, mx - out - R), R}
+}
+
+/** distance (cm, wall plane) from a point to badge b's pill line; < 0 inside the pill */
+export function pillDist(b: {c: vec3; L: number; R: number}, x: number, y: number): number {
+  return Math.hypot(Math.max(0, Math.abs(x - b.c.x) - b.L), y - b.c.y) - b.R
+}
+
+/** points (world) on badge b's pill line, `n` of them, plus its centre first */
+function pillPoints(b: {c: vec3; L: number; R: number}, n: number): vec3[] {
+  const out: vec3[] = [b.c]
+  const per = 2 * b.L + Math.PI * b.R
+  for (let i = 0; i < n; i++) {
+    let s = (i / n) * 2 * per
+    if (s < Math.PI * b.R) { const t = -Math.PI / 2 + s / b.R; out.push(new vec3(b.c.x + b.L + b.R * Math.cos(t), b.c.y + b.R * Math.sin(t), b.c.z)); continue }
+    s -= Math.PI * b.R
+    if (s < 2 * b.L) { out.push(new vec3(b.c.x + b.L - s, b.c.y + b.R, b.c.z)); continue }
+    s -= 2 * b.L
+    if (s < Math.PI * b.R) { const t = Math.PI / 2 + s / b.R; out.push(new vec3(b.c.x - b.L + b.R * Math.cos(t), b.c.y + b.R * Math.sin(t), b.c.z)); continue }
+    s -= Math.PI * b.R
+    out.push(new vec3(b.c.x - b.L + Math.min(s, 2 * b.L), b.c.y - b.R, b.c.z))
+  }
+  return out
+}
+
+/** the suggestion label's visible text box (wall-plane world cm): "R hand" is about 7 x 2.6 cm at its own size */
+export function labelTextBox(main: NextHoldMain): {x: number; y: number; hw: number; hh: number} | null {
+  const so = mustFind("SuggestLabel")
+  if (!main.getSuggestion()) return null
+  const p = so.getTransform().getWorldPosition()
+  const k = main.getLabelScale()
+  return {x: p.x, y: p.y, hw: 4.5 * k, hh: 1.6 * k}
+}
+
+/**
+ * Attribution: each badge must belong, at a glance, to its own hold and name its limb.
+ * - its text is "n · LIMB", the limb of look-ahead step n (from `want`);
+ * - on `cam`'s screen, the ring nearest the badge's outline is its own hold's ring (the glow's
+ *   outer ring for the glowing hold, the ring circle for every other hold, drawn or not), and the
+ *   next nearest is at least `marginCm` (as seen at the badge) further away.
+ * Returns a summary line.
+ */
+export function checkBadgeAttribution(cam: Camera, main: NextHoldMain, want: {limb: string; holdId: string}[], errs: string[], tag: string, marginCm = 2): string {
+  const out: string[] = []
+  if (findSceneObjectsByName("Ghost_1").length || findSceneObjectsByName("GhostNumber_1").length) errs.push(`${tag}: a badge 1 exists; the glow is step 1`)
+  const sug = main.getSuggestion()
+  if (want.length && (!sug || main.getGhostHold(1) !== want[0].holdId)) errs.push(`${tag}: step 1 (${want[0].holdId}) is not the glowing suggestion (${sug ? sug.holdId : "none"})`)
+  const glowSo = mustFind("SuggestGlow")
+  const glowOuter = glowSo.enabled
+    ? renderedInnerRadius("SuggestGlow") + (GLOW_PROFILE.ringAt + GLOW_PROFILE.ringW) * ((renderedOuterRadius("SuggestGlow") - renderedInnerRadius("SuggestGlow")) / GLOW_PROFILE.span)
+    : 0
+  const line = main.getRingLineWidth()
+  const circles = HOLDS.map((h) => {
+    const p = mustFind("Hold_" + h.id).getTransform().getWorldPosition()
+    const r = glowSo.enabled && sug && sug.holdId === h.id ? glowOuter : HOLD_SIZE[h.type].ringR + line / 2
+    const pts: vec2[] = []
+    for (let i = 0; i < 72; i++) {
+      const t = (i / 72) * Math.PI * 2
+      pts.push(cam.worldSpaceToScreenSpace(new vec3(p.x + r * Math.cos(t), p.y + r * Math.sin(t), p.z)))
+    }
+    return {id: h.id, pts}
+  })
+  for (const n of BADGE_STEPS) {
+    const numSo = mustFind("GhostNumber_" + n)
+    const step = want[n - 1]
+    if (!step) {
+      if (numSo.enabled) errs.push(`${tag}: badge ${n} shows, but the look-ahead has ${want.length} steps`)
+      continue
+    }
+    if (!numSo.enabled) { errs.push(`${tag}: badge ${n} hidden, look-ahead step ${n} is ${step.limb} -> ${step.holdId}`); continue }
+    const text = (numSo.getComponent("Component.Text") as Text).text
+    if (text !== `${n} · ${step.limb}`) errs.push(`${tag}: badge ${n} reads "${text}", want "${n} · ${step.limb}"`)
+    if (main.getGhostHold(n) !== step.holdId) errs.push(`${tag}: badge ${n} on ${main.getGhostHold(n)}, step ${n} is on ${step.holdId}`)
+    const b = ghostBadge(n)
+    const bpts = pillPoints(b, 32).slice(1).map((p) => cam.worldSpaceToScreenSpace(p))
+    const c = cam.worldSpaceToScreenSpace(b.c)
+    const margin = cam.worldSpaceToScreenSpace(new vec3(b.c.x + marginCm, b.c.y, b.c.z)).distance(c)
+    const d = circles.map((ci) => {
+      let m = 1e9
+      for (const p of bpts) for (const q of ci.pts) m = Math.min(m, p.distance(q))
+      return {id: ci.id, d: m}
+    }).sort((a, z) => a.d - z.d)
+    const cmPer = marginCm / margin
+    const second = d[1]
+    out.push(`${n} "${text}": nearest ${d[0].id} ${(d[0].d * cmPer).toFixed(1)} cm, next ${second.id} ${(second.d * cmPer).toFixed(1)} cm`)
+    if (d[0].id !== step.holdId) errs.push(`${tag}: badge ${n} (${step.holdId}) is nearest the ring of ${d[0].id} on screen (${(d[0].d * cmPer).toFixed(1)} cm), not its own`)
+    else if (second.d - d[0].d < margin) errs.push(`${tag}: badge ${n}'s own ring ${step.holdId} is only ${((second.d - d[0].d) * cmPer).toFixed(1)} cm nearer than ${second.id}'s on screen, want >= ${marginCm}`)
+  }
+  return `badges: ${out.join("; ") || "none"}`
 }
 
 /** Even-odd point-in-polygon on screen points. */
@@ -310,13 +410,13 @@ function inPoly(poly: vec2[], p: vec2): boolean {
  * Every shown ghost number must be readable: no glow ring may cover it on screen, as `cam` sees it.
  * The glow's outer ring is read from the rendered SuggestGlow mesh: its inner edge plus
  * (ringAt + ringW) of the glow profile at the mesh's own scale, plus 1 profile cm for the ring's
- * soft halo. That circle is projected to the screen as a polygon, and so is the circle of each
- * badge's ring around its number: no point of the badge circle (so no part of the number inside
- * it) may fall inside the glow's outer ring. Also: no two badges overlap, the numbers draw after
- * the glow and the badges (render order), and no dot of the sequence path sits under a badge.
+ * soft halo. That circle is projected to the screen as a polygon; no point of a badge's pill (its
+ * centre and its line, so no part of the text inside it) may fall inside it. Also: no two badges
+ * overlap, the texts draw after the glow and the badges (render order), and no dot of the sequence
+ * path sits under a badge, inside the glow's outer ring, or (given `main`) on the label's text.
  * Returns a summary line.
  */
-export function checkGhostNumbersClear(cam: Camera, errs: string[], tag: string): string {
+export function checkGhostNumbersClear(cam: Camera, errs: string[], tag: string, main?: NextHoldMain): string {
   const glowSo = mustFind("SuggestGlow")
   const out: string[] = []
   const glowOn = glowSo.enabled
@@ -336,49 +436,55 @@ export function checkGhostNumbersClear(cam: Camera, errs: string[], tag: string)
     }
   }
   const glowOrder = (glowSo.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).getRenderOrder()
-  const badges: {c: vec3; r: number}[] = []
-  for (let n = 1; n <= 3; n++) {
+  const badges: {n: number; b: {c: vec3; L: number; R: number}}[] = []
+  for (const n of BADGE_STEPS) {
     const numSo = mustFind("GhostNumber_" + n)
     if (!numSo.enabled) continue
     const num = numSo.getComponent("Component.Text") as Text
     const ringOrder = (mustFind("Ghost_" + n).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).getRenderOrder()
     if (!(num.getRenderOrder() > glowOrder && num.getRenderOrder() > ringOrder)) {
-      errs.push(`${tag}: ghost ${n} number render order ${num.getRenderOrder()} is not above the glow (${glowOrder}) and its badge (${ringOrder})`)
+      errs.push(`${tag}: badge ${n} text render order ${num.getRenderOrder()} is not above the glow (${glowOrder}) and its badge (${ringOrder})`)
     }
-    const c = numSo.getTransform().getWorldPosition()
-    const rb = ghostBadgeRadius(n)
-    badges.push({c, r: rb})
+    const b = ghostBadge(n)
+    badges.push({n, b})
     if (!glowOn) { out.push(`${n}: no glow`); continue }
-    const l = glowInv!.multiplyPoint(c)
-    const centre = Math.hypot(l.x, l.y)
-    let covered = 0
-    const screen: vec2[] = [cam.worldSpaceToScreenSpace(c)]
-    for (let i = 0; i < 24; i++) {
-      const t = (i / 24) * Math.PI * 2
-      screen.push(cam.worldSpaceToScreenSpace(glowW!.multiplyPoint(new vec3(l.x + rb * Math.cos(t), l.y + rb * Math.sin(t), 0))))
+    // the pill's centre and line, each point tested against the glow's outer ring on screen
+    const pts = pillPoints(b, 32)
+    let covered = 0, nearest = 1e9
+    for (const p of pts) {
+      if (inPoly(poly, cam.worldSpaceToScreenSpace(p))) covered++
+      const l = glowInv!.multiplyPoint(p)
+      nearest = Math.min(nearest, Math.hypot(l.x, l.y) - ringOuter)
     }
-    for (const p of screen) if (inPoly(poly, p)) covered++
-    if (covered) errs.push(`${tag}: ghost ${n}'s number is covered by the glow: ${covered} of ${screen.length} points of its badge (centre + circle r ${rb.toFixed(2)} cm) are inside the glow's outer ring (r ${ringOuter.toFixed(2)} cm, number ${centre.toFixed(2)} cm from the glow centre)`)
-    out.push(`${n}: ${(centre - rb - ringOuter).toFixed(2)} cm clear`)
+    if (covered) errs.push(`${tag}: badge ${n}'s text is covered by the glow: ${covered} of ${pts.length} points of its pill are inside the glow's outer ring (r ${ringOuter.toFixed(2)} cm)`)
+    out.push(`${n}: ${nearest.toFixed(2)} cm clear`)
   }
-  // nor may another badge's ring run through a number: badge circles must not overlap
+  // nor may another badge's line run through a text: pills must not overlap
   for (let i = 0; i < badges.length; i++) {
     for (let j = i + 1; j < badges.length; j++) {
-      const gap = Math.hypot(badges[i].c.x - badges[j].c.x, badges[i].c.y - badges[j].c.y)
-      if (gap < badges[i].r + badges[j].r) errs.push(`${tag}: ghost ${i + 1} and ghost ${j + 1} badges overlap (${gap.toFixed(2)} cm apart, radii ${badges[i].r.toFixed(2)} + ${badges[j].r.toFixed(2)})`)
+      const a = badges[i].b, z = badges[j].b
+      const gap = Math.hypot(Math.max(0, Math.abs(a.c.x - z.c.x) - a.L - z.L), a.c.y - z.c.y) - a.R - z.R
+      if (gap < 0) errs.push(`${tag}: badges ${badges[i].n} and ${badges[j].n} overlap (${gap.toFixed(2)} cm)`)
     }
   }
+  // the dotted path runs edge to edge: no dot under a badge, inside the glow's outer ring or on the label
+  const label = main ? labelTextBox(main) : null
   let dots = 0
   for (let n = 1; n <= 2; n++) {
     for (const d of ghostPathDots(n)) {
       dots++
-      for (let b = 0; b < badges.length; b++) {
-        const gap = Math.hypot(d.x - badges[b].c.x, d.y - badges[b].c.y)
-        if (gap < badges[b].r) errs.push(`${tag}: GhostPath_${n} has a dot ${gap.toFixed(2)} cm from ghost ${b + 1}'s number, inside its badge (r ${badges[b].r.toFixed(2)})`)
+      for (const {n: bn, b} of badges) {
+        const gap = pillDist(b, d.x, d.y)
+        if (gap < 0) errs.push(`${tag}: GhostPath_${n} has a dot inside badge ${bn} (${gap.toFixed(2)} cm)`)
       }
+      if (glowOn) {
+        const l = glowInv!.multiplyPoint(new vec3(d.x, d.y, glowW!.multiplyPoint(vec3.zero()).z))
+        if (Math.hypot(l.x, l.y) < ringOuter) errs.push(`${tag}: GhostPath_${n} has a dot inside the glow's outer ring (${Math.hypot(l.x, l.y).toFixed(2)} < ${ringOuter.toFixed(2)} cm)`)
+      }
+      if (label && Math.abs(d.x - label.x) < label.hw && Math.abs(d.y - label.y) < label.hh) errs.push(`${tag}: GhostPath_${n} has a dot on the "${main!.getLabelText()}" label`)
     }
   }
-  return `numbers vs glow: ${out.join(", ") || "no ghosts"}; path ${dots} dots`
+  return `badges vs glow: ${out.join(", ") || "no badges"}; path ${dots} dots`
 }
 
 /** The dot centres (wall-plane world x, y) of GhostPath_n's rendered mesh, or [] if it is hidden.

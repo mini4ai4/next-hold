@@ -24,7 +24,7 @@ import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
-import {camera, checkGhostNumbersClear, checkGroundSizes, eyeToWallCm, frames, getMain, groundSizesFor, mustFind, renderedLineWidth, restorePreset} from "./NextHoldTestKit"
+import {camera, checkBadgeAttribution, checkGhostNumbersClear, checkGroundSizes, eyeToWallCm, frames, getMain, groundSizesFor, mustFind, renderedLineWidth, restorePreset} from "./NextHoldTestKit"
 
 /** where the climber stands to read the problem: on the mats, about 2.5 m back */
 const SCAN_CM = 250
@@ -120,7 +120,8 @@ export class N7GroundViewpointScenario extends Scenario {
         print(`[N7] ${pose.name} (head pitched ${pitch.toFixed(1)} deg): ${inside.length}/${problem.length} whole rings inside: ${inside.join(",")} (isSphereVisible: ${loose})`)
         print(`[N7] ${pose.name}: clearance to the nearest view edge, cm: ${holds.map((h) => `${h.id} ${clearance(h.p, radius(h)).toFixed(1)}`).join(", ")}`)
         if (!inside.length) errs.push(`${pose.name}: no whole ring inside the view`)
-        print(`[N7] ${pose.name}: ${checkGhostNumbersClear(cam, errs, pose.name)}`)
+        print(`[N7] ${pose.name}: ${checkGhostNumbersClear(cam, errs, pose.name, main)}`)
+        print(`[N7] ${pose.name}: ${checkBadgeAttribution(cam, main, main.getPreview(), errs, pose.name)}`)
       }
       const missing = problem.filter((id) => !covered[id])
       print(`[N7] two head positions from ${SCAN_CM} cm cover ${problem.length - missing.length}/${problem.length} problem holds; in both: ${problem.filter((id) => covered[id] && covered[id].length === 2).join(",") || "none"}`)

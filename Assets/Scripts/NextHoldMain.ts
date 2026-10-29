@@ -70,6 +70,9 @@ const GROUND_RESIZE_CM = 2
 /** from the ring line's outer edge to the suggestion label's centre at the label's own size, cm
  *  (with the 1.6 cm line: 3.2 cm below the ring's radius, as before) */
 const LABEL_GAP = 2.4
+/** half the suggestion label's box at its 110 cm size (cm): "R hand" at the label's size */
+const LABEL_HALF_W = 7
+const LABEL_HALF_H = 2
 
 const LIMB_LABEL: {[l: string]: string} = {LH: "L hand", RH: "R hand", LF: "L foot", RF: "R foot"}
 const HAND_LIMBS: Limb[] = ["LH", "RH"]
@@ -372,7 +375,7 @@ export class NextHoldMain extends BaseScriptComponent {
       showMarkers: true,
       marks,
       tags,
-      ghosts: this.preview.map((m) => m.holdId),
+      ghosts: this.preview.map((m) => ({hold: m.holdId, limb: m.limb})),
       // the body: the centre of mass the scoring itself uses for this position
       torso: centreOfMass(this.position, holds),
     }
@@ -402,12 +405,13 @@ export class NextHoldMain extends BaseScriptComponent {
     const ground = this.view === "ground"
     this.callouts.setLabelMinSize(ground ? minReadSize(this.groundCm) : 0)
     const labelScale = this.callouts.getLabelScale()
+    const labelBox = s.glowHoldId ? this.labelBox(s.glowHoldId) : null
     if (ground) {
-      this.visuals.apply({...s, viewCm: this.groundCm, labelScale})
+      this.visuals.apply({...s, viewCm: this.groundCm, labelScale, labelBox})
     } else {
       const rings: {[id: string]: RingColour | null} = {}
       if (s.glowHoldId) rings[s.glowHoldId] = s.rings[s.glowHoldId] || null
-      this.visuals.apply({...s, rings, ghosts: [], viewCm: DESIGN_VIEW_CM, labelScale})
+      this.visuals.apply({...s, rings, ghosts: [], viewCm: DESIGN_VIEW_CM, labelScale, labelBox})
     }
     // the label's size changed with the view: keep it just below the ring
     if (s.glowHoldId) this.callouts.moveSuggestion(this.labelPos(s.glowHoldId), this.wallRot())
@@ -416,9 +420,21 @@ export class NextHoldMain extends BaseScriptComponent {
   /** Centred just below the suggested ring's line, between the hold and the climber's eye line;
    *  a larger label (Ground) hangs a little lower. Inside the glow's target ring in both views. */
   private labelPos(id: string): vec3 {
+    const c = this.labelCentre(id)
+    return this.wall.wallToWorld(c.x, c.y, 3)
+  }
+
+  private labelCentre(id: string): WallPt {
     const h = this.holds[id]
     const dy = this.ringRadius(id) + this.getRingLineWidth() / 2 + LABEL_GAP * this.callouts.getLabelScale()
-    return this.wall.wallToWorld(h.x, h.y - dy, 3)
+    return {x: h.x, y: h.y - dy}
+  }
+
+  /** the suggestion label's box on the wall (cm) at its current size: the badges and the path keep clear of it */
+  private labelBox(id: string): {x: number; y: number; hw: number; hh: number} {
+    const c = this.labelCentre(id)
+    const k = this.callouts.getLabelScale()
+    return {x: c.x, y: c.y, hw: LABEL_HALF_W * k, hh: LABEL_HALF_H * k}
   }
 
   /** The eye's distance (cm) from the wall plane, along the wall's normal; null without a camera. */
@@ -639,9 +655,9 @@ export class NextHoldMain extends BaseScriptComponent {
   isHoldDim(id: string): boolean { return this.wall.isHoldDim(id) }
   isMarkVisible(id: string): boolean { return this.visuals ? this.visuals.isMarkVisible(id) : false }
   getTagText(id: string): string | null { return this.visuals ? this.visuals.tagText(id) : null }
-  /** sequence preview: the next moves shown as ghost rings 1, 2, 3 */
+  /** sequence preview: the next moves; step 1 is the glowing suggestion, steps 2 and 3 badges "2 · LH" */
   getPreview(): {limb: Limb; holdId: string}[] { return this.preview.map((m) => ({limb: m.limb, holdId: m.holdId})) }
-  /** the hold ghost ring n (1-based) is drawn on, or null when hidden */
+  /** the hold look-ahead step n (1-based) is shown on (step 1 by the glow), or null when hidden */
   getGhostHold(n: number): string | null { return this.visuals ? this.visuals.ghostHold(n) : null }
   isStartLit(): boolean { return this.typePicker.isStartLit() }
   isTopLit(): boolean { return this.typePicker.isTopLit() }
