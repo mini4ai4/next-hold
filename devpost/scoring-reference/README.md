@@ -6,8 +6,16 @@ the design brief's done-criteria rest on a rule that's been run, not guessed.
 - `scoring.js` — a pure-JS reference of the green/yellow/red rule from `../IDEA.md`
   (grip quality × reach factor × balance factor → green ≥ 0.7, yellow 0.4–0.7, red < 0.4),
   plus the upward goal (below).
-- `scoring.test.js` — 18 assertions tying the rule to the brief's done-criteria. Run:
-  `node scoring.test.js` → **18 passed, 0 failed**.
+- `scoring.test.js` — 27 assertions tying the rule to the brief's done-criteria. Run:
+  `node scoring.test.js` → **27 passed, 0 failed**.
+
+## Feet reach like legs (added 29 Oct, session 14)
+Until then a foot used the arm's 77 cm reach. Now a foot reaches from the **hip** with the
+leg's reach (1.25 × the arm's), and the hip hangs 0.5 × reach below the lower hand, because a
+climber pulls the hip in toward the hands for a foot move. A foot can go well below the hands
+(a rock-over about 40 cm under them is green), but a target above the hip is a **high step**:
+its reach falls to 0 at 0.35 × reach above the hip, and the why-line says "HIGH STEP". Hands
+are unchanged. Every number is a share of reach, so all of it scales with the climber's height.
 
 ## The upward goal (added 28 Oct, after the pre-submission review)
 Among moves of similar quality, a hold that gets you higher and closer to the problem's

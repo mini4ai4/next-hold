@@ -47,6 +47,42 @@ function reachFactor(d, reach) {
   return 0.0; // out of reach is always red
 }
 
+// Feet (added 29 Oct, session 14): a foot does not reach like an arm. It reaches from
+// the hip, and while the hands hold on, the climber pulls the hip in and up toward
+// them for a foot move. So a foot can go well below the hands (a rock-over with the
+// foot about 40 cm under the hands is a normal move) but not far above the hip.
+//   hip       = HIP_DROP x reach below the lower hand (no hand on: the COM), at the
+//               COM's x, HIP_SIDE cm to the foot's side
+//   leg reach = LEG_REACH x reach from the hip, same 0.8 / 1.0 bands as an arm
+//   high step = a target above the hip loses reach in a straight line, down to 0 at
+//               HIGH_STEP x reach above it
+// A foot's reach factor is the leg's factor x the high-step factor. Hands are unchanged.
+// Everything is a share of `reach`, so it all scales with the climber's height.
+const LEG_REACH = 1.25;  // 96 cm for a 175 cm climber
+const HIP_DROP = 0.5;    // 38.5 cm below the lower hand
+const HIGH_STEP = 0.35;  // 27 cm above the hip is out of reach
+const HIP_SIDE = 10;
+
+function hipOf(limb, position, holds, com, reach) {
+  const hands = HANDS.map((l) => position[l]).filter((id) => id != null && holds[id]);
+  const y = hands.length ? Math.min(...hands.map((id) => holds[id].y)) - HIP_DROP * reach : com.y;
+  return { x: com.x + (limb === "RF" ? +HIP_SIDE : -HIP_SIDE), y };
+}
+
+function highStepFactor(target, hip, reach) {
+  const rise = target.y - hip.y;
+  if (rise <= 0) return 1.0;
+  if (rise >= HIGH_STEP * reach) return 0.0;
+  return 1.0 - rise / (HIGH_STEP * reach);
+}
+
+// Where the moving limb reaches from, how far it reaches, and (feet only) the high step.
+function limbReach(limb, target, position, holds, com, reach) {
+  if (HANDS.includes(limb)) return { from: shoulderOf(limb, com), reach, high: 1.0 };
+  const hip = hipOf(limb, position, holds, com, reach);
+  return { from: hip, reach: LEG_REACH * reach, high: highStepFactor(target, hip, reach) };
+}
+
 function balanceFactor(limb, target, position, holds, com) {
   const isHand = HANDS.includes(limb);
   let f = 1.0;
@@ -82,7 +118,7 @@ const GOAL_WEIGHT = 0.25;
 function goalFactor(limb, target, position, holds, top, reach, com) {
   if (top == null || !holds[top]) return 1.0;
   const on = position[limb];
-  const from = on != null && holds[on] ? holds[on] : shoulderOf(limb, com);
+  const from = on != null && holds[on] ? holds[on] : limbReach(limb, target, position, holds, com, reach).from;
   const t = holds[top];
   const gained = (target.y - from.y) + (dist(from, t) - dist(target, t));
   const progress = Math.max(-1, Math.min(1, gained / (2 * reach)));
@@ -101,9 +137,11 @@ function scoreHold({ limb, holdId, holds, holdTypes, position, reach, top = null
   const target = holds[holdId];
   const quality = GRIP[holdTypes[holdId]] ?? 0.5;
   const com = centreOfMass(position, holds);
-  const shoulder = shoulderOf(limb, com);
-  const d = dist(shoulder, target);
-  const rf = reachFactor(d, reach);
+  // hands reach from the shoulder; feet from the hip, with the high step (see limbReach)
+  const lr = limbReach(limb, target, position, holds, com, reach);
+  const d = dist(lr.from, target);
+  const legOrArm = reachFactor(d, lr.reach);
+  const rf = legOrArm * lr.high;
   const bf = balanceFactor(limb, target, position, holds, com);
   const score = quality * rf * bf;
   const gf = goalFactor(limb, target, position, holds, top, reach, com);
@@ -115,11 +153,13 @@ function scoreHold({ limb, holdId, holds, holdTypes, position, reach, top = null
   const why = [];
   why.push(String(holdTypes[holdId] || "unmarked").toUpperCase() + " HOLD");
   if (rf === 0) why.push("OUT OF REACH");
-  else if (rf < 1) why.push("LONG REACH");
+  else if (legOrArm < 1) why.push("LONG REACH");
+  if (lr.high < 1) why.push("HIGH STEP");
   if (bf < 1) why.push("COMMITTING BALANCE");
 
   return { holdId, limb, score, colour: colourFor(score), rank, why: why.join(" · "),
-           parts: { quality, reachFactor: rf, balanceFactor: bf, goalFactor: gf, dist: d } };
+           parts: { quality, reachFactor: rf, balanceFactor: bf, goalFactor: gf, dist: d,
+                    limbReach: lr.reach, highStep: lr.high } };
 }
 
 // Colour every reachable candidate hold, and pick the single best next move (by rank).
@@ -132,4 +172,5 @@ function evaluate({ holds, holdTypes, position, limb, reach, top = null }) {
   return { results, suggestion: best && best.score > 0 ? best : null };
 }
 
-module.exports = { GRIP, GOAL_WEIGHT, reachFactor, balanceFactor, goalFactor, colourFor, scoreHold, evaluate };
+module.exports = { GRIP, GOAL_WEIGHT, LEG_REACH, HIP_DROP, HIGH_STEP, reachFactor, balanceFactor, goalFactor,
+                   hipOf, highStepFactor, colourFor, scoreHold, evaluate };

@@ -74,9 +74,33 @@ const pinRes = P.scoreHold({ limb: "RH", holdId: "pin", holds: { ...holds, pin: 
 check("why for a pinch at a stretch: \"PINCH HOLD · LONG REACH\"", pinRes.why === "PINCH HOLD · LONG REACH", pinRes.why);
 check("why for the far cross-body crimp: \"CRIMP HOLD · OUT OF REACH · COMMITTING BALANCE\"",
   sideRes.why === "CRIMP HOLD · OUT OF REACH · COMMITTING BALANCE", sideRes.why);
-const WHY_FORM = /^[A-Z]+ HOLD( · (LONG REACH|OUT OF REACH|COMMITTING BALANCE))*$/;
+const WHY_FORM = /^[A-Z]+ HOLD( · (LONG REACH|OUT OF REACH|HIGH STEP|COMMITTING BALANCE))*$/;
 check("every why is capitals in the form \"<TYPE> HOLD · ...\" (no lowercase \"pinch\")",
   ev.results.concat(gEv.results, [pinRes, lowRes]).every((r) => WHY_FORM.test(r.why)));
+// the reference's foot checks (session 14), against the port
+const fHolds = { ...holds, hiL: { x: 115, y: 190 }, hiR: { x: 140, y: 190 }, rock: { x: 150, y: 150 }, high: { x: 150, y: 172 } };
+const fTypes = { ...holdTypes, hiL: "jug", hiR: "jug", rock: "jug", high: "jug" };
+const hiHands = { LH: "hiL", RH: "hiR", LF: "lf", RF: "rf" };
+const comHi = P.centreOfMass(hiHands, fHolds);
+const hip = P.hipOf("RF", hiHands, fHolds, comHi, REACH);
+check("the hip hangs 0.5 x reach below the lower hand, 10 cm to the foot's side",
+  Math.abs(hip.y - (190 - 0.5 * REACH)) < 1e-9 && Math.abs(hip.x - (comHi.x + 10)) < 1e-9, hip);
+const rock = P.scoreHold({ limb: "RF", holdId: "rock", holds: fHolds, holdTypes: fTypes, position: hiHands, reach: REACH });
+check("foot: a rock-over 40 cm below the hands is green, from the hip with leg reach (1.25 x 77)",
+  rock.colour === "green" && rock.parts.limbReach === 1.25 * REACH && rock.parts.highStep === 1, rock);
+const high = P.scoreHold({ limb: "RF", holdId: "high", holds: fHolds, holdTypes: fTypes, position: hiHands, reach: REACH });
+check("foot: a jug ~20 cm above the hip is hard (red), and the why says HIGH STEP",
+  high.colour === "red" && high.parts.highStep < 0.4 && high.why === "JUG HOLD · HIGH STEP", high);
+check("hands are unchanged: arm reach from the shoulder, no high step",
+  upRes.parts.limbReach === REACH && upRes.parts.highStep === 1, upRes.parts);
+// the reference's own feet checks, port == reference on the foot wall too
+let feetSame = true;
+for (const limb of P.LIMBS) {
+  const a = R.evaluate({ holds: fHolds, holdTypes: fTypes, position: hiHands, limb, reach: REACH });
+  const b = P.evaluate({ holds: fHolds, holdTypes: fTypes, position: hiHands, limb, reach: REACH });
+  if (JSON.stringify(a) !== JSON.stringify(b)) feetSame = false;
+}
+check("port == reference with the hands high (every limb, every hold)", feetSame);
 
 // ---- 2. port == reference on the real Lens wall ------------------------------
 const wHolds = {}, wTypes = {};
@@ -167,6 +191,14 @@ for (const m of seq) {
   chainPos = { ...chainPos, [m.limb]: m.holdId };
 }
 check("every step is bestMove from the position the earlier steps leave", chainOk);
+check("every foot step of the preset look-ahead is a leg move: no high step, within leg reach", (() => {
+  let p = { ...wPos };
+  for (const m of seq) {
+    if (P.FEET.includes(m.limb) && !(m.parts.highStep === 1 && m.parts.dist <= m.parts.limbReach && m.parts.limbReach > CLIMBER_REACH)) return false;
+    p = { ...p, [m.limb]: m.holdId };
+  }
+  return seq.some((m) => P.FEET.includes(m.limb));
+})(), seq.map((m) => ({ limb: m.limb, hold: m.holdId, parts: m.parts })));
 check("the preset look-ahead climbs: each target is higher than the hold that limb leaves", (() => {
   let p = { ...wPos };
   for (const m of seq) { if (!(pHolds[m.holdId].y > pHolds[p[m.limb]].y)) return false; p = { ...p, [m.limb]: m.holdId }; }

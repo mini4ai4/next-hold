@@ -23,7 +23,12 @@ export interface RefResult {
   /** score x goalFactor: what the suggestion is picked by */
   rank: number
   why: string
+  /** from the shoulder (hand) or the hip (foot) */
   dist: number
+  /** the arm's reach for a hand, the leg's (1.25 x) for a foot */
+  limbReach: number
+  /** feet: 1 at or below the hip, falling to 0 at 0.35 x reach above it; hands: 1 */
+  highStep: number
   reachFactor: number
   balanceFactor: number
   goalFactor: number
@@ -51,20 +56,38 @@ export class ReferenceRule {
     return n === 0 ? {x: 120, y: 100} : {x: sx / n, y: sy / n}
   }
 
+  /** a hand's shoulder (hands reach from here with the arm's reach) */
   anchor(limb: RefLimb, com: RefPt): RefPt {
     const side = limb === "RH" || limb === "RF" ? 18 : -18
     const up = limb === "LH" || limb === "RH" ? 35 : -35
     return {x: com.x + side, y: com.y + up}
   }
 
+  /** a foot's hip: 0.5 x reach below the lower hand on (no hand on: the COM), 10 cm to the foot's side */
+  hip(limb: RefLimb, p: RefPosition, com: RefPt): RefPt {
+    let low = Infinity
+    for (const l of ["LH", "RH"]) {
+      const id = p[l]
+      if (id != null && this.holds[id]) low = Math.min(low, this.holds[id].y)
+    }
+    return {x: com.x + (limb === "RF" ? 10 : -10), y: low < Infinity ? low - 0.5 * this.reach : com.y}
+  }
+
   score(limb: RefLimb, holdId: string, p: RefPosition): RefResult {
     const t = this.holds[holdId]
     const q = REF_GRIP[this.types[holdId]] !== undefined ? REF_GRIP[this.types[holdId]] : 0.5
     const com = this.com(p)
-    const a = this.anchor(limb, com)
+    // hands: arm reach from the shoulder. Feet: leg reach (1.25 x) from the hip, and a target
+    // above the hip loses reach in a straight line to 0 at 0.35 x reach above it (the high step)
+    const isHand = limb === "LH" || limb === "RH"
+    const a = isHand ? this.anchor(limb, com) : this.hip(limb, p, com)
+    const limbReach = isHand ? this.reach : 1.25 * this.reach
+    const rise = t.y - a.y
+    const high = isHand || rise <= 0 ? 1.0 : rise >= 0.35 * this.reach ? 0.0 : 1.0 - rise / (0.35 * this.reach)
     const d = Math.sqrt((a.x - t.x) * (a.x - t.x) + (a.y - t.y) * (a.y - t.y))
-    const r = d / this.reach
-    const rf = r <= 0.8 ? 1.0 : r <= 1.0 ? 1.0 - (r - 0.8) * 2.0 : 0.0
+    const r = d / limbReach
+    const legOrArm = r <= 0.8 ? 1.0 : r <= 1.0 ? 1.0 - (r - 0.8) * 2.0 : 0.0
+    const rf = legOrArm * high
 
     let bf = 1.0
     if (limb === "LH" || limb === "RH") {
@@ -92,10 +115,12 @@ export class ReferenceRule {
     }
     const why: string[] = [String(this.types[holdId] || "unmarked").toUpperCase() + " HOLD"]
     if (rf === 0) why.push("OUT OF REACH")
-    else if (rf < 1) why.push("LONG REACH")
+    else if (legOrArm < 1) why.push("LONG REACH")
+    if (high < 1) why.push("HIGH STEP")
     if (bf < 1) why.push("COMMITTING BALANCE")
     const colour: RefColour = s >= 0.7 ? "green" : s >= 0.4 ? "yellow" : "red"
-    return {holdId, limb, score: s, colour, rank: s * gf, why: why.join(" · "), dist: d, reachFactor: rf, balanceFactor: bf, goalFactor: gf}
+    return {holdId, limb, score: s, colour, rank: s * gf, why: why.join(" · "), dist: d, reachFactor: rf, balanceFactor: bf, goalFactor: gf,
+      limbReach, highStep: high}
   }
 
   /** Every hold no limb is on, scored for `limb`. */

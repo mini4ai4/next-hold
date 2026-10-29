@@ -92,9 +92,37 @@ const pinRes = S.scoreHold({ limb: "RH", holdId: "pin", holds: wHolds, holdTypes
 check("why for a pinch at a stretch: \"PINCH HOLD · LONG REACH\"", pinRes.why === "PINCH HOLD · LONG REACH", pinRes.why);
 check("why for the far cross-body crimp: \"CRIMP HOLD · OUT OF REACH · COMMITTING BALANCE\"",
   sideRes.why === "CRIMP HOLD · OUT OF REACH · COMMITTING BALANCE", sideRes.why);
-const WHY_FORM = /^[A-Z]+ HOLD( · (LONG REACH|OUT OF REACH|COMMITTING BALANCE))*$/;
+const WHY_FORM = /^[A-Z]+ HOLD( · (LONG REACH|OUT OF REACH|HIGH STEP|COMMITTING BALANCE))*$/;
 check("every why is capitals in the form \"<TYPE> HOLD · ...\" (no lowercase \"pinch\")",
   ev.results.concat(gEv.results, [pinRes, lowRes]).every((r) => WHY_FORM.test(r.why)));
+
+// ---- feet reach from the hip, not with the arm's reach (session 14) -----------
+// Hands high (both at 190), feet still low. The hip hangs HIP_DROP x reach (38.5 cm)
+// below the lower hand: y 151.5.
+const fHolds = { ...holds, hiL: { x: 115, y: 190 }, hiR: { x: 140, y: 190 },
+                 rock: { x: 150, y: 150 },   // 40 cm below the hands: a rock-over
+                 high: { x: 150, y: 172 } }; // ~20 cm above the hip, 18 cm below the hands
+const fTypes = { ...holdTypes, hiL: "jug", hiR: "jug", rock: "jug", high: "jug" };
+const hiHands = { LH: "hiL", RH: "hiR", LF: "lf", RF: "rf" };
+const comHi = { x: (115 + 140 + 95 + 145) / 4, y: (190 + 190 + 40 + 45) / 4 };
+const hip = S.hipOf("RF", hiHands, fHolds, comHi, REACH);
+check("the hip hangs 0.5 x reach below the lower hand, 10 cm to the foot's side",
+  Math.abs(hip.y - (190 - 0.5 * REACH)) < 1e-9 && Math.abs(hip.x - (comHi.x + 10)) < 1e-9, hip);
+const rock = S.scoreHold({ limb: "RF", holdId: "rock", holds: fHolds, holdTypes: fTypes, position: hiHands, reach: REACH });
+check("foot: a rock-over 40 cm below the hands is green, measured from the hip with leg reach (1.25 x 77)",
+  rock.colour === "green" && rock.parts.limbReach === 1.25 * REACH && rock.parts.highStep === 1 &&
+  Math.abs(rock.parts.dist - Math.hypot(150 - hip.x, 150 - hip.y)) < 1e-9, rock);
+const high = S.scoreHold({ limb: "RF", holdId: "high", holds: fHolds, holdTypes: fTypes, position: hiHands, reach: REACH });
+check("foot: a jug ~20 cm above the hip is hard (red), and the why says HIGH STEP",
+  high.colour === "red" && high.parts.highStep < 0.4 && high.why === "JUG HOLD · HIGH STEP", high);
+check("high step: 1 at or below the hip, 0 from 0.35 x reach above it",
+  S.highStepFactor({ y: hip.y }, hip, REACH) === 1 && S.highStepFactor({ y: hip.y - 50 }, hip, REACH) === 1 &&
+  S.highStepFactor({ y: hip.y + 0.351 * REACH }, hip, REACH) === 0 &&
+  Math.abs(S.highStepFactor({ y: hip.y + 0.175 * REACH }, hip, REACH) - 0.5) < 1e-9);
+// the same holds for a hand: arm reach from the shoulder, no high step (hands unchanged)
+check("hands are unchanged: arm reach from the shoulder, no high step",
+  upRes.parts.limbReach === REACH && upRes.parts.highStep === 1 &&
+  Math.abs(upRes.parts.dist - Math.hypot(140 - (120 + 18), 190 - (96.25 + 35))) < 1e-9, upRes.parts);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

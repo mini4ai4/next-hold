@@ -15,6 +15,7 @@ import {N6ViewModesScenario} from "./N6ViewModesScenario"
 import {N7GroundViewpointScenario} from "./N7GroundViewpointScenario"
 import {N8StickFigureScenario} from "./N8StickFigureScenario"
 import {N9AutoViewScenario} from "./N9AutoViewScenario"
+import {N10FootReachScenario} from "./N10FootReachScenario"
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -31,6 +32,7 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "r3-sequence-preview", typename: N3SequencePreviewScenario.getTypeName()},
     {id: "r4-why-wording", typename: N4WhyWordingScenario.getTypeName()},
     {id: "r5-control-row-in-view", typename: N5ControlRowInViewScenario.getTypeName()},
+    {id: "r6-foot-reach", typename: N10FootReachScenario.getTypeName()},
     {id: "a1-view-modes", typename: N6ViewModesScenario.getTypeName()},
     {id: "a2-ground-scan-250", typename: N7GroundViewpointScenario.getTypeName()},
     {id: "a3-auto-view", typename: N9AutoViewScenario.getTypeName()},

@@ -119,7 +119,7 @@ export class NextHoldMain extends BaseScriptComponent {
   @ui.separator
   @ui.group_start("Settings")
   @input
-  @hint("Climber height in cm. Reach = height x 0.44 (175 cm -> 77 cm); feet use the same reach.")
+  @hint("Climber height in cm at open. Arm reach = height x 0.44 (175 cm -> 77 cm); feet reach 1.25 x that from the hip.")
   @widget(new SliderWidget(120, 210, 1))
   climberHeightCm: number = 175
 

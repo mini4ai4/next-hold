@@ -11,7 +11,8 @@ import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {frames, getMain, makeReference, mustFind, pinch, restorePreset} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 
-const WHY_FORM = /^[A-Z]+ HOLD( · (LONG REACH|OUT OF REACH|COMMITTING BALANCE))*$/
+/** "HIGH STEP" since session 14: a foot target above the hip */
+const WHY_FORM = /^[A-Z]+ HOLD( · (LONG REACH|OUT OF REACH|HIGH STEP|COMMITTING BALANCE))*$/
 
 function shownWhy(): string {
   const t = mustFind("WhyText").getComponent("Component.Text") as Text

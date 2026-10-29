@@ -38,14 +38,17 @@ export class C3ReachAndJugScenario extends Scenario {
       if (main.getHoldColour("far") !== null || renderedRingColour("far", main) !== null) {
         errs.push(`${limb}: far is outside the problem but shows ${renderedRingColour("far", main)}`)
       }
-      // the top hold (h20) is in the problem and beyond reach of every limb from the preset
+      // the top hold (h20) is in the problem and beyond reach of every limb from the preset.
+      // A hand's reach is the arm's, from the shoulder; a foot's is the leg's, from the hip, and
+      // a foot can also be out of reach by being too far above the hip (the high step)
       let beyond = 0
       for (const r of ref.evaluate(limb, pos).results) {
-        if (r.dist <= BRIEF_REACH) continue
+        if (r.dist > r.limbReach && r.reachFactor !== 0) errs.push(`reference: ${limb} ${r.holdId} is beyond reach with a reach factor ${r.reachFactor}`)
+        if (r.reachFactor !== 0) continue
         beyond++
         const rc = renderedRingColour(r.holdId, main)
         if (main.getHoldColour(r.holdId) !== "red") errs.push(`${limb}: getHoldColour(${r.holdId}) = ${main.getHoldColour(r.holdId)} beyond reach`)
-        if (rc !== "red") errs.push(`${limb}: ${r.holdId} is ${r.dist.toFixed(0)} cm away (beyond reach) but renders ${rc}`)
+        if (rc !== "red") errs.push(`${limb}: ${r.holdId} is ${r.dist.toFixed(0)} cm away (reach ${r.limbReach.toFixed(0)}, high step ${r.highStep.toFixed(2)}) but renders ${rc}`)
       }
       if (beyond === 0) errs.push(`precondition: no problem hold is beyond reach of ${limb}`)
       print(`[C3] ${limb}: ${beyond} problem holds beyond reach, all checked red`)
