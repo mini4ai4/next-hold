@@ -1,6 +1,7 @@
 // NextHoldCalloutUI — the two pieces of text that appear on the wall:
-//   SuggestLabel: the limb label beside the suggested hold ("R hand"); it
-//                 fades after about 2 s (brief: "When things show").
+//   SuggestLabel: the limb label beside the suggested hold ("R hand"). In
+//                 Ground it fades after about 2 s (brief: "When things show");
+//                 On wall it stays, since it is the only word there.
 //   WhyLine:      that hold's "why" line, only when asked for with '?', in
 //                 capitals: "PINCH HOLD · LONG REACH".
 //
@@ -72,6 +73,10 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
   private labelMinSize = 0
   private labelShownAt = -1
   private labelOpacity = 0
+  /** a suggestion is showing (its label may have faded) */
+  private labelActive = false
+  /** On wall: the label is the only word there, so it stays instead of fading */
+  private labelSticky = false
   private whyWanted = false
   private whyReady = false
   private whyHoldId: string | null = null
@@ -152,6 +157,17 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     tr.setWorldRotation(worldRot)
     this.labelText.text = text
     this.labelShownAt = getTime()
+    this.labelActive = true
+    this.setLabelOpacity(1)
+  }
+
+  /** On wall the label stays (sticky); in Ground it fades ~2 s after it shows. Leaving On wall
+   *  starts the fade afresh, so the label is still there for a moment after stepping back. */
+  setLabelSticky(sticky: boolean): void {
+    if (sticky === this.labelSticky) return
+    this.labelSticky = sticky
+    if (!this.labelActive) return
+    this.labelShownAt = getTime()
     this.setLabelOpacity(1)
   }
 
@@ -175,6 +191,7 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
 
   hideSuggestion(): void {
     this.labelShownAt = -1
+    this.labelActive = false
     this.setLabelOpacity(0)
   }
 
@@ -203,6 +220,10 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
   getWhyHoldId(): string | null { return this.whyHoldId }
 
   private tickLabel(): void {
+    if (this.labelSticky && this.labelActive) {
+      if (this.labelOpacity < 1) this.setLabelOpacity(1)
+      return
+    }
     if (this.labelShownAt < 0) return
     const t = getTime() - this.labelShownAt
     if (t <= this.labelHoldSeconds) {

@@ -433,6 +433,8 @@ export class NextHoldMain extends BaseScriptComponent {
     if (!s) return
     const ground = this.view === "ground"
     this.callouts.setLabelMinSize(ground ? minReadSize(this.groundCm) : 0)
+    // On wall the label is the only word: it stays there; in Ground it fades
+    this.callouts.setLabelSticky(!ground)
     const labelScale = this.callouts.getLabelScale()
     const labelBox = s.glowHoldId ? this.labelBox(s.glowHoldId) : null
     if (ground) {

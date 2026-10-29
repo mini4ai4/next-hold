@@ -12,7 +12,8 @@
 // text never below its own size. The preset viewpoint is the near case, so Ground
 // must use those sizes there, not the 365 cm ones. The test measures D from the
 // scene and reads every size from what renders. On wall keeps its own sizes
-// (1.6 cm line, label at its 110 cm size).
+// (1.6 cm line, label at its 110 cm size), and keeps its one word: the label
+// stays in full On wall (also after a move), while Ground still fades it in ~2 s.
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
@@ -163,6 +164,13 @@ export class N6ViewModesScenario extends Scenario {
     print(`[N6] on wall sizes: ring line ${wallLine.toFixed(2)} cm, label ${wallLabel.toFixed(1)}`)
     if (!(Math.abs(wallLine - RING_LINE_AT_110) < 0.01)) errs.push(`on wall: ring line ${wallLine.toFixed(2)} cm, want ${RING_LINE_AT_110}`)
     if (Math.abs(wallLabel - LABEL_OWN_SIZE) > 0.01) errs.push(`on wall: label size ${wallLabel.toFixed(1)}, want its own ${LABEL_OWN_SIZE.toFixed(1)}`)
+    // On wall keeps its word: well past the 2 s fade the label still shows, in full
+    await sleep(3000)
+    const wallSug = main.getSuggestion()
+    const wallLabelOn = mustFind("SuggestLabel").enabled
+    print(`[N6] on wall, 3 s later: label "${main.getLabelText()}" shown ${wallLabelOn}, opacity ${main.getLabelOpacity().toFixed(2)}`)
+    if (!wallLabelOn || main.getLabelOpacity() < 0.99) errs.push(`on wall: the label faded (shown ${wallLabelOn}, opacity ${main.getLabelOpacity().toFixed(2)}) 3 s after switching`)
+    if (wallSug && main.getLabelText() !== wallSug.label) errs.push(`on wall: label reads "${main.getLabelText()}", want "${wallSug.label}"`)
 
     // ── pinch it again: Ground, every ring back, same colours, same frame ──
     const toGround = await pinchCapture("ViewToggle", () => snap(main))
@@ -177,7 +185,13 @@ export class N6ViewModesScenario extends Scenario {
       }
       if (toGround.value.ghosts.join() !== g0.ghosts.join()) errs.push(`back on ground: ghosts ${toGround.value.ghosts.join()}, were ${g0.ghosts.join()}`)
     }
-
+    // Ground still fades the label: shown on return, gone ~2 s later
+    await frames(2)
+    const backOn = main.isLabelVisible()
+    await sleep(2600)
+    print(`[N6] back on ground: label shown on return ${backOn}, 2.6 s later ${main.isLabelVisible()}`)
+    if (!backOn) errs.push("back on ground: the label did not show on return")
+    if (main.isLabelVisible()) errs.push(`back on ground: the label still shows 2.6 s later (opacity ${main.getLabelOpacity().toFixed(2)})`)
     // ── On wall still follows a move: one ring, on the new suggestion ──
     await pinch("ViewToggle")
     await frames(2)
@@ -185,6 +199,11 @@ export class N6ViewModesScenario extends Scenario {
     const moved = await pinchCapture("Hold_" + sug.holdId, () => snap(main))
     if (!moved.fired || !moved.value) errs.push(`Hold_${sug.holdId} pinch did not fire`)
     else checkOnWall(main, moved.value, errs, `on wall, after ${sug.limb} -> ${sug.holdId}`)
+    await sleep(2600)
+    const next = main.getSuggestion()
+    if (next && (!main.isLabelVisible() || main.getLabelOpacity() < 0.99 || main.getLabelText() !== next.label)) {
+      errs.push(`on wall, 2.6 s after the move: label "${main.getLabelText()}" opacity ${main.getLabelOpacity().toFixed(2)}, want "${next.label}" in full`)
+    }
 
     // ── On wall: the off-view arrow and chime still work. Shortest run of up to three
     //    moves (as in C4) after which the reference's best move is out of the camera's view ──
