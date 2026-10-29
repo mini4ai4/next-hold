@@ -612,6 +612,190 @@ export function ghostPathDots(n: number): vec2[] {
   return out
 }
 
+// ── session 18: what the camera actually sees (screen boxes, 0..1) ──────────
+
+export interface ScreenBox { x0: number; x1: number; y0: number; y1: number }
+
+function visualsUnder(so: SceneObject, out: BaseMeshVisual[]): BaseMeshVisual[] {
+  if (!so.isEnabledInHierarchy) return out
+  for (const t of ["Component.RenderMeshVisual", "Component.Text"]) {
+    for (const c of so.getComponents(t as any) as BaseMeshVisual[]) if (c.enabled) out.push(c)
+  }
+  for (let i = 0; i < so.getChildrenCount(); i++) visualsUnder(so.getChild(i), out)
+  return out
+}
+
+/** the screen box of everything that renders under the named object (every corner of every visual's
+ *  world bounding box, projected); null if nothing renders or a corner is behind the camera */
+export function screenBoxOf(name: string, cam: Camera, meshesOnly = false): ScreenBox | null {
+  const vis = visualsUnder(mustFind(name), []).filter((v) => !meshesOnly || v.getTypeName() === "Component.RenderMeshVisual")
+  if (!vis.length) return null
+  const inv = cam.getSceneObject().getTransform().getInvertedWorldTransform()
+  const b: ScreenBox = {x0: 1e9, x1: -1e9, y0: 1e9, y1: -1e9}
+  for (const v of vis) {
+    const lo = v.worldAabbMin(), hi = v.worldAabbMax()
+    for (const x of [lo.x, hi.x]) for (const y of [lo.y, hi.y]) for (const z of [lo.z, hi.z]) {
+      const p = new vec3(x, y, z)
+      if (inv.multiplyPoint(p).z >= 0) return null
+      const s = cam.worldSpaceToScreenSpace(p)
+      b.x0 = Math.min(b.x0, s.x); b.x1 = Math.max(b.x1, s.x); b.y0 = Math.min(b.y0, s.y); b.y1 = Math.max(b.y1, s.y)
+    }
+  }
+  return b
+}
+
+export function boxesOverlap(a: ScreenBox, b: ScreenBox): boolean {
+  return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1
+}
+
+export function fmtBox(b: ScreenBox | null): string {
+  return b ? `x ${b.x0.toFixed(3)}..${b.x1.toFixed(3)} y ${b.y0.toFixed(3)}..${b.y1.toFixed(3)}` : "none"
+}
+
+/** a ring as the camera sees it: 64 screen points of a circle of radius r (cm) in the wall plane at world point c */
+function screenCircle(cam: Camera, c: vec3, r: number): vec2[] {
+  const pts: vec2[] = []
+  for (let i = 0; i < 64; i++) {
+    const t = (i / 64) * Math.PI * 2
+    pts.push(cam.worldSpaceToScreenSpace(new vec3(c.x + r * Math.cos(t), c.y + r * Math.sin(t), c.z)))
+  }
+  return pts
+}
+
+function boxOf(pts: vec2[]): ScreenBox {
+  return {x0: Math.min(...pts.map((p) => p.x)), x1: Math.max(...pts.map((p) => p.x)),
+    y0: Math.min(...pts.map((p) => p.y)), y1: Math.max(...pts.map((p) => p.y))}
+}
+
+/** the suggested ring's screen box: the rendered glow's outer edge (its whole bloom, the label inside it) */
+export function activeRingBox(cam: Camera): ScreenBox | null {
+  const glow = mustFind("SuggestGlow")
+  if (!glow.enabled) return null
+  return boxOf(screenCircle(cam, glow.getTransform().getWorldPosition(), renderedOuterRadius("SuggestGlow")))
+}
+
+/**
+ * Item 2: On wall the control row's screen box must not overlap the suggested ring's (glow and label
+ * included). Returns a summary; pushes an error on overlap.
+ */
+export function checkRowClearOfRing(cam: Camera, errs: string[], tag: string): string {
+  const ring = activeRingBox(cam)
+  const row = screenBoxOf("ControlRow", cam)
+  if (!ring) { errs.push(`${tag}: no suggested ring to check the row against`); return "no ring" }
+  if (row && boxesOverlap(row, ring)) errs.push(`${tag}: the control row (${fmtBox(row)}) overlaps the suggested ring (${fmtBox(ring)}) on screen`)
+  return `ring ${fmtBox(ring)}, row ${fmtBox(row)}`
+}
+
+/** every corner of what renders under each named object is on screen; returns the names that aren't */
+export function notOnScreen(names: string[], cam: Camera): string[] {
+  const out: string[] = []
+  for (const n of names) {
+    const b = screenBoxOf(n, cam)
+    if (!b || b.x0 < 0 || b.x1 > 1 || b.y0 < 0 || b.y1 > 1) out.push(`${n} (${fmtBox(b)})`)
+  }
+  return out
+}
+
+/** the score the Lens's "?" must explain on hold id, by the test's own rule: the selected limb's from
+ *  here, unless a shown step tag (2 or 3, not on the glow) sits on it: then that step's, as its ring
+ *  wears that step's colour (session 16) */
+export function expectedWhy(main: NextHoldMain, id: string): {why: string; colour: RefColour; from: string} | null {
+  const ref = makeReference(main.getHeightCm())
+  const pos = main.getPosition() as RefPosition
+  const sel = main.getSelectedLimb() as RefLimb
+  if (main.getView() === "ground" && taggedHolds(main)[id]) {
+    const steps = ref.sequence(pos, sel)
+    for (const n of BADGE_STEPS) {
+      const st = steps[n - 1]
+      if (st && st.holdId === id && main.getGhostHold(n) === id) return {why: st.why, colour: st.colour as RefColour, from: `step ${n} ${st.limb}`}
+    }
+  }
+  const r = ref.score(sel, id, pos)
+  return r ? {why: r.why, colour: r.colour as RefColour, from: `selected ${sel}`} : null
+}
+
+/**
+ * Item 5 (session 18): the why-line and the ring under it agree, and it reads as that ring's.
+ * - its text is the reference why for the score that hold's ring shows (expectedWhy), and the ring
+ *   as rendered (its Ring_<id>, or the glow) is that score's colour;
+ * - on screen its plate covers no ring (every visible ring and the glow, as drawn), and the ring
+ *   nearest the plate is the asked hold's.
+ */
+export function checkWhyAgrees(cam: Camera, main: NextHoldMain, errs: string[], tag: string): string {
+  const id = main.getWhyHoldId()
+  if (!main.isWhyVisible() || !id) { errs.push(`${tag}: no why-line shown`); return "none" }
+  const text = (mustFind("WhyText").getComponent("Component.Text") as Text).text
+  const want = expectedWhy(main, id)
+  if (!want) { errs.push(`${tag}: the reference scores no ring on ${id}`); return "none" }
+  if (text !== want.why) errs.push(`${tag}: why-line on ${id} reads "${text}", the ring shows ${want.from}: "${want.why}"`)
+  const glowing = main.isRingGlowing(id)
+  const ringSo = mustFind(glowing ? "SuggestGlow" : "Ring_" + id)
+  const ringCol = ringSo.enabled ? classifyColour((ringSo.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4, main) : null
+  if (ringCol !== want.colour) errs.push(`${tag}: ${id}'s ring renders ${ringCol}, the why-line explains a ${want.colour} score (${want.from})`)
+  // placement, on screen: the plate itself (its mesh), distances in screen heights (x scaled by the
+  // aspect, so a gap counts the same across as up and down)
+  const plate = screenBoxOf("WhyLine", cam, true)
+  if (!plate) { errs.push(`${tag}: the why-line plate does not render`); return "no plate" }
+  const line = main.getRingLineWidth()
+  const rings: {id: string; pts: vec2[]}[] = []
+  for (const h of HOLDS) {
+    const c = mustFind("Hold_" + h.id).getTransform().getWorldPosition()
+    if (main.isRingGlowing(h.id)) rings.push({id: h.id, pts: screenCircle(cam, mustFind("SuggestGlow").getTransform().getWorldPosition(), renderedOuterRadius("SuggestGlow"))})
+    else if (mustFind("Ring_" + h.id).enabled) rings.push({id: h.id, pts: screenCircle(cam, c, HOLD_SIZE[h.type].ringR + line / 2)})
+  }
+  const inside = (p: vec2) => p.x > plate.x0 && p.x < plate.x1 && p.y > plate.y0 && p.y < plate.y1
+  const gap = (pts: vec2[]) => Math.min(...pts.map((p) => Math.hypot(cam.aspect * Math.max(0, plate.x0 - p.x, p.x - plate.x1), Math.max(0, plate.y0 - p.y, p.y - plate.y1))))
+  const covered = rings.filter((r) => r.pts.some(inside)).map((r) => r.id)
+  if (covered.length) errs.push(`${tag}: the why-line plate (${fmtBox(plate)}) covers the ring of ${covered.join(", ")}`)
+  const near = rings.map((r) => ({id: r.id, d: gap(r.pts)})).sort((a, b) => a.d - b.d)
+  if (!near.length || near[0].id !== id) errs.push(`${tag}: the ring nearest the why-line on screen is ${near.length ? near[0].id : "none"}, not the asked ${id}`)
+  // and clearly so: the next ring at least a third further off
+  else if (near.length > 1 && near[1].d < near[0].d * 1.33 + 0.005) errs.push(`${tag}: the asked ${id} is barely the nearest ring (${near[0].d.toFixed(3)} vs ${near[1].id} ${near[1].d.toFixed(3)})`)
+  return `why "${text}" on ${id} (${want.from}), ring ${ringCol}; plate ${fmtBox(plate)}; nearest ${near.slice(0, 2).map((n) => n.id + " " + n.d.toFixed(3)).join(", ")}`
+}
+
+/**
+ * Item 6 (session 18): the off-view arrow points at the suggested hold, off screen, and nothing of the
+ * control row lies between it and the screen edge it points to (it read as pointing at "Climb").
+ */
+export function checkArrowPointsAt(cam: Camera, main: NextHoldMain, errs: string[], tag: string): string {
+  const sug = main.getSuggestion()
+  if (!sug) { errs.push(`${tag}: no suggestion`); return "none" }
+  if (!main.isOffViewArrowVisible()) { errs.push(`${tag}: no off-view arrow`); return "no arrow" }
+  const camT = cam.getSceneObject().getTransform()
+  const hold = main.getHoldWorldPosition(sug.holdId)!
+  const local = camT.getInvertedWorldTransform().multiplyPoint(hold)
+  const tanV = Math.tan(cam.fov / 2), tanH = tanV * cam.aspect
+  // the hold's direction in normalised view coords (+y up), as the arrow is placed
+  const depth = Math.max(1e-3, -local.z)
+  const want = new vec2(local.x / (depth * tanH), local.y / (depth * tanV))
+  const arrow = camT.getInvertedWorldTransform().multiplyPoint(mustFind("OffViewArrowMesh").getTransform().getWorldPosition())
+  const ad = Math.max(1e-3, -arrow.z)
+  const got = new vec2(arrow.x / (ad * tanH), arrow.y / (ad * tanV))
+  const ang = (v: vec2) => Math.atan2(v.y, v.x) * 180 / Math.PI
+  let diff = Math.abs(ang(want) - ang(got)) % 360
+  if (diff > 180) diff = 360 - diff
+  if (diff > 10) errs.push(`${tag}: the arrow sits ${diff.toFixed(0)}° off the direction of ${sug.holdId}`)
+  // the arrow mesh points along its +X, rolled in the camera's frame by the direction's angle
+  const fwd = camT.getInvertedWorldTransform().multiplyDirection(mustFind("OffViewArrowMesh").getTransform().getWorldRotation().multiplyVec3(vec3.right()))
+  let pdiff = Math.abs(ang(new vec2(fwd.x, fwd.y)) - ang(want)) % 360
+  if (pdiff > 180) pdiff = 360 - pdiff
+  if (pdiff > 25) errs.push(`${tag}: the arrow points ${pdiff.toFixed(0)}° away from ${sug.holdId}`)
+  if (Math.abs(want.x) <= 1 && Math.abs(want.y) <= 1) errs.push(`${tag}: ${sug.holdId} is on screen while the arrow shows`)
+  // from the arrow to the edge it points at: no part of the control row
+  const row = screenBoxOf("ControlRow", cam)
+  const a = cam.worldSpaceToScreenSpace(mustFind("OffViewArrowMesh").getTransform().getWorldPosition())
+  const dir = new vec2(want.x, -want.y).normalize() // screen y runs down
+  let hit = false
+  for (let s = 0; s <= 1.5 && row; s += 0.01) {
+    const p = new vec2(a.x + dir.x * s, a.y + dir.y * s)
+    if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1) break
+    if (p.x > row.x0 && p.x < row.x1 && p.y > row.y0 && p.y < row.y1) { hit = true; break }
+  }
+  if (hit) errs.push(`${tag}: the control row (${fmtBox(row)}) lies between the arrow and the edge it points to`)
+  return `arrow at ${got.x.toFixed(2)},${got.y.toFixed(2)} toward ${sug.holdId} at ${want.x.toFixed(2)},${want.y.toFixed(2)} (${diff.toFixed(0)}° off, mesh ${pdiff.toFixed(0)}°); row ${fmtBox(row)}`
+}
+
 // ── setup only: bring the Lens back to the demo preset ──────────────────────
 
 /**

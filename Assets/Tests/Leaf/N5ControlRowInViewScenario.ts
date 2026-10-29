@@ -1,8 +1,10 @@
 // Review item 5, then strict review 29.10 plan item 4: where the control row and
 // the why-line go, and how large, in each view. The wall root never moves.
-// On wall (climbing): the row sits below the hands and every control, both rows
-// and the safety note, is fully inside the scene camera's view, also after a real
-// pinch moves a hand. Drawn at its 110 cm size.
+// On wall (climbing): the row sits below the one suggested ring (session 18: its
+// screen box never overlaps the ring's, glow and label included) and, from the
+// preset's 125 cm, every control, both rows and the safety note, is fully inside
+// the scene camera's view, also after a real pinch moves a hand. Drawn at its
+// 110 cm size.
 // Ground (reading the problem): the row sits beside the problem, never over it:
 // its plate, projected from the eye onto the wall, lies wholly outside the
 // problem's outline (every problem ring, line included), at the start holds'
@@ -21,7 +23,7 @@ import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
-import {camera, eyeToWallCm, frames, getMain, mustFind, pinch, restorePreset} from "./NextHoldTestKit"
+import {camera, checkRowClearOfRing, eyeToWallCm, frames, getMain, mustFind, pinch, restorePreset} from "./NextHoldTestKit"
 
 /** the wall root's preset place (BUILD_LOG session 5); this item must not move it */
 const WALL_ROOT = new vec3(-10.5, -166, -125)
@@ -199,12 +201,15 @@ export class N5ControlRowInViewScenario extends Scenario {
     const wallErrs: string[] = []
     for (const c of CONTROLS) wallErrs.push(...outOfView(c, live, "on wall"))
     wallErrs.push(...outOfView("ControlRow", live, "on wall"))
-    // the row follows the hands: still fully in view after a hand moves up
+    // session 18: below the one ring, never over it on screen
+    print(`[N5] on wall, preset: ${checkRowClearOfRing(live, wallErrs, "on wall, preset")}`)
+    // the row follows the ring: still fully in view, and clear of it, after a hand moves up
     const sug = main.getSuggestion()
     if (sug) {
       await pinch("Hold_" + sug.holdId)
       await frames(3)
       for (const c of ["Toggle_LF", "Toggle_RF", "ModeSwitch", "ViewToggle", "SafetyNote"]) wallErrs.push(...outOfView(c, live, `on wall, after ${sug.limb} -> ${sug.holdId}`))
+      print(`[N5] on wall, after ${sug.limb} -> ${sug.holdId}: ${checkRowClearOfRing(live, wallErrs, `on wall, after ${sug.limb} -> ${sug.holdId}`)}`)
     }
     print(`[N5] on wall: ${wallErrs.length ? wallErrs.length + " out of view" : "every control in the straight-ahead view"}`)
     errs.push(...wallErrs)

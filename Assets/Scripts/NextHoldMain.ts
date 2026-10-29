@@ -49,6 +49,12 @@ import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/
 
 /** half the why-line plate: WHY_W (40 cm) in NextHoldCalloutUI plus its padding */
 const WHY_HALF_W = 21.5
+/** how far in front of the wall face the control row and the why-line stand (cm) */
+const PANEL_Z = 10
+/** On wall: gap (cm, as the eye sees it on the wall) between the suggested ring's glow and the control row */
+const ROW_RING_GAP = 3
+/** the why-line: gap (cm, as seen) from the asked hold's ring, and the least clearance from any other ring or text */
+const WHY_RING_GAP = 1.5
 /** half the type picker: the Start / Top row (2 x 8 cm + gap) + padding wide;
  *  title, five type buttons, the Start / Top and Remove / Done rows, gaps and padding tall */
 const PICKER_HALF_W = 10.5
@@ -277,6 +283,10 @@ export class NextHoldMain extends BaseScriptComponent {
       const sizeKey = size ? size.x.toFixed(2) + "x" + size.y.toFixed(2) : ""
       if (sizeKey !== this.placedRowSize) {
         this.placedRowSize = sizeKey
+        this.placeControlRow()
+      } else if (this.view === "wall") {
+        // On wall the row keeps out of the line of sight to the ring as seen from where the eye is
+        // now: placed once at the switch (mid-walk, still looking up) it stayed over the ring
         this.placeControlRow()
       }
       this.updateFigureMask(false) // the head moves, and the row lays itself out late
@@ -621,8 +631,9 @@ export class NextHoldMain extends BaseScriptComponent {
   }
 
   /**
-   * On wall (and up close): centred between the two hand holds, below the lower one, and kept in
-   * view; it slides when a hand moves. In Ground: beside the problem, level with its start holds, on
+   * On wall: out of the line of sight to the one ring, just below its glow as the eye sees it
+   * (beside it with no room below), re-placed every frame as the eye moves; in view only as far as
+   * that allows (session 18). In setup On wall: below the hands, kept in view. In Ground: beside the problem, level with its start holds, on
    * the side nearer the eye, and as large as the distance needs, so it never covers the problem.
    * From the near end of Ground it may sit outside a straight-ahead view: you turn your head to it,
    * as you turn it to read the problem. It is kept in view vertically and never slides over the problem.
@@ -644,17 +655,62 @@ export class NextHoldMain extends BaseScriptComponent {
       this.controlRow.placeAt(this.wall.wallToWorld(x, Math.max(halfH + 2, p.y), 10), this.wallRot(), k)
       return
     }
-    const hands = HAND_LIMBS.map((l) => this.position[l]).filter((id) => id != null && this.holds[id]) as string[]
-    let x = 120, y = 120
-    if (hands.length > 0) {
-      x = hands.reduce((s, id) => s + this.holds[id].x, 0) / hands.length
-      y = Math.min(...hands.map((id) => this.holds[id].y)) - this.rowDropCm
+    const ring = this.overlay && this.mode === "climb" ? this.overlay.glowHoldId : null
+    if (!ring) {
+      // no suggested ring (setup): below the hands, kept in view, as before
+      const hands = HAND_LIMBS.map((l) => this.position[l]).filter((id) => id != null && this.holds[id]) as string[]
+      let x = 120, y = 120
+      if (hands.length > 0) {
+        x = hands.reduce((s, id) => s + this.holds[id].x, 0) / hands.length
+        y = Math.min(...hands.map((id) => this.holds[id].y)) - this.rowDropCm
+      }
+      x = Math.min(220, Math.max(20, x))
+      y = Math.max(12, y)
+      this.controlRow.placeAt(this.keepInView(this.wall.wallToWorld(x, y, PANEL_Z), halfW, halfH), this.wallRot(), k)
+      return
     }
-    x = Math.min(220, Math.max(20, x))
-    y = Math.max(12, y)
-    // keep the whole block inside the view, both rows and the note under them, not just its
-    // centre: at the preset the LF / RF / Climb row and the note fell below the narrow view
-    this.controlRow.placeAt(this.keepInView(this.wall.wallToWorld(x, y, 10), halfW, halfH), this.wallRot(), k)
+    // On wall the one ring and its word are the view: the row goes out of the line of sight to it.
+    // Below the ring's glow as the eye sees it (the row stands PANEL_Z in front of the wall, so it is
+    // placed where its outline, projected from the eye onto the wall, clears the glow), or beside it
+    // when there is no room below. It comes into view only as far as it can without crossing the
+    // ring: from 70 cm the view is about 40 x 46 cm, so it mostly hangs just under it; glance down.
+    const eye = this.eyeOnWall()
+    const s = eye ? this.seenScale(eye, PANEL_Z) : 1
+    const h = this.holds[ring]
+    const R = this.glowRadius(ring) + ROW_RING_GAP
+    const below = h.y - R - 2 * halfH * s >= 0
+    const seen = below ? {x: h.x, y: h.y - R - halfH * s}
+      : {x: h.x < 120 ? h.x + R + halfW * s : h.x - R - halfW * s, y: h.y}
+    const p = this.unproject(seen, eye, s)
+    const kv = this.toWall(this.keepInView(this.wall.wallToWorld(p.x, p.y, PANEL_Z), halfW, halfH))
+    // below: it may slide sideways into view, and down, never up toward the ring; beside: up or down
+    const x = below ? kv.x : p.x
+    const y = Math.max(halfH + 2, below ? Math.min(p.y, kv.y) : kv.y)
+    this.controlRow.placeAt(this.wall.wallToWorld(x, y, PANEL_Z), this.wallRot(), k)
+  }
+
+  /** the suggested ring's outer edge with its glow (wall cm): the "one ring" On wall */
+  private glowRadius(id: string): number {
+    return this.ringRadius(id) + this.getRingLineWidth() / 2 + GLOW_PROFILE.span * this.callouts.getLabelScale()
+  }
+
+  /** the eye in wall cm: x from the wall's left edge, y up from the floor, z out from the face; null without a camera */
+  private eyeOnWall(): {x: number; y: number; z: number} | null {
+    const finder = WorldCameraFinderProvider.getInstance()
+    const cam = finder ? finder.getComponent() : null
+    if (!cam) return null
+    const l = this.wall.getTransform().getInvertedWorldTransform().multiplyPoint(cam.getSceneObject().getTransform().getWorldPosition())
+    return {x: l.x - this.wall.wallToLocal(0, 0).x, y: l.y, z: l.z}
+  }
+
+  /** how much larger something `z` cm in front of the wall looks, projected from the eye onto the wall */
+  private seenScale(eye: {z: number} | null, z: number): number {
+    return eye && eye.z > z + 1 ? eye.z / (eye.z - z) : 1
+  }
+
+  /** the point on a plane in front of the wall that the eye sees at wall point q (s = seenScale for that plane) */
+  private unproject(q: WallPt, eye: {x: number; y: number} | null, s: number): WallPt {
+    return eye ? {x: eye.x + (q.x - eye.x) / s, y: eye.y + (q.y - eye.y) / s} : {x: q.x, y: q.y}
   }
 
   /** The problem's outline on the wall (cm): every problem hold's ring, its line included. */
