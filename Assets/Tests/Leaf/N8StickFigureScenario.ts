@@ -2,7 +2,8 @@
 // person, not an X: a head, a spine from the shoulders to the hips, and each limb
 // in two segments bent out at the elbow or knee, ending on its hold. Shoulders and
 // hips come from the scoring's own anchors. Thinner and softer than the rings.
-// After a limb moves, the figure follows in the same frame.
+// After a limb moves, the figure follows in the same frame. Session 16: the figure is
+// On wall only; in Ground it is hidden (the limb markers stay), also in a pinch's frame.
 // End points are read from what renders: each Figure_<line> is a unit
 // mesh along local +X, so its world start is the transform applied to (0,0,0)
 // and its world end the transform applied to (1,0,0). The expected centre of
@@ -148,6 +149,19 @@ function snap(main: NextHoldMain): FigSnap {
 
 const d2 = (a: {x: number; y: number}, b: {x: number; y: number}) => Math.hypot(a.x - b.x, a.y - b.y)
 
+/** Ground (session 16): every figure line and the head are off, and each limb on a hold keeps its marker. */
+function checkHiddenInGround(main: NextHoldMain, errs: string[], tag: string): string {
+  if (main.getView() !== "ground") errs.push(`${tag}: view ${main.getView()}, want ground`)
+  const on = LINES.concat(["Head"]).filter((n) => mustFind("Figure_" + n).enabled)
+  if (on.length) errs.push(`${tag}: the figure shows in Ground (${on.map((n) => "Figure_" + n).join(", ")})`)
+  const pos = main.getPosition() as RefPosition
+  const noMarker = REF_LIMBS.filter((l) => pos[l] != null && !mustFind("Marker_" + l).enabled)
+  if (noMarker.length) errs.push(`${tag}: no marker in Ground for ${noMarker.join(", ")}`)
+  const msg = `${tag}: figure ${on.length ? on.length + " parts shown" : "hidden"}, markers ${noMarker.length ? "missing " + noMarker.join(",") : "all shown"}`
+  print(`[N8] ${msg}`)
+  return msg
+}
+
 /**
  * The figure reads as a person (session 15), against the test's own rule: shoulders at the
  * shoulder anchors (centre of mass + (±18, 35)), hips at the rule's hip for each foot but at
@@ -220,14 +234,15 @@ export class N8StickFigureScenario extends Scenario {
     await restorePreset(main)
     const errs: string[] = []
 
-    // ── at the preset ──
-    const s0 = snap(main)
-    check(s0, errs, "preset")
-    // Ground puts the row beside the problem, clear of the figure; On wall puts it below the hands,
-    // where the torso point is below the row and both hand lines pass behind it
-    checkFade(main, errs, "ground, preset")
+    // ── at the preset, Ground: no figure (session 16: from 2.5 m its thin line was a smudge that
+    //    competed with the rings; the limb markers show where the hands and feet are) ──
+    checkHiddenInGround(main, errs, "ground, preset")
+    // ── On wall: the figure; the row sits below the hands, so both hand lines pass behind it ──
     await pinch("ViewToggle")
     await frames(3)
+    if (main.getView() !== "wall") errs.push(`setup: view ${main.getView()} after ViewToggle, want wall`)
+    const s0 = snap(main)
+    check(s0, errs, "on wall, preset")
     if (checkFade(main, errs, "on wall, preset") === 0) errs.push("on wall, preset: no figure line passes behind the control row; the fade check proves nothing")
 
     // thinner and lower-contrast than the rings (session 15): the figure's line is narrower than the
@@ -269,24 +284,37 @@ export class N8StickFigureScenario extends Scenario {
       if (d2(before, after) < 1) errs.push(`pinch frame: Figure_${sug.limb}_Lower end did not move`)
     }
 
-    // ── a foot this time, and back in Ground (the figure shows in both) ──
+    // ── back in Ground the figure goes; a foot moves there and it stays hidden in the pinch's own
+    //    frame; On wall again it shows the new position ──
     await pinch("ViewToggle")
     await frames(2)
     if (main.getView() !== "ground") errs.push(`setup: view ${main.getView()} after the second ViewToggle, want ground`)
+    checkHiddenInGround(main, errs, "ground, after the hand move")
     await pinch("Toggle_LF")
     await frames(2)
     const lfSug = main.getSuggestion()
     if (lfSug && lfSug.limb === "LF") {
-      const got2 = await pinchCapture("Hold_" + lfSug.holdId, () => snap(main))
-      if (!got2.fired || !got2.value) errs.push(`Hold_${lfSug.holdId} pinch did not fire`)
-      else check(got2.value, errs, `ground, pinch frame, LF -> ${lfSug.holdId}`)
-      checkFade(main, errs, "ground, after the foot move")
+      const hidErrs: string[] = []
+      const got2 = await pinchCapture("Hold_" + lfSug.holdId, () => checkHiddenInGround(main, hidErrs, `ground, pinch frame, LF -> ${lfSug.holdId}`))
+      errs.push(...hidErrs)
+      if (!got2.fired) errs.push(`Hold_${lfSug.holdId} pinch did not fire`)
+      await pinch("ViewToggle")
+      await frames(3)
+      if (main.getView() !== "wall") errs.push(`setup: view ${main.getView()} after the third ViewToggle, want wall`)
+      const s2 = snap(main)
+      if (s2.pos.LF !== lfSug.holdId) errs.push(`on wall: LF on ${s2.pos.LF}, want ${lfSug.holdId}`)
+      check(s2, errs, `on wall, after LF -> ${lfSug.holdId}`)
+      checkFade(main, errs, "on wall, after the foot move")
     } else {
       errs.push(`setup: no LF suggestion after Toggle_LF (${lfSug ? lfSug.limb + "->" + lfSug.holdId : "none"})`)
     }
 
     await restorePreset(main)
-    check(snap(main), errs, "after restore")
+    checkHiddenInGround(main, errs, "ground, after restore")
+    await pinch("ViewToggle")
+    await frames(3)
+    check(snap(main), errs, "on wall, after restore")
+    await restorePreset(main)
     expect(errs.length, "stick figure mismatches:\n" + errs.join("\n")).toBe(0)
   }
 }

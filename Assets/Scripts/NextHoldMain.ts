@@ -59,7 +59,8 @@ const ROW_SIDE_GAP = 4
 
 export type Mode = "climb" | "setup"
 /** What is shown, never what is scored. "ground": standing back at the base, every ring of the
- *  problem and the ghosts 1-2-3. "wall": face ~40 cm from the wall, only the suggested ring. */
+ *  problem and the ghosts 1-2-3, no stick figure. "wall": face ~40 cm from the wall, only the
+ *  suggested ring, and the stick figure. */
 export type View = "ground" | "wall"
 
 /** Ground view: the far end of the distance range Ground sizes itself for (cm). Climbers read a
@@ -497,7 +498,9 @@ export class NextHoldMain extends BaseScriptComponent {
     const labelScale = this.callouts.getLabelScale()
     const labelBox = s.glowHoldId ? this.labelBox(s.glowHoldId) : null
     if (ground) {
-      this.visuals.apply({...s, viewCm: this.groundCm, labelScale, labelBox})
+      // no stick figure in Ground: its 1 cm line is a faint smudge from 2.5 m and competes with
+      // the rings; the limb markers already show where the hands and feet are
+      this.visuals.apply({...s, body: null, viewCm: this.groundCm, labelScale, labelBox})
     } else {
       const rings: {[id: string]: RingColour | null} = {}
       if (s.glowHoldId) rings[s.glowHoldId] = s.rings[s.glowHoldId] || null
