@@ -6,20 +6,48 @@
 // suggestion, same colours, same position.
 // Input path: real SIK pinches on ViewToggle, Toggle_<limb> and Hold_<id>; the
 // mode switch is read back inside the pinch's own onTriggerEnd (same frame).
-// Readability from the ground: the ghost numbers and the suggestion label must
-// read at 180 cm at least as large as Body text (size 39) does at 110 cm, the
-// distance the UI type scale is built for.
+// Readability from the ground: apparent size goes as 1 / distance, so from the
+// Ground distance D the ghost numbers and the suggestion label must be at least
+// Body (size 39) x D / 110, and the rings' crisp line at least its 110 cm width
+// (1.6 cm) x D / 110. The line width is read from the rendered Ring mesh. On wall
+// keeps its own sizes (1.6 cm line, label at its 110 cm size).
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLDS, HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
+import {RING_PROFILE} from "../../Scripts/Wall/ProceduralTextures"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {camera, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, renderedRingColour, restorePreset} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 
 const BODY_SIZE_AT_110 = 39
-const GROUND_CM = 180
+const RING_LINE_AT_110 = RING_PROFILE.core
+/** the label's own size: HeadlineXL (62) x 1.3 */
+const LABEL_OWN_SIZE = 62 * 1.3
+
+/**
+ * Width (cm) of the crisp line of the rendered Ring_<id>: the ring texture's core runs from
+ * U = inner / total to U = (inner + core) / total, so it is the radius at the second minus the first.
+ */
+function renderedLineWidth(id: string): number {
+  const mesh = (mustFind("Ring_" + id).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh
+  const pos = mesh.getVertexDataForAttribute("position")
+  const uv = mesh.getVertexDataForAttribute("texture0")
+  const {inner, core, outer} = RING_PROFILE
+  const total = inner + core + outer
+  const radiusAt = (u: number) => {
+    for (let i = 0; i * 2 < uv.length; i++) {
+      if (Math.abs(uv[i * 2] - u) < 1e-4) return Math.hypot(pos[i * 3], pos[i * 3 + 1])
+    }
+    return NaN
+  }
+  return radiusAt((inner + core) / total) - radiusAt(inner / total)
+}
+
+function textSize(name: string): number {
+  return (mustFind(name).getComponent("Component.Text") as Text).size
+}
 
 interface ViewSnap {
   view: string
@@ -124,16 +152,21 @@ export class N6ViewModesScenario extends Scenario {
     const g0 = snap(main)
     checkGround(main, g0, errs, "ground at open")
 
-    // readable from the ground: apparent size at 180 cm vs Body at 110 cm
-    const need = BODY_SIZE_AT_110 * GROUND_CM / 110
+    // readable from the ground: apparent size at D vs the same thing at 110 cm
+    const D = main.getGroundViewCm()
+    const need = BODY_SIZE_AT_110 * D / 110
+    const needLine = RING_LINE_AT_110 * D / 110
     for (let n = 1; n <= 3; n++) {
       if (!g0.ghosts[n - 1]) continue
-      const size = (mustFind("GhostNumber_" + n).getComponent("Component.Text") as Text).size
-      if (size < need) errs.push(`ground: ghost ${n} number size ${size.toFixed(1)} reads smaller than Body at ${GROUND_CM} cm (need ${need.toFixed(1)})`)
+      const size = textSize("GhostNumber_" + n)
+      if (size < need) errs.push(`ground: ghost ${n} number size ${size.toFixed(1)} reads smaller than Body at ${D} cm (need ${need.toFixed(1)})`)
     }
-    const labelSize = (mustFind("SuggestLabel").getComponent("Component.Text") as Text).size
+    const labelSize = textSize("SuggestLabel")
     if (labelSize < need) errs.push(`ground: suggestion label size ${labelSize.toFixed(1)} < ${need.toFixed(1)}`)
-    print(`[N6] ground readability: ghost number ${(mustFind("GhostNumber_1").getComponent("Component.Text") as Text).size.toFixed(1)}, label ${labelSize.toFixed(1)}, need >= ${need.toFixed(1)}`)
+    const lines = HOLDS.filter((h) => g0.ringOn[h.id]).map((h) => renderedLineWidth(h.id))
+    const thinnest = Math.min(...lines)
+    if (!(thinnest >= needLine - 0.01)) errs.push(`ground: thinnest ring line ${thinnest.toFixed(2)} cm < ${needLine.toFixed(2)} cm`)
+    print(`[N6] ground readability at ${D} cm: ghost number ${textSize("GhostNumber_1").toFixed(1)}, label ${labelSize.toFixed(1)}, need >= ${need.toFixed(1)}; ring line ${thinnest.toFixed(2)} cm (${lines.length} rings), need >= ${needLine.toFixed(2)}`)
 
     // ── pinch the view switch: On wall, read in the same frame ──
     const toWall = await pinchCapture("ViewToggle", () => snap(main))
@@ -144,6 +177,13 @@ export class N6ViewModesScenario extends Scenario {
     }
     await frames(3)
     checkOnWall(main, snap(main), errs, "on wall, 3 frames later")
+    // On wall keeps its own sizes
+    const sugW = main.getSuggestion()
+    const wallLine = sugW ? renderedLineWidth(sugW.holdId) : NaN
+    const wallLabel = textSize("SuggestLabel")
+    print(`[N6] on wall sizes: ring line ${wallLine.toFixed(2)} cm, label ${wallLabel.toFixed(1)}`)
+    if (!(Math.abs(wallLine - RING_LINE_AT_110) < 0.01)) errs.push(`on wall: ring line ${wallLine.toFixed(2)} cm, want ${RING_LINE_AT_110}`)
+    if (Math.abs(wallLabel - LABEL_OWN_SIZE) > 0.01) errs.push(`on wall: label size ${wallLabel.toFixed(1)}, want its own ${LABEL_OWN_SIZE.toFixed(1)}`)
 
     // ── pinch it again: Ground, every ring back, same colours, same frame ──
     const toGround = await pinchCapture("ViewToggle", () => snap(main))

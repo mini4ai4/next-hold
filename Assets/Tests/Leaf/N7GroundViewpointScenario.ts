@@ -1,21 +1,24 @@
-// Strict review A, the viewpoint check: from the ground, ~180 cm back from the
-// wall at eye height, is every hold of the marked problem (its whole ring)
-// inside the view?
+// Strict review A, the viewpoint check: Ground mode means "step back about 3 m
+// and the whole problem colours for you". From GROUND_VIEW_CM back from the wall
+// (asked for at 300 cm; the whole problem first fits at 365 cm, so the Lens uses
+// that) at eye height, is every hold of the marked problem, its whole ring,
+// inside the view? The id keeps "300" for the review item it answers.
 // The preview camera is driven by device tracking, so instead of moving it the
 // test builds a second camera with the same projection (fov, aspect, near, far,
-// read from the live scene camera), puts it 180 cm back from the wall face at
-// the scene camera's eye height, aims it at the middle of the problem (the best
-// case for fitting it), and asks Camera.isSphereVisible for each hold. A sanity
-// pass first proves isSphereVisible on that camera follows its pose.
-// It also reports how far back the whole problem first fits, at the same aim.
+// read from the live scene camera), puts it that far back from the wall face at
+// the scene camera's eye height and aims it at the middle of the problem.
+// "In view" is strict: the circle through the outer edge of the ring's line, at
+// the width Ground draws it, must lie fully inside all four sides of the view
+// (camera.isSphereVisible is also reported, but it is true for a ring that is
+// only partly in view). A sanity pass first proves the test camera follows its pose.
+// It also finds the smallest distance (1 cm steps) where the whole problem fits.
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
+import {ringLineWidth} from "../../Scripts/NextHoldWallVisuals"
 import {camera, getMain, mustFind, restorePreset} from "./NextHoldTestKit"
-
-const BACK_CM = 180
 
 @component
 export class N7GroundViewpointScenario extends Scenario {
@@ -24,6 +27,7 @@ export class N7GroundViewpointScenario extends Scenario {
     const main = getMain()
     await restorePreset(main)
     const errs: string[] = []
+    const BACK_CM = main.getGroundViewCm()
 
     const live = camera()
     const so = global.scene.createSceneObject("GroundViewpointCam")
@@ -39,54 +43,67 @@ export class N7GroundViewpointScenario extends Scenario {
       const tr = so.getTransform()
 
       const problem = main.getProblemHolds()
-      const spheres = problem.map((id) => ({
-        id, p: mustFind("Hold_" + id).getTransform().getWorldPosition(), r: HOLD_SIZE[holdById(id)!.type].ringR,
-      }))
+      const holds = problem.map((id) => ({id, p: mustFind("Hold_" + id).getTransform().getWorldPosition(), r: HOLD_SIZE[holdById(id)!.type].ringR}))
+      // the ring's outer line edge at distance `back`: Ground widens the line with the distance
+      const radius = (h: {r: number}, back: number) => h.r + ringLineWidth(back) / 2
       let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9
-      for (const s of spheres) {
-        x0 = Math.min(x0, s.p.x - s.r); x1 = Math.max(x1, s.p.x + s.r)
-        y0 = Math.min(y0, s.p.y - s.r); y1 = Math.max(y1, s.p.y + s.r)
+      for (const h of holds) {
+        const r = radius(h, BACK_CM)
+        x0 = Math.min(x0, h.p.x - r); x1 = Math.max(x1, h.p.x + r)
+        y0 = Math.min(y0, h.p.y - r); y1 = Math.max(y1, h.p.y + r)
       }
-      const faceZ = spheres[0].p.z
+      const faceZ = holds[0].p.z
       const eyeY = live.getSceneObject().getTransform().getWorldPosition().y
       const aim = new vec3((x0 + x1) / 2, (y0 + y1) / 2, faceZ)
 
-      const place = (back: number, aimAt: vec3 | null) => {
+      const place = (back: number) => {
         const eye = new vec3(aim.x, eyeY, faceZ + back)
         tr.setWorldPosition(eye)
-        const dir = aimAt ? aimAt.sub(eye).normalize() : new vec3(0, 0, -1)
-        tr.setWorldRotation(quat.lookAt(dir.uniformScale(-1), vec3.up()))
+        tr.setWorldRotation(quat.lookAt(aim.sub(eye).normalize().uniformScale(-1), vec3.up()))
       }
-      const visible = () => spheres.filter((s) => cam.isSphereVisible(s.p, s.r)).map((s) => s.id)
+      const tanV = Math.tan(cam.fov / 2), tanH = tanV * cam.aspect
+      const aV = Math.atan(tanV), aH = Math.atan(tanH)
+      /** how far (cm) the circle of radius r around p stays inside the nearest side of the view; < 0 = it crosses it */
+      const clearance = (p: vec3, r: number) => {
+        const l = tr.getInvertedWorldTransform().multiplyPoint(p)
+        const depth = -l.z
+        // distance from the point to each side plane of the view, positive inside
+        const sides = [
+          depth * Math.sin(aH) - Math.abs(l.x) * Math.cos(aH),
+          depth * Math.sin(aV) - Math.abs(l.y) * Math.cos(aV),
+        ]
+        return Math.min(sides[0], sides[1]) - r
+      }
+      const fullyIn = (back: number) => holds.filter((h) => clearance(h.p, radius(h, back)) >= 0).map((h) => h.id)
 
-      // sanity: isSphereVisible on this camera follows its pose
-      place(BACK_CM, aim)
+      // sanity: the test camera follows its pose
+      place(BACK_CM)
       const ahead = cam.isSphereVisible(aim, 1)
       const behind = cam.isSphereVisible(new vec3(aim.x, eyeY, faceZ + 2 * BACK_CM), 1)
       print(`[N7] sanity: aim point visible ${ahead}, point behind the eye visible ${behind}`)
       if (!ahead || behind) errs.push(`sanity: isSphereVisible does not follow the test camera (ahead ${ahead}, behind ${behind})`)
 
-      const vFov = live.fov * 180 / Math.PI
-      const hFov = 2 * Math.atan(Math.tan(live.fov / 2) * live.aspect) * 180 / Math.PI
-      print(`[N7] view ${hFov.toFixed(1)} x ${vFov.toFixed(1)} deg; problem spans wall ${(x1 - x0).toFixed(0)} x ${(y1 - y0).toFixed(0)} cm; eye ${(eyeY - (mustFind("ClimbingWall (stand-in)").getTransform().getWorldPosition().y)).toFixed(0)} cm above the floor`)
+      const vFov = (2 * aV * 180) / Math.PI, hFov = (2 * aH * 180) / Math.PI
+      const floorY = mustFind("ClimbingWall (stand-in)").getTransform().getWorldPosition().y
+      print(`[N7] view ${hFov.toFixed(1)} x ${vFov.toFixed(1)} deg; problem (whole rings, Ground line ${ringLineWidth(BACK_CM).toFixed(2)} cm) spans ${(x1 - x0).toFixed(0)} x ${(y1 - y0).toFixed(0)} cm; eye ${(eyeY - floorY).toFixed(0)} cm above the floor`)
 
-      place(BACK_CM, aim)
-      const seen = visible()
+      place(BACK_CM)
+      const seen = fullyIn(BACK_CM)
       const missing = problem.filter((id) => seen.indexOf(id) < 0)
-      place(BACK_CM, null)
-      const level = visible()
-      print(`[N7] ${BACK_CM} cm back, aimed at the problem's middle: ${seen.length}/${problem.length} holds in view; out: ${missing.join(",") || "none"}`)
-      print(`[N7] ${BACK_CM} cm back, looking level: ${level.length}/${problem.length} in view`)
+      const loose = holds.filter((h) => cam.isSphereVisible(h.p, radius(h, BACK_CM))).length
+      const tight = holds.map((h) => `${h.id} ${clearance(h.p, radius(h, BACK_CM)).toFixed(1)}`)
+      print(`[N7] ${BACK_CM} cm back: ${seen.length}/${problem.length} whole rings inside the view (isSphereVisible: ${loose}/${problem.length}); out: ${missing.join(",") || "none"}`)
+      print(`[N7] clearance to the nearest view edge, cm: ${tight.join(", ")}`)
 
       let fits = -1
-      for (let back = 100; back <= 800; back += 10) {
-        place(back, aim)
-        if (visible().length === problem.length) { fits = back; break }
+      for (let back = 150; back <= 800; back += 1) {
+        place(back)
+        if (fullyIn(back).length === problem.length) { fits = back; break }
       }
       print(`[N7] the whole problem first fits ${fits > 0 ? fits + " cm" : "beyond 800 cm"} back (aimed at its middle)`)
 
       if (missing.length) {
-        errs.push(`from ${BACK_CM} cm back ${missing.length} of ${problem.length} problem holds are outside the ${hFov.toFixed(0)} x ${vFov.toFixed(0)} deg view (${missing.join(",")}); the whole problem first fits at ${fits > 0 ? fits + " cm" : "> 800 cm"}`)
+        errs.push(`from ${BACK_CM} cm back ${missing.length} of ${problem.length} problem rings are not fully inside the ${hFov.toFixed(0)} x ${vFov.toFixed(0)} deg view (${missing.join(",")}); the whole problem first fits at ${fits > 0 ? fits + " cm" : "> 800 cm"}`)
       }
     } finally {
       so.destroy()

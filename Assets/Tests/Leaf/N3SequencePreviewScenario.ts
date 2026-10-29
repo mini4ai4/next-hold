@@ -9,6 +9,7 @@ import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
+import {GLOW_PROFILE} from "../../Scripts/Wall/ProceduralTextures"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, planeDistanceToHold, renderedRingColour, restorePreset} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
@@ -36,7 +37,7 @@ function snap(main: NextHoldMain, holds: string[]): GhostSnap {
   return s
 }
 
-function checkGhosts(s: GhostSnap, errs: string[], tag: string): string[] {
+function checkGhosts(main: NextHoldMain, s: GhostSnap, errs: string[], tag: string): string[] {
   const ref = makeReference()
   const want = ref.sequence(s.pos, s.selected as any)
   const ids = want.map((m) => m.holdId)
@@ -50,9 +51,11 @@ function checkGhosts(s: GhostSnap, errs: string[], tag: string): string[] {
     if (g.on !== !!w || g.numberOn !== !!w) errs.push(`${tag}: ghost ${n} ring/number enabled ${g.on}/${g.numberOn}, want ${!!w}`)
     if (w && g.number !== "" + n) errs.push(`${tag}: ghost ${n} reads "${g.number}"`)
     if (w) {
-      const r = HOLD_SIZE[holdById(w)!.type].ringR
-      // a small badge on the hold: just outside its ring, within the glow's radius
-      if (g.dist < r || g.dist > r + 8) errs.push(`${tag}: ghost ${n} is ${g.dist.toFixed(1)} cm from Hold_${w} (ring ${r})`)
+      // a badge on the hold: outside its ring's line, within the glow's outer edge, both as
+      // drawn in this view (Ground draws them larger to read from further back)
+      const edge = HOLD_SIZE[holdById(w)!.type].ringR + main.getRingLineWidth() / 2
+      const glowOut = edge + GLOW_PROFILE.span * main.getLabelScale()
+      if (g.dist < edge || g.dist > glowOut) errs.push(`${tag}: ghost ${n} is ${g.dist.toFixed(1)} cm from Hold_${w} (ring line edge ${edge.toFixed(1)}, glow edge ${glowOut.toFixed(1)})`)
     }
   }
   return ids
@@ -69,7 +72,7 @@ export class N3SequencePreviewScenario extends Scenario {
 
     // ── at the preset: three ghosts, 1 on the suggestion ──
     const s0 = snap(main, problem)
-    const ids0 = checkGhosts(s0, errs, "preset")
+    const ids0 = checkGhosts(main, s0, errs, "preset")
     const sug0 = main.getSuggestion()
     if (!sug0 || ids0[0] !== sug0.holdId) errs.push(`ghost 1 (${ids0[0]}) is not on the suggested hold ${sug0 ? sug0.holdId : "none"}`)
     if (ids0.length !== 3) errs.push(`preset look-ahead has ${ids0.length} moves, want 3`)
@@ -87,7 +90,7 @@ export class N3SequencePreviewScenario extends Scenario {
     if (!got.fired || !got.value) errs.push(`Hold_${sug0!.holdId} pinch did not fire`)
     else {
       const a = got.value
-      const ids1 = checkGhosts(a, errs, "pinch frame")
+      const ids1 = checkGhosts(main, a, errs, "pinch frame")
       // the main rings changed in that same frame
       let changed = 0
       for (const id of problem) if (a.rendered[id] !== s0.rendered[id]) changed++
@@ -102,7 +105,7 @@ export class N3SequencePreviewScenario extends Scenario {
     await pinch("Toggle_" + other)
     await frames(3)
     const s2 = snap(main, problem)
-    checkGhosts(s2, errs, "after Toggle_" + other)
+    checkGhosts(main, s2, errs, "after Toggle_" + other)
     const sug2 = main.getSuggestion()
     if (sug2 && main.getGhostHold(1) !== sug2.holdId) errs.push(`ghost 1 ${main.getGhostHold(1)} is not on ${other}'s suggestion ${sug2.holdId}`)
 

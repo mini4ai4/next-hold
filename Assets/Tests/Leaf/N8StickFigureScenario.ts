@@ -6,16 +6,110 @@
 // mesh along local +X, so its world start is the transform applied to (0,0,0)
 // and its world end the transform applied to (1,0,0). The expected centre of
 // mass comes from the test's own port of scoring.js (NextHoldReferenceRule).
+// The figure must not run through the control row: where a line passes behind
+// the row's plate, as the eye sees it, it fades out. The test projects the
+// plate's four corners from the eye onto the wall itself, then reads each line's
+// brightness along its length from the rendered mesh (the centre vertices' U:
+// the core's U = full, near 0 = faded) and checks every sample behind the plate
+// is faded and every sample well clear of it is full.
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
+import {HOVER_PROFILE} from "../../Scripts/Wall/ProceduralTextures"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
-import {fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, restorePreset} from "./NextHoldTestKit"
+import {camera, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, restorePreset} from "./NextHoldTestKit"
 import {REF_LIMBS, RefPosition} from "./NextHoldReferenceRule"
 
 const TOL = 0.5 // cm in the wall plane
+/** a line is "full" here or further from the plate's outline (the Lens fades from 1.5 cm out over 4 cm) */
+const CLEAR_CM = 6
+const FULL_U = (HOVER_PROFILE.coreAt + HOVER_PROFILE.coreW / 2) / HOVER_PROFILE.span
+
+/** the control row plate's outline on the wall (wall-local cm), projected from the eye */
+function plateOnWall(main: NextHoldMain): {x: number; y: number}[] {
+  const size = main.controlRow.getSize()
+  if (!size) throw new Error("control row has no laid-out size")
+  const toWall = mustFind("ClimbingWall (stand-in)").getTransform().getInvertedWorldTransform()
+  const row = main.controlRow.getSceneObject().getTransform().getWorldTransform()
+  const eye = toWall.multiplyPoint(camera().getSceneObject().getTransform().getWorldPosition())
+  return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => {
+    const c = toWall.multiplyPoint(row.multiplyPoint(new vec3(sx * size.x / 2, sy * size.y / 2, 0)))
+    const k = eye.z / (eye.z - c.z)
+    return {x: eye.x + k * (c.x - eye.x), y: eye.y + k * (c.y - eye.y)}
+  })
+}
+
+/** largest signed distance to the outline's edges: <= 0 inside, else a lower bound of the distance outside */
+function outside(poly: {x: number; y: number}[], p: {x: number; y: number}): number {
+  let area = 0
+  for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; area += a.x * b.y - b.x * a.y }
+  const sgn = area >= 0 ? 1 : -1
+  let worst = -1e9
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length]
+    const l = Math.hypot(b.x - a.x, b.y - a.y) || 1
+    worst = Math.max(worst, (sgn * ((b.y - a.y) * (p.x - a.x) - (b.x - a.x) * (p.y - a.y))) / l)
+  }
+  return worst
+}
+
+/** brightness (0..1) of the rendered Figure_<limb> line at t along it, from its mesh's centre vertices */
+function lineBrightness(limb: string): (t: number) => number {
+  const mesh = (mustFind("Figure_" + limb).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh
+  const pos = mesh.getVertexDataForAttribute("position")
+  const uv = mesh.getVertexDataForAttribute("texture0")
+  const st: {t: number; f: number}[] = []
+  for (let i = 0; i * 3 < pos.length; i++) if (Math.abs(pos[i * 3 + 1]) < 1e-4) st.push({t: pos[i * 3], f: uv[i * 2] / FULL_U})
+  st.sort((a, b) => a.t - b.t)
+  return (t: number) => {
+    for (let i = 1; i < st.length; i++) {
+      if (t <= st[i].t + 1e-6) {
+        const a = st[i - 1], b = st[i]
+        return b.t - a.t < 1e-6 ? b.f : a.f + ((t - a.t) / (b.t - a.t)) * (b.f - a.f)
+      }
+    }
+    return st.length ? st[st.length - 1].f : 0
+  }
+}
+
+/** Behind the plate every sample is faded, well clear of it every sample is full. Returns the count of samples behind it. */
+function checkFade(main: NextHoldMain, errs: string[], tag: string): number {
+  const plate = plateOnWall(main)
+  const wallInv = mustFind("ClimbingWall (stand-in)").getTransform().getInvertedWorldTransform()
+  let behind = 0
+  const notes: string[] = []
+  for (const l of REF_LIMBS) {
+    const so = mustFind("Figure_" + l)
+    if (!so.enabled) continue
+    const m = so.getTransform().getWorldTransform()
+    const a = wallInv.multiplyPoint(m.multiplyPoint(vec3.zero())), b = wallInv.multiplyPoint(m.multiplyPoint(new vec3(1, 0, 0)))
+    const f = lineBrightness(l)
+    let inN = 0, badIn = 0, badOut = 0
+    for (let i = 0; i <= 200; i++) {
+      const t = i / 200
+      const p = {x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y)}
+      const d = outside(plate, p)
+      const v = f(t)
+      if (d <= 0) { inN++; if (v > 0.1) badIn++ }
+      else if (d >= CLEAR_CM && v < 0.95) badOut++
+    }
+    behind += inN
+    if (badIn) errs.push(`${tag}: Figure_${l} shows (brightness > 0.1) at ${badIn} of ${inN} samples behind the control row`)
+    if (badOut) errs.push(`${tag}: Figure_${l} is dimmed at ${badOut} samples more than ${CLEAR_CM} cm clear of the control row`)
+    notes.push(`${l} ${inN}/201 behind`)
+  }
+  const torso = mustFind("Figure_Torso")
+  if (torso.enabled) {
+    const tp = wallInv.multiplyPoint(torso.getTransform().getWorldPosition())
+    const ta = ((torso.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4).w
+    if (outside(plate, tp) <= 0 && ta > 0.1) errs.push(`${tag}: torso point is behind the control row but shows (alpha ${ta.toFixed(2)})`)
+    notes.push(`torso ${outside(plate, tp) <= 0 ? "behind" : (outside(plate, tp).toFixed(1) + " cm clear")}, alpha ${ta.toFixed(2)}`)
+  }
+  print(`[N8] ${tag}, fade behind the control row: ${notes.join(", ")}`)
+  return behind
+}
 
 interface FigSnap {
   pos: RefPosition
@@ -81,6 +175,8 @@ export class N8StickFigureScenario extends Scenario {
     // ── at the preset ──
     const s0 = snap(main)
     check(s0, errs, "preset")
+    // at the preset the torso point is below the row and both hand lines pass behind it
+    if (checkFade(main, errs, "preset") === 0) errs.push("preset: no figure line passes behind the control row; the fade check proves nothing")
 
     // thin and light: every channel bright on the additive display, not opaque
     for (const n of ["Figure_Torso", ...REF_LIMBS.map((l) => "Figure_" + l)]) {
@@ -95,7 +191,12 @@ export class N8StickFigureScenario extends Scenario {
 
     // ── a real pinch moves a limb: the figure follows in the same frame ──
     const sug = main.getSuggestion()!
-    const got = await pinchCapture("Hold_" + sug.holdId, () => snap(main))
+    const fadeErrs: string[] = []
+    const got = await pinchCapture("Hold_" + sug.holdId, () => {
+      checkFade(main, fadeErrs, `pinch frame, ${sug.limb} -> ${sug.holdId}`)
+      return snap(main)
+    })
+    errs.push(...fadeErrs)
     if (!got.fired || !got.value) errs.push(`Hold_${sug.holdId} pinch did not fire`)
     else {
       if (got.value.pos[sug.limb] !== sug.holdId) errs.push(`pinch frame: ${sug.limb} on ${got.value.pos[sug.limb]}, want ${sug.holdId}`)
@@ -114,6 +215,7 @@ export class N8StickFigureScenario extends Scenario {
       const got2 = await pinchCapture("Hold_" + lfSug.holdId, () => snap(main))
       if (!got2.fired || !got2.value) errs.push(`Hold_${lfSug.holdId} pinch did not fire`)
       else check(got2.value, errs, `on wall, pinch frame, LF -> ${lfSug.holdId}`)
+      checkFade(main, errs, "on wall, after the foot move")
     } else {
       errs.push(`setup: no LF suggestion after Toggle_LF (${lfSug ? lfSug.limb + "->" + lfSug.holdId : "none"})`)
     }

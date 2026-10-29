@@ -298,11 +298,12 @@ export class UVGeo {
 /**
  * Flat annulus facing +Z with U = 0 at rIn and U = 1 at rOut (V fixed), so a
  * profile row paints it radially. sx / sy stretch it into an ellipse, `rot`
- * spins it (radians), `c` offsets it.
+ * spins it (radians), `c` offsets it. u0 / u1 paint only part of the row
+ * (one band of a ring built from several annuli).
  */
 export function addProfileAnnulus(
   g: UVGeo, rIn: number, rOut: number, segments: number, v: number,
-  c: V3 = [0, 0, 0], sx = 1, sy = 1, rot = 0,
+  c: V3 = [0, 0, 0], sx = 1, sy = 1, rot = 0, u0 = 0, u1 = 1,
 ) {
   const start = g.count;
   const cr = Math.cos(rot), sr = Math.sin(rot);
@@ -312,8 +313,8 @@ export function addProfileAnnulus(
   };
   for (let k = 0; k <= segments; k++) {
     const t = (k / segments) * Math.PI * 2;
-    g.vert(at(rIn, t), 0, v);
-    g.vert(at(rOut, t), 1, v);
+    g.vert(at(rIn, t), u0, v);
+    g.vert(at(rOut, t), u1, v);
   }
   for (let k = 0; k < segments; k++) {
     const in0 = start + k * 2, out0 = in0 + 1, in1 = in0 + 2, out1 = in0 + 3;

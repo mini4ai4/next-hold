@@ -5,7 +5,8 @@
 //                 capitals: "PINCH HOLD · LONG REACH".
 //
 // Owns: the text widgets, the label's fade timer. Passive view.
-// Main -> UI: showSuggestion(), hideSuggestion(), showWhy(), hideWhy().
+// Main -> UI: showSuggestion(), moveSuggestion(), hideSuggestion(), showWhy(), hideWhy(),
+//             setLabelMinSize().
 // Must not: score anything or pick the suggestion; Main does that.
 
 import {BackPlate} from "SpectaclesUIKit.lspkg/Scripts/BackPlate"
@@ -65,6 +66,9 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
   private whyText: Text
   private whyPlate: BackPlate
 
+  private labelBaseSize = 0
+  /** set by Main per view: from further back the label must not read smaller than Body at 110 cm */
+  private labelMinSize = 0
   private labelShownAt = -1
   private labelOpacity = 0
   private whyWanted = false
@@ -80,6 +84,8 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     this.labelText.depthTest = true
     applyTextRole(this.labelText, "HeadlineXL")
     this.labelText.size *= LABEL_SCALE
+    this.labelBaseSize = this.labelText.size
+    this.labelText.size = Math.max(this.labelBaseSize, this.labelMinSize)
     this.labelText.horizontalAlignment = HorizontalAlignment.Center
     this.labelText.verticalAlignment = VerticalAlignment.Center
     this.labelText.horizontalOverflow = HorizontalOverflow.Overflow
@@ -144,6 +150,24 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     this.labelText.text = text
     this.labelShownAt = getTime()
     this.setLabelOpacity(1)
+  }
+
+  /** The label's size never drops below this (0 = its own 110 cm size). */
+  setLabelMinSize(size: number): void {
+    this.labelMinSize = size
+    if (this.labelText) this.labelText.size = Math.max(this.labelBaseSize, size)
+  }
+
+  /** How much larger the label is drawn than its own 110 cm size (1 = not at all). */
+  getLabelScale(): number {
+    return this.labelBaseSize > 0 ? Math.max(this.labelBaseSize, this.labelMinSize) / this.labelBaseSize : 1
+  }
+
+  /** Move the label (its size changed) without showing it again or restarting its fade. */
+  moveSuggestion(worldPos: vec3, worldRot: quat): void {
+    const tr = this.labelRoot.getTransform()
+    tr.setWorldPosition(worldPos)
+    tr.setWorldRotation(worldRot)
   }
 
   hideSuggestion(): void {

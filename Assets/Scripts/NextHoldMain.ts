@@ -20,7 +20,7 @@
 // isAskArmed(), isOffViewArrowVisible(), isTypePickerVisible(), getHoldType(id),
 // isInProblem(id), getProblemHolds(), getStartHolds(), getTopHold(), isHoldDim(id),
 // isMarkVisible(id), getTagText(id), getPreview(), getGhostHold(n), getView(),
-// getTorso().
+// getTorso(), getGroundViewCm(), getRingLineWidth(), getFigureMask().
 // Action API mirrors a pinch: pressHold(id), pressLimb(limb), pressAsk(),
 // pressMode(), pressView(), pickType(type), pressStart(), pressTop().
 //
@@ -33,7 +33,7 @@ import {HOLDS, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP, HOLD_S
 import {
   Evaluation, HoldTypes, Holds, LIMBS, Limb, Position, ScoreResult, bestMove, centreOfMass, evaluate, sequence,
 } from "./NextHoldScoring"
-import {NextHoldWallVisuals, OverlayState, RingColour} from "./NextHoldWallVisuals"
+import {DESIGN_VIEW_CM, NextHoldWallVisuals, OverlayState, RingColour, WallPt, minReadSize, ringLineWidth} from "./NextHoldWallVisuals"
 import {NextHoldControlRowUI} from "./NextHoldControlRowUI"
 import {NextHoldTypePickerUI} from "./NextHoldTypePickerUI"
 import {NextHoldCalloutUI} from "./NextHoldCalloutUI"
@@ -55,9 +55,17 @@ export type Mode = "climb" | "setup"
  *  problem and the ghosts 1-2-3. "wall": face ~40 cm from the wall, only the suggested ring. */
 export type View = "ground" | "wall"
 
-/** Text and badges are sized for ~110 cm (the UI type scale). From the ground (~180 cm) the
- *  ghost badges grow by this much so their number still reads at least as large as Body text. */
-const GROUND_BADGE_SCALE = 1.25
+/** Ground view: how far back from the wall the climber stands (cm). Bouldering mats let you step
+ *  back this far. It is the closest distance where every ring of the preset problem, whole, fits
+ *  in the ~32 x 37 deg SPECS view (test a2): the problem spans ~235 cm of wall height, so 300 cm
+ *  cuts the foot jugs and the top. Text and lines are sized for 110 cm; in Ground the ring line,
+ *  the ghost badges and the suggestion label grow so they read from here at least as large as
+ *  Body text does at 110 cm. */
+export const GROUND_VIEW_CM = 365
+
+/** from the ring line's outer edge to the suggestion label's centre at the label's own size, cm
+ *  (with the 1.6 cm line: 3.2 cm below the ring's radius, as before) */
+const LABEL_GAP = 2.4
 
 const LIMB_LABEL: {[l: string]: string} = {LH: "L hand", RH: "R hand", LF: "L foot", RF: "R foot"}
 const HAND_LIMBS: Limb[] = ["LH", "RH"]
@@ -147,6 +155,8 @@ export class NextHoldMain extends BaseScriptComponent {
   /** sequence preview: the next 2-3 moves from here (step 1 = the suggestion) */
   private preview: ScoreResult[] = []
   private pickerHold: string | null = null
+  /** the control row outline last pushed to the stick figure */
+  private lastMask: WallPt[] | null = null
   private hovered: string | null = null
   private visuals: NextHoldWallVisuals
   private ready = false
@@ -203,7 +213,10 @@ export class NextHoldMain extends BaseScriptComponent {
       this.recompute(true)
     })
 
-    this.createEvent("UpdateEvent").bind(() => this.visuals.tick(getTime()))
+    this.createEvent("UpdateEvent").bind(() => {
+      this.visuals.tick(getTime())
+      if (this.ready) this.updateFigureMask(false) // the head moves, and the row lays itself out late
+    })
   }
 
   // ── actions (one pinch each) ──────────────────────────────────────────────
@@ -356,12 +369,12 @@ export class NextHoldMain extends BaseScriptComponent {
     this.controlRow.setMode(this.mode)
     this.controlRow.setView(this.view)
     this.placeControlRow()
+    this.updateFigureMask(true)
 
     if (sug) {
       const h = this.holds[sug.holdId]
       const r = this.ringRadius(sug.holdId)
-      // centred just below the ring: between the hold and the climber's eye line
-      this.callouts.showSuggestion(this.wall.wallToWorld(h.x, h.y - r - 3.2, 3), this.wallRot(), LIMB_LABEL[sug.limb])
+      this.callouts.showSuggestion(this.labelPos(sug.holdId), this.wallRot(), LIMB_LABEL[sug.limb])
       this.offViewArrow.setTarget(this.wall.wallToWorld(h.x, h.y, 0), sug.limb + ":" + sug.holdId, r)
     } else {
       this.callouts.hideSuggestion()
@@ -373,13 +386,62 @@ export class NextHoldMain extends BaseScriptComponent {
   private pushOverlay(): void {
     const s = this.overlay
     if (!s) return
-    if (this.view === "ground") {
-      this.visuals.apply({...s, ghostScale: GROUND_BADGE_SCALE})
-      return
+    const ground = this.view === "ground"
+    this.callouts.setLabelMinSize(ground ? minReadSize(GROUND_VIEW_CM) : 0)
+    const labelScale = this.callouts.getLabelScale()
+    if (ground) {
+      this.visuals.apply({...s, viewCm: GROUND_VIEW_CM, labelScale})
+    } else {
+      const rings: {[id: string]: RingColour | null} = {}
+      if (s.glowHoldId) rings[s.glowHoldId] = s.rings[s.glowHoldId] || null
+      this.visuals.apply({...s, rings, ghosts: [], viewCm: DESIGN_VIEW_CM, labelScale})
     }
-    const rings: {[id: string]: RingColour | null} = {}
-    if (s.glowHoldId) rings[s.glowHoldId] = s.rings[s.glowHoldId] || null
-    this.visuals.apply({...s, rings, ghosts: [], ghostScale: 1})
+    // the label's size changed with the view: keep it just below the ring
+    if (s.glowHoldId) this.callouts.moveSuggestion(this.labelPos(s.glowHoldId), this.wallRot())
+  }
+
+  /** Centred just below the suggested ring's line, between the hold and the climber's eye line;
+   *  a larger label (Ground) hangs a little lower. Inside the glow's target ring in both views. */
+  private labelPos(id: string): vec3 {
+    const h = this.holds[id]
+    const lineW = ringLineWidth(this.view === "ground" ? GROUND_VIEW_CM : DESIGN_VIEW_CM)
+    const dy = this.ringRadius(id) + lineW / 2 + LABEL_GAP * this.callouts.getLabelScale()
+    return this.wall.wallToWorld(h.x, h.y - dy, 3)
+  }
+
+  /**
+   * The stick figure fades where it passes behind the control row. The row stands ~10 cm off the
+   * wall, so its outline on the wall is where the eye sees it: each corner of the row's plate is
+   * projected from the eye onto the wall plane. Pushed when a corner moves by more than 0.3 cm.
+   */
+  private updateFigureMask(force: boolean): void {
+    const mask = this.rowOutlineOnWall()
+    const last = this.lastMask
+    const moved = !mask || !last || mask.some((p, i) => Math.hypot(p.x - last[i].x, p.y - last[i].y) > 0.3)
+    if (!force && !moved && !!mask === !!last) return
+    this.lastMask = mask
+    this.visuals.setFigureMask(mask)
+  }
+
+  private rowOutlineOnWall(): WallPt[] | null {
+    const cam = WorldCameraFinderProvider.getInstance()
+    const camComp = cam ? cam.getComponent() : null
+    if (!camComp) return null
+    const size = this.controlRow.getSize()
+    const hw = size ? size.x / 2 : ROW_HALF_W
+    const hh = size ? size.y / 2 : ROW_HALF_H
+    const toWall = this.wall.getTransform().getInvertedWorldTransform()
+    const row = this.controlRow.getTransform().getWorldTransform()
+    const eye = toWall.multiplyPoint(camComp.getSceneObject().getTransform().getWorldPosition())
+    const x0 = this.wall.wallToLocal(0, 0).x
+    const out: WallPt[] = []
+    for (const [cx, cy] of [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]]) {
+      const c = toWall.multiplyPoint(row.multiplyPoint(new vec3(cx, cy, 0)))
+      if (eye.z <= c.z + 1e-3) return null // the eye is not in front of the row
+      const k = eye.z / (eye.z - c.z) // eye + k (c - eye) lands on the wall plane z = 0
+      out.push({x: eye.x + k * (c.x - eye.x) - x0, y: eye.y + k * (c.y - eye.y)})
+    }
+    return out
   }
 
   /** Centred between the two hand holds, below the lower one; slides when a hand moves. */
@@ -479,6 +541,14 @@ export class NextHoldMain extends BaseScriptComponent {
   isReady(): boolean { return this.ready }
   getMode(): Mode { return this.mode }
   getView(): View { return this.view }
+  /** how far back the Ground view is drawn to be read from (cm) */
+  getGroundViewCm(): number { return GROUND_VIEW_CM }
+  /** width of the rings' crisp line in the current view (cm) */
+  getRingLineWidth(): number { return ringLineWidth(this.view === "ground" ? GROUND_VIEW_CM : DESIGN_VIEW_CM) }
+  /** how much larger the suggestion label (and the glow with it) is drawn than at 110 cm */
+  getLabelScale(): number { return this.callouts.getLabelScale() }
+  /** the control row outline (wall cm) the stick figure fades behind, or null */
+  getFigureMask(): WallPt[] | null { return this.visuals ? this.visuals.getFigureMask() : null }
   /** the torso point of the stick figure, in wall cm (null before the first recompute) */
   getTorso(): {x: number; y: number} | null { return this.overlay && this.overlay.torso ? {...this.overlay.torso} : null }
   getPosition(): Position { return {...this.position} }
