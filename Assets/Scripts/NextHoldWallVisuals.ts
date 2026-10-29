@@ -5,7 +5,8 @@
 // SuggestGlow, HoverRing, setup mode's Mark_<id> "in your problem" ring and
 // Tag_<id> START / TOP text, the sequence preview's badges for steps 2 and 3
 // (Ghost_2..3 pill outlines with their GhostNumber_2..3 text "2 · LH", pinned on
-// the hold's ring; GhostHoldRing_2..3 when that hold has no ring of its own),
+// the hold's ring; GhostHoldRing_2..3 when that hold has no ring of its own because
+// a limb is on it now; the pill and that ring wear the step's own green / yellow / red),
 // the dotted GhostPath_1 (glow -> badge 2) and GhostPath_2 (badge 2 -> 3),
 // and the stick figure: Figure_LH / RH / LF / RF lines from
 // Figure_Torso to each limb's hold, faded where they pass behind the control
@@ -60,8 +61,18 @@ export interface OverlayState {
   torso: {x: number; y: number} | null
 }
 
-/** one step of the look-ahead: the hold and the limb that moves onto it */
-export interface GhostStep {hold: string; limb: string}
+export interface FigureBody {
+  shoulders: {L: WallPt; R: WallPt}
+  hips: {L: WallPt; R: WallPt}
+  armLength: number
+  legLength: number
+  /** head radius (cm) */
+  headR: number
+}
+
+/** one step of the look-ahead: the hold, the limb that moves onto it, and how secure that move is
+ *  for you at its turn (its tag, and the ring it puts on a hold a limb is on now, wear this colour) */
+export interface GhostStep {hold: string; limb: string; colour: RingColour}
 
 export interface OverlayColours {
   green: vec4
@@ -312,10 +323,9 @@ export class NextHoldWallVisuals {
       ring.mat.mainPass.baseColor = GHOST_COLOR
       ring.so.enabled = false
       ;(ring.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).setRenderOrder(ORDER_GHOST)
-      const holdRing = this.makeVisual("GhostHoldRing_" + n, this.thinRingMesh(9))
-      holdRing.mat.mainPass.baseColor = GHOST_COLOR
+      // a ring like every other, in the step's colour (set in apply)
+      const holdRing = this.makeVisual("GhostHoldRing_" + n, this.ringMesh(9, RING_W))
       holdRing.so.enabled = false
-      ;(holdRing.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).setRenderOrder(ORDER_GHOST)
       const label = this.makeText("GhostNumber_" + n, vec3.zero(), GHOST_NUMBER_SIZE, GHOST_NUMBER_COLOR)
       label.text.text = "" + n
       label.text.setRenderOrder(ORDER_GHOST_NUMBER)
@@ -454,8 +464,11 @@ export class NextHoldWallVisuals {
       g.ring.so.getTransform().setLocalPosition(this.wallToLocal(best.x, best.y, RING_Z + 0.15))
       g.label.so.getTransform().setLocalPosition(this.wallToLocal(best.x, best.y, RING_Z + 0.3))
       if (!ownRing && !onGlow) {
-        ;(g.holdRing.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.thinRingMesh(HOLD_SIZE[h.type].ringR)
-        g.holdRing.so.getTransform().setLocalPosition(this.wallToLocal(h.x, h.y, RING_Z + 0.1))
+        // a limb is on this hold now, so it has no ring of its own: it gets an ordinary ring in
+        // the colour of the step that moves onto it (never white)
+        ;(g.holdRing.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.ringMesh(HOLD_SIZE[h.type].ringR, ringW)
+        g.holdRing.mat.mainPass.baseColor = scaled(this.colours[step.colour], RING_DIM)
+        g.holdRing.so.getTransform().setLocalPosition(this.wallToLocal(h.x, h.y, RING_Z))
         g.holdRing.so.enabled = true
       }
     }
@@ -485,6 +498,8 @@ export class NextHoldWallVisuals {
       m.so.getTransform().setLocalPosition(this.wallToLocal(h.x, h.y, HOLD_SIZE[h.type].d * 1.4 + 1 + nudge))
       const k = limb === s.selectedLimb ? MARKER_SELECTED : MARKER_DIM
       m.mat.mainPass.baseColor = new vec4(k, k, k, 1)
+      // the tag's outline says how secure its move is at its turn; the text stays light to read
+      g.ring.mat.mainPass.baseColor = this.colours[step.colour]
     }
   }
 

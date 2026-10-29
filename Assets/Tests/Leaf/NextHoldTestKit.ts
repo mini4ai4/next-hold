@@ -398,6 +398,51 @@ export function checkBadgeAttribution(cam: Camera, main: NextHoldMain, want: {li
   return `badges: ${out.join("; ") || "none"}`
 }
 
+/** A ring colour, not white: the weakest channel well below the strongest (white is ~0.9 of it,
+ *  the Lens's red, yellow and green are at most 0.5). */
+export function isHued(c: vec4): boolean {
+  const mx = Math.max(c.x, c.y, c.z)
+  return mx > 0 && Math.min(c.x, c.y, c.z) / mx < 0.6
+}
+
+/**
+ * Session 15, the white ring: every ring-like object on the wall (score rings and the ring a step
+ * puts on a hold a limb is on now) must be green, yellow or red. Each badge's outline and its
+ * GhostHoldRing (when shown) must be the colour of its step at its turn, by the test's own search
+ * at `heightCm`; every step after the glow must be green or yellow. Returns a summary line.
+ */
+export function checkStepColours(main: NextHoldMain, pos: RefPosition, selected: string, errs: string[], tag: string,
+                                 heightCm = BRIEF_HEIGHT): string {
+  const want = makeReference(heightCm).sequence(pos, selected as RefLimb)
+  const out: string[] = []
+  for (const h of HOLDS) {
+    const so = mustFind("Ring_" + h.id)
+    if (!so.enabled) continue
+    const c = (so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4
+    if (!isHued(c)) errs.push(`${tag}: Ring_${h.id} is not green, yellow or red (${c})`)
+  }
+  for (const n of BADGE_STEPS) {
+    const step = want[n - 1]
+    const holdRing = mustFind("GhostHoldRing_" + n)
+    if (!step) {
+      if (holdRing.enabled) errs.push(`${tag}: GhostHoldRing_${n} shows, but there is no step ${n}`)
+      continue
+    }
+    if (step.colour === "red") errs.push(`${tag}: step ${n} ${step.limb}->${step.holdId} is red (${step.score.toFixed(2)}): not a move you can make`)
+    const pill = (mustFind("Ghost_" + n).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4
+    const pc = classifyColour(pill, main)
+    if (!isHued(pill) || pc !== step.colour) errs.push(`${tag}: badge ${n} outline ${pc} (${pill}), step ${n} is ${step.colour}`)
+    let ring = "own ring"
+    if (holdRing.enabled) {
+      const c = (holdRing.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4
+      ring = classifyColour(c, main) + " ring on an occupied hold"
+      if (!isHued(c) || classifyColour(c, main) !== step.colour) errs.push(`${tag}: GhostHoldRing_${n} on ${step.holdId} is ${classifyColour(c, main)} (${c}), step ${n} is ${step.colour}`)
+    }
+    out.push(`${n}. ${step.limb}->${step.holdId} ${step.colour} ${step.score.toFixed(2)} (badge ${pc}, ${ring})`)
+  }
+  return out.join("; ") || "no steps after the glow"
+}
+
 /** Even-odd point-in-polygon on screen points. */
 function inPoly(poly: vec2[], p: vec2): boolean {
   let inside = false

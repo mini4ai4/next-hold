@@ -434,7 +434,7 @@ export class NextHoldMain extends BaseScriptComponent {
       marks,
       tags,
       tagsAbove: climb,
-      ghosts: this.preview.map((m) => ({hold: m.holdId, limb: m.limb})),
+      ghosts: this.preview.map((m) => ({hold: m.holdId, limb: m.limb, colour: m.colour})),
       // the body: the centre of mass the scoring itself uses for this position
       torso: centreOfMass(this.position, holds),
     }
@@ -781,8 +781,11 @@ export class NextHoldMain extends BaseScriptComponent {
   isHoldDim(id: string): boolean { return this.wall.isHoldDim(id) }
   isMarkVisible(id: string): boolean { return this.visuals ? this.visuals.isMarkVisible(id) : false }
   getTagText(id: string): string | null { return this.visuals ? this.visuals.tagText(id) : null }
-  /** sequence preview: the next moves; step 1 is the glowing suggestion, steps 2 and 3 badges "2 · LH" */
-  getPreview(): {limb: Limb; holdId: string}[] { return this.preview.map((m) => ({limb: m.limb, holdId: m.holdId})) }
+  /** sequence preview: the next moves; step 1 is the glowing suggestion, steps 2 and 3 badges "2 · LH".
+   *  colour / score: how secure each move is for you at its turn (its tag wears that colour) */
+  getPreview(): {limb: Limb; holdId: string; colour: RingColour; score: number}[] {
+    return this.preview.map((m) => ({limb: m.limb, holdId: m.holdId, colour: m.colour, score: m.score}))
+  }
   /** the hold look-ahead step n (1-based) is shown on (step 1 by the glow), or null when hidden */
   getGhostHold(n: number): string | null { return this.visuals ? this.visuals.ghostHold(n) : null }
   isStartLit(): boolean { return this.typePicker.isStartLit() }

@@ -1,7 +1,10 @@
-// Review item 3, "Sequence preview": a small look-ahead over bestMove gives the
-// next 2-3 moves. Step 1 is the glowing suggestion with its label; steps 2 and 3
-// show as small light badges pinned on their own hold's ring, naming the limb:
-// "2 · LH", "3 · RF". They update in the same frame as the main rings.
+// Review item 3, "Sequence preview": the next 2-3 moves. Step 1 is the glowing
+// suggestion with its label; after it, since session 15, the start of the cheapest
+// secure route to the top, searched over every limb and hold. Steps 2 and 3 show as
+// small badges pinned on their own hold's ring, naming the limb: "2 · LH", "3 · LF".
+// They update in the same frame as the main rings. Each badge's outline wears its
+// step's colour; a step onto a hold a limb is on now gets a ring in that colour, so
+// no ring on the wall is white (session 15, item 3).
 // Attribution (strict review 29.10): on screen the ring nearest each badge is its
 // own hold's, by at least 2 cm, and its text names the limb that moves in that
 // step. Every badge stays readable: no glow ring and no other badge covers it,
@@ -17,7 +20,7 @@ import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {
-  BADGE_STEPS, camera, checkBadgeAttribution, checkGhostNumbersClear, fmtPos, frames, ghostBadge, ghostPathDots, getMain,
+  BADGE_STEPS, camera, checkBadgeAttribution, checkGhostNumbersClear, checkStepColours, fmtPos, frames, ghostBadge, ghostPathDots, getMain,
   makeReference, mustFind, pinch, pinchCapture, renderedRingColour, restorePreset,
 } from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
@@ -78,13 +81,17 @@ export class N3SequencePreviewScenario extends Scenario {
     if (!sug0 || ids0[0] !== sug0.holdId) errs.push(`step 1 (${ids0[0]}) is not the suggested hold ${sug0 ? sug0.holdId : "none"}`)
     if (ids0.length !== 3) errs.push(`preset look-ahead has ${ids0.length} moves, want 3`)
 
-    // light-coloured: every channel of the badge line and text is bright
+    // session 15: each badge's outline wears its step's colour (how secure that move is at its
+    // turn, by the test's own search), its text stays light; and nothing on the wall is a white
+    // ring: a step onto a hold a limb is on now (no score ring) gets a ring in that step's colour
+    print(`[N3] preset colours: ${checkStepColours(main, s0.pos, s0.selected, errs, "preset")}`)
     for (const n of BADGE_STEPS) {
-      const rc = (mustFind("Ghost_" + n).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4
       const tc = (mustFind("GhostNumber_" + n).getComponent("Component.Text") as Text).textFill.color
-      if (Math.min(rc.x, rc.y, rc.z) < 0.75 || rc.w < 0.8) errs.push(`badge ${n} colour ${rc} is not light`)
       if (Math.min(tc.x, tc.y, tc.z) < 0.75) errs.push(`badge ${n} text colour ${tc} is not light`)
     }
+    const occupiedStep = s0.steps.findIndex((id, i) => i > 0 && !!id && Object.keys(s0.pos).some((l) => s0.pos[l] === id))
+    if (occupiedStep < 0) errs.push("precondition: no preset step goes onto a hold a limb is on now (the case the white ring was)")
+    else if (!mustFind("GhostHoldRing_" + (occupiedStep + 1)).enabled) errs.push(`step ${occupiedStep + 1} is onto an occupied hold but has no ring`)
 
     // ── a real pinch on the suggestion: badges and rings in the same frame ──
     const got = await pinchCapture("Hold_" + sug0!.holdId, () => snap(main, problem))
@@ -92,6 +99,7 @@ export class N3SequencePreviewScenario extends Scenario {
     else {
       const a = got.value
       const ids1 = checkGhosts(main, a, errs, "pinch frame")
+      print(`[N3] pinch frame colours: ${checkStepColours(main, a.pos, a.selected, errs, "pinch frame")}`)
       let changed = 0
       for (const id of problem) if (a.rendered[id] !== s0.rendered[id]) changed++
       if (changed === 0) errs.push("pinch frame: no main ring changed")
@@ -125,7 +133,7 @@ export class N3SequencePreviewScenario extends Scenario {
       const third = main.getGhostHold(2) !== sug.holdId ? main.getGhostHold(2)! : main.getGhostHold(3)!
       // a match: steps 2 and 3 on one hold, joined by an arc around it
       let want = [{limb: sug.limb, holdId: sug.holdId}, {limb: "LH", holdId: third}, {limb: "RH", holdId: third}]
-      vis.apply({...vis.state, ghosts: want.map((m) => ({hold: m.holdId, limb: m.limb}))})
+      vis.apply({...vis.state, ghosts: want.map((m) => ({hold: m.holdId, limb: m.limb, colour: "green"}))})
       let tag = `match ${third},${third}`
       const hold = mustFind("Hold_" + third).getTransform().getWorldPosition()
       const b2 = ghostBadge(2), b3 = ghostBadge(3)
@@ -140,7 +148,7 @@ export class N3SequencePreviewScenario extends Scenario {
 
       // step 2 on the glowing hold (two limbs onto it in a row): badge 2 sits on the glow's outer ring
       want = [{limb: sug.limb, holdId: sug.holdId}, {limb: "LH", holdId: sug.holdId}, {limb: "RF", holdId: third}]
-      vis.apply({...vis.state, ghosts: want.map((m) => ({hold: m.holdId, limb: m.limb}))})
+      vis.apply({...vis.state, ghosts: want.map((m) => ({hold: m.holdId, limb: m.limb, colour: "green"}))})
       tag = `step 2 on the glow ${sug.holdId}`
       if (mustFind("GhostPath_1").enabled) errs.push(`${tag}: GhostPath_1 shows, but step 2 is on the glowing hold itself`)
       print(`[N3] ${tag}: ${checkBadgeAttribution(camera(), main, want, errs, tag)}; ${checkGhostNumbersClear(camera(), errs, tag, main)}`)
