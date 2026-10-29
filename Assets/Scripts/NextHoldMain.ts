@@ -43,6 +43,8 @@ import {NextHoldControlRowUI} from "./NextHoldControlRowUI"
 import {NextHoldTypePickerUI} from "./NextHoldTypePickerUI"
 import {NextHoldCalloutUI} from "./NextHoldCalloutUI"
 import {NextHoldOffViewArrow} from "./NextHoldOffViewArrow"
+import {NextHoldPinchRipple, RippleEvent} from "./NextHoldPinchRipple"
+import {GLOW_PROFILE} from "./Wall/ProceduralTextures"
 import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/CameraProvider/WorldCameraFinderProvider"
 
 /** half the why-line plate: WHY_W (40 cm) in NextHoldCalloutUI plus its padding */
@@ -199,6 +201,10 @@ export class NextHoldMain extends BaseScriptComponent {
   private placedRowSize = "-"
   private hovered: string | null = null
   private visuals: NextHoldWallVisuals
+  /** the brief ring where a pinch lands (a hold or a button) */
+  private ripple: NextHoldPinchRipple
+  /** control row and picker buttons by scene name, for the ripple */
+  private uiObjects: {[name: string]: SceneObject} = {}
   private ready = false
 
   onAwake() {
@@ -222,6 +228,7 @@ export class NextHoldMain extends BaseScriptComponent {
       {green: this.greenColor, yellow: this.yellowColor, red: this.redColor},
     )
     this.visuals.build()
+    this.ripple = new NextHoldPinchRipple(this.getSceneObject(), this.ringMaterial)
 
     const interactables: {id: string; it: Interactable}[] = []
     for (const id of this.wall.getHoldIds()) {
@@ -262,6 +269,7 @@ export class NextHoldMain extends BaseScriptComponent {
 
     this.createEvent("UpdateEvent").bind(() => {
       this.visuals.tick(getTime())
+      this.ripple.tick(getTime())
       if (!this.ready) return
       // the row lays itself out late (after a start or a refresh): once its real size is known, or
       // whenever it changes, place it again, or in Ground it sits too close and covers a ring
@@ -300,6 +308,7 @@ export class NextHoldMain extends BaseScriptComponent {
       // any order, and the picker stays until Done.
       this.problem[id] = true
       this.pickerHold = id
+      this.rippleHold(id)
       const h = this.holds[id]
       const ringR = this.ringRadius(id)
       const right = h.x < 160
@@ -318,10 +327,12 @@ export class NextHoldMain extends BaseScriptComponent {
       if (!r) return // no ring on an occupied hold: stay armed, wait for a ring
       this.askArmed = false
       this.controlRow.setAskArmed(false)
+      this.rippleHold(id)
       this.showWhyFor(id, r)
       return
     }
     if (this.isOccupied(id)) return // the reference doesn't score occupied holds
+    this.rippleHold(id)
     this.position[this.selected] = id
     this.callouts.hideWhy()
     this.recompute(true)
@@ -329,6 +340,7 @@ export class NextHoldMain extends BaseScriptComponent {
 
   pressLimb(limb: Limb): void {
     if (!this.ready || LIMBS.indexOf(limb) < 0) return
+    this.rippleButton("Toggle_" + limb)
     this.selected = limb
     this.callouts.hideWhy()
     this.recompute(false)
@@ -336,12 +348,14 @@ export class NextHoldMain extends BaseScriptComponent {
 
   pressAsk(): void {
     if (!this.ready) return
+    this.rippleButton("AskButton")
     this.askArmed = this.mode === "climb" ? !this.askArmed : false
     this.controlRow.setAskArmed(this.askArmed)
   }
 
   pressMode(): void {
     if (!this.ready) return
+    this.rippleButton("ModeSwitch")
     this.mode = this.mode === "climb" ? "setup" : "climb"
     this.askArmed = false
     this.controlRow.setAskArmed(false)
@@ -354,6 +368,7 @@ export class NextHoldMain extends BaseScriptComponent {
   /** Ground <-> On wall by hand. It holds until the eye next crosses a threshold (followDistance). */
   pressView(): void {
     if (!this.ready) return
+    this.rippleButton("ViewToggle")
     this.setView(this.view === "ground" ? "wall" : "ground")
   }
 
@@ -362,6 +377,7 @@ export class NextHoldMain extends BaseScriptComponent {
    *  it), the position doesn't change. */
   pressHeight(step: number): void {
     if (!this.ready || step === 0) return
+    this.rippleButton(step > 0 ? "HeightUp" : "HeightDown")
     const snapped = Math.round(this.heightCm / HEIGHT_STEP_CM) * HEIGHT_STEP_CM
     const next = Math.min(HEIGHT_MAX_CM, Math.max(HEIGHT_MIN_CM, snapped + (step > 0 ? 1 : -1) * HEIGHT_STEP_CM))
     if (next === this.heightCm) return
@@ -382,6 +398,7 @@ export class NextHoldMain extends BaseScriptComponent {
   /** Setup: the hold's type. The picker stays open, so Start and Top still work after it. */
   pickType(type: string): void {
     if (!this.ready || this.mode !== "setup" || !this.pickerHold) return
+    this.rippleButton("TypeButton_" + type)
     this.holdTypes[this.pickerHold] = type
     this.typePicker.setType(type)
   }
@@ -389,6 +406,7 @@ export class NextHoldMain extends BaseScriptComponent {
   /** Setup: close the picker; the hold stays in the problem with what was set. */
   pressDone(): void {
     if (!this.ready || this.mode !== "setup" || !this.pickerHold) return
+    this.rippleButton("DoneButton")
     this.pickerHold = null
     this.typePicker.hide()
   }
@@ -396,6 +414,7 @@ export class NextHoldMain extends BaseScriptComponent {
   /** Setup: take the picker's hold out of the problem (its start / top flags stop counting) and close it. */
   pressRemove(): void {
     if (!this.ready || this.mode !== "setup" || !this.pickerHold) return
+    this.rippleButton("RemoveButton")
     delete this.problem[this.pickerHold]
     this.pickerHold = null
     this.typePicker.hide()
@@ -406,6 +425,7 @@ export class NextHoldMain extends BaseScriptComponent {
   pressStart(): void {
     if (!this.ready || this.mode !== "setup" || !this.pickerHold) return
     const id = this.pickerHold
+    this.rippleButton("StartButton")
     if (this.startFlags[id]) delete this.startFlags[id]
     else this.startFlags[id] = true
     this.typePicker.setFlags(!!this.startFlags[id], this.topFlag === id)
@@ -416,6 +436,7 @@ export class NextHoldMain extends BaseScriptComponent {
   pressTop(): void {
     if (!this.ready || this.mode !== "setup" || !this.pickerHold) return
     const id = this.pickerHold
+    this.rippleButton("TopButton")
     this.topFlag = this.topFlag === id ? null : id
     this.typePicker.setFlags(!!this.startFlags[id], this.topFlag === id)
     this.recompute(false)
@@ -671,6 +692,28 @@ export class NextHoldMain extends BaseScriptComponent {
     this.callouts.showWhy(this.keepInView(this.wall.wallToWorld(h.x, y, 10), WHY_HALF_W * k), this.wallRot(), r.why, id, k)
   }
 
+  // ── pinch ripple ──────────────────────────────────────────────────────────
+  /** the ripple on a hold: just outside its ring, the ring line's width */
+  private rippleHold(id: string): void {
+    const h = this.holds[id]
+    const w = this.getRingLineWidth()
+    this.ripple.play(id, this.wall.wallToWorld(h.x, h.y, 0.6), this.wallRot(), this.ringRadius(id) + w, w)
+  }
+
+  /** the ripple on a control row or picker button, in front of its face, at the panel's size */
+  private rippleButton(name: string): void {
+    let so = this.uiObjects[name]
+    if (!so) {
+      so = findUnder(this.controlRow.getSceneObject(), name) || findUnder(this.typePicker.getSceneObject(), name)
+      if (!so) return
+      this.uiObjects[name] = so
+    }
+    const tr = so.getTransform()
+    const k = tr.getWorldScale().x
+    const out = this.wall.wallToWorld(0, 0, 1).sub(this.wall.wallToWorld(0, 0, 0)).normalize()
+    this.ripple.play(name, tr.getWorldPosition().add(out.uniformScale(2.2 * k)), this.wallRot(), 3.2 * k, 0.9 * k)
+  }
+
   private setHover(id: string | null): void {
     // outside setup a hold that isn't in the problem is not a target, so it doesn't highlight
     if (id && this.mode === "climb" && !this.problem[id]) id = null
@@ -843,4 +886,18 @@ export class NextHoldMain extends BaseScriptComponent {
   getPickerLitType(): string | null { return this.typePicker.getLitType() }
   isStartLit(): boolean { return this.typePicker.isStartLit() }
   isTopLit(): boolean { return this.typePicker.isTopLit() }
+  /** every pinch ripple played (newest last): the hold id or button name it landed on, and when */
+  getRippleLog(): RippleEvent[] { return this.ripple ? this.ripple.getLog() : [] }
+  isRippleVisible(): boolean { return this.ripple ? this.ripple.isVisible() : false }
+  getRippleWorldPosition(): vec3 | null { return this.ripple ? this.ripple.getWorldPosition() : null }
+}
+
+/** the first SceneObject called `name` under root (root included), enabled or not */
+function findUnder(root: SceneObject, name: string): SceneObject | null {
+  if (root.name === name) return root
+  for (let i = 0; i < root.getChildrenCount(); i++) {
+    const f = findUnder(root.getChild(i), name)
+    if (f) return f
+  }
+  return null
 }

@@ -4,6 +4,7 @@
 // Input path: real SIK pinches on Hold_<id> (simulated right hand). The
 // post-move state is captured inside the Interactable's onTriggerEnd, in the
 // same frame as the Lens's own handler, with no frame wait.
+// Session 18: a real pinch on a hold, and on a button, shows the pinch ripple there for 300 ms.
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
@@ -130,6 +131,53 @@ export class C2PinchMoveScenario extends Scenario {
     })[0]
     if (!t3) errs.push("setup: no problem hold for RF after which another limb is best")
     else await moveAndCheck(main, t3, errs, "move 3 (RF -> " + t3 + ")")
+
+    // session 18: a real pinch shows a brief ripple where it lands, a hold or a button, for 300 ms
+    await restorePreset(main)
+    await sleep(500) // the setup's own ripples are over
+    const rid = main.getSuggestion()!.holdId
+    // every frame from before the pinch until 1 s after it: when the ripple shows (the simulated
+    // hand's pinch only returns after its release, too late to start sampling then)
+    const samples: {t: number; on: boolean}[] = []
+    let sampling = true
+    const sampler = (async () => { while (sampling) { samples.push({t: getTime(), on: main.isRippleVisible()}); await frames(1) } })()
+    const rp = await pinchCapture("Hold_" + rid, () => ({
+      vis: main.isRippleVisible(), at: main.getRippleWorldPosition(), last: main.getRippleLog().slice(-1)[0],
+    }))
+    while (getTime() - rp.time < 1) await frames(1)
+    sampling = false
+    await sampler
+    if (!rp.fired || !rp.value) errs.push("ripple: the hold pinch never fired")
+    else {
+      const v = rp.value
+      const hold = mustFind("Hold_" + rid).getTransform().getWorldPosition()
+      const off = v.at ? Math.hypot(v.at.x - hold.x, v.at.y - hold.y) : -1
+      print(`[C2] ripple on a pinch of ${rid}: shown ${v.vis} in the pinch frame, ${off.toFixed(2)} cm from the hold, logged "${v.last ? v.last.target : "-"}"`)
+      if (!v.vis) errs.push(`ripple: not shown in the frame ${rid} was pinched`)
+      if (!v.last || v.last.target !== rid) errs.push(`ripple: logged on ${v.last ? v.last.target : "nothing"}, want ${rid}`)
+      if (!(off >= 0 && off < 0.5)) errs.push(`ripple: centred ${off.toFixed(2)} cm from ${rid}`)
+      // it lasts 300 ms from the pinch: the last frame showing it is before 0.3 s, the first after
+      // it without it at or past 0.3 s (frame times vary in the preview: measured where it changes)
+      const t0 = rp.time
+      const after = samples.filter((s) => s.t >= t0 - 1e-4)
+      const lastOn = Math.max(0, ...after.filter((s) => s.on).map((s) => s.t - t0))
+      const gone = after.filter((s) => !s.on && s.t - t0 > lastOn)[0]
+      const firstOff = gone ? gone.t - t0 : -1
+      const shownFrames = after.filter((s) => s.on).length
+      print(`[C2] ripple: shown in ${shownFrames} frames, last at ${(lastOn * 1000).toFixed(0)} ms, gone at ${(firstOff * 1000).toFixed(0)} ms`)
+      if (!(shownFrames >= 2 && lastOn < 0.3 && firstOff >= 0.3 - 1e-3)) {
+        errs.push(`ripple: shown in ${shownFrames} frames, last at ${(lastOn * 1000).toFixed(0)} ms, gone at ${(firstOff * 1000).toFixed(0)} ms (want 300 ms)`)
+      }
+    }
+    await pinch("Toggle_LF")
+    await frames(1)
+    const lastB = main.getRippleLog().slice(-1)[0]
+    const btn = mustFind("Toggle_LF").getTransform().getWorldPosition()
+    const at = main.getRippleWorldPosition()!
+    const offB = Math.hypot(at.x - btn.x, at.y - btn.y)
+    print(`[C2] ripple on a pinch of Toggle_LF: logged "${lastB ? lastB.target : "-"}", ${offB.toFixed(2)} cm from the button, shown ${main.isRippleVisible()}`)
+    if (!lastB || lastB.target !== "Toggle_LF" || offB > 0.5) errs.push(`ripple: the Toggle_LF pinch rippled on ${lastB ? lastB.target : "nothing"}, ${offB.toFixed(2)} cm from it`)
+    await restorePreset(main)
 
     expect(errs.length, "criterion 2 mismatches:\n" + errs.join("\n")).toBe(0)
   }
