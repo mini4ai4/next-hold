@@ -7,8 +7,8 @@
 //   (walking in and out, looking up, down and away); tracking comes back at the end;
 // - ACTIONS call the same NextHoldMain functions a real pinch calls (pressLimb, pressHold,
 //   pressHeight, pressAsk, pressMode, pickType, pressStart, pressDone, pressRemove);
-// - scene 0 has no overlays: every overlay material and text under NextHold and the wall's
-//   Overlays is drawn at alpha 0, then faded in from scene 1. Only the alpha is scaled, over
+// - the take opens on the bare wall for OVERLAYS_FROM s (1 s): every overlay material and text under
+//   NextHold and the wall's Overlays is drawn at alpha 0, then faded in. Only the alpha is scaled, over
 //   whatever colour the Lens itself sets, and each one is handed back untouched once it is in;
 // - what isn't the product is hidden (HIDE_WHILE_PLAYING: the LEAF banner, SIK's cursor and hand
 //   visuals) and the hold colliders' wireframes are off;

@@ -1,11 +1,15 @@
 // Session 17, the demo autopilot (Assets/Scripts/Demo): it plays VIDEO_PLAN scenes 0-7 by itself
 // for the screen recording. This plays the whole timeline at x8 and checks, in the frame each
 // DemoTimeline.CHECKS entry fires, that the scene reached its key state:
-//   0 no overlays; 1 Ground at 2.5 m with the tags; 2 still Ground at 1.35 m, then On wall under
-//   80 cm with one ring and "R hand"; 3 after the pinch the ring is on h09, then Ground again with
-//   the tags moved on; 4 back at the start, "2 · LH" on h09 at 155 cm and on h10 at 195 cm;
-//   5 LF on lh is green, "?" on h11 says "POCKET HOLD · HIGH STEP"; 6 the off-view arrow, and gone
-//   when looking back; 7 the setup picker: open on h12, Crimp, Start, Done, reopened, Removed.
+//   0 the lit Ground read by 2.5 s (glow, "R hand", the tags, TOP, on screen); 1 Ground at 2.5 m
+//   with the tags; 2 still Ground at 1.35 m, then On wall under 80 cm with one ring and "R hand",
+//   both fully in the shot; 3 after the pinch the ring is on h09, then Ground again with the tags
+//   moved on; 4 back at the start, "2 · LH" on h09 at 155 cm and on h10 at 195 cm, with the −/+ row
+//   in the shot; 5 LF on lh is green, "?" on h11 says "POCKET HOLD · HIGH STEP", over h11's own ring
+//   in that score's colour; 6 the off-view arrow pointing at the next hold with no panel in the way,
+//   and gone when looking back; 7 the setup picker: open on h12, Crimp, Start, Done, reopened, Removed.
+// Session 18, every frame of the take: On wall the panel's screen box never overlaps the ring's;
+// each height change happens with the −/+ row in the shot; every pinch shows its ripple there.
 // The view is the Lens's own: the autopilot moves the wearer's camera, so Main measures the real
 // eye distance (no sizing camera). It also checks that idle the autopilot touches nothing, every
 // scene start is logged in order, and stop() hands back tracking, hidden objects and colours.
@@ -14,12 +18,33 @@ import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {findSceneObjectsByName, sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {DemoAutopilot} from "../../Scripts/Demo/DemoAutopilot"
-import {CHECKS, HIDE_WHILE_PLAYING, SCENES} from "../../Scripts/Demo/DemoTimeline"
+import {ACTIONS, CHECKS, DemoAction, HIDE_WHILE_PLAYING, SCENES} from "../../Scripts/Demo/DemoTimeline"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {HOLDS} from "../../Scripts/Wall/WallLayout"
-import {camera, eyeToWallCm, frames, getMain, mustFind, restorePreset} from "./NextHoldTestKit"
+import {
+  activeRingBox, camera, checkArrowPointsAt, checkRowClearOfRing, checkWhyAgrees, eyeToWallCm, fmtBox, frames, getMain,
+  mustFind, notOnScreen, restorePreset,
+} from "./NextHoldTestKit"
 
 const SPEED = 8
+
+/** where each autopilot action's pinch lands, so its ripple shows there: a hold id or a button's scene name */
+function rippleTarget(a: DemoAction): string {
+  switch (a.do) {
+    case "pressLimb": return "Toggle_" + a.arg
+    case "pressHold": return String(a.arg)
+    case "pressHeight": return (a.arg as number) > 0 ? "HeightUp" : "HeightDown"
+    case "pressAsk": return "AskButton"
+    case "pressMode": return "ModeSwitch"
+    case "pressView": return "ViewToggle"
+    case "pickType": return "TypeButton_" + a.arg
+    case "pressStart": return "StartButton"
+    case "pressTop": return "TopButton"
+    case "pressDone": return "DoneButton"
+    case "pressRemove": return "RemoveButton"
+  }
+  return "?"
+}
 
 /** the alpha an overlay is drawn at: UI Kit's opacityFactor, a material's baseColor or a text's fill */
 function alphaOf(name: string): number {
@@ -57,16 +82,38 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
     const r = ringsShown()
     want(r.length === 1 && r[0] === ring, `rings ${r.join(",") || "none"}, want only ${ring}`)
     want(main.isLabelVisible() && main.getLabelText() === label, `label "${main.getLabelText()}" (shown ${main.isLabelVisible()}), want "${label}"`)
+    // session 18: the one ring (its whole glow) and its word fully in the shot, and the panel clear of it
+    const g = activeRingBox(camera())
+    want(!!g && g.x0 >= 0 && g.x1 <= 1 && g.y0 >= 0 && g.y1 <= 1, `the glow of ${ring} is not fully in view (${fmtBox(g)})`)
+    const off = notOnScreen(["SuggestLabel"], camera())
+    want(!off.length, `not fully in view: ${off.join(", ")}`)
+    checkRowClearOfRing(camera(), e, "on wall")
+  }
+  /** session 18, scene 4: the −/+ row and badge 2 in the shot while the height changes */
+  const heightInShot = () => {
+    const off = notOnScreen(["HeightDown", "HeightLabel", "HeightUp", "GhostNumber_2"], camera())
+    want(!off.length, `not fully in view: ${off.join(", ")}`)
   }
   const badge2 = (hold: string, text: string) => {
     const b = badge(2)
     want(b.hold === hold && b.text === text, `badge 2 "${b.text}" on ${b.hold}, want "${text}" on ${hold}`)
   }
   switch (key) {
-    case "s0-no-overlays":
-      want(pilot.getOverlayAlpha() === 0, `overlay alpha ${pilot.getOverlayAlpha()}, want 0`)
-      for (const n of ["Ring_up", "SuggestGlow", "SuggestLabel", "GhostNumber_2", "Tag_h20"]) {
-        want(alphaOf(n) < 0.01, `${n} drawn at alpha ${alphaOf(n).toFixed(2)} in scene 0`)
+    case "s0-ground-read":
+      // session 18: the hook lands in 2 s: the lit Ground read, the glow on up with "R hand", the
+      // 1-2-3 and TOP, all faded in and on screen
+      ground(240, 270)
+      want(pilot.getOverlayAlpha() === 1, `overlay alpha ${pilot.getOverlayAlpha()}, want 1 by 2 s`)
+      for (const n of ["Ring_h09", "SuggestGlow", "SuggestLabel", "GhostNumber_2", "Tag_h20"]) {
+        want(alphaOf(n) > 0.5, `${n} drawn at alpha ${alphaOf(n).toFixed(2)} at 2.5 s`)
+      }
+      want(main.isRingGlowing("up") && main.isLabelVisible() && main.getLabelText() === "R hand",
+        `glow on up ${main.isRingGlowing("up")}, label "${main.getLabelText()}" shown ${main.isLabelVisible()}`)
+      badge2("h09", "2 · LH")
+      want(main.getTagText("h20") === "TOP", `h20 tag "${main.getTagText("h20")}", want TOP`)
+      {
+        const off = notOnScreen(["SuggestLabel", "GhostNumber_2", "GhostNumber_3", "Tag_h20"], camera())
+        want(!off.length, `not fully in view: ${off.join(", ")}`)
       }
       break
     case "s1-lower":
@@ -109,10 +156,12 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
     case "s4-155":
       want(main.getHeightCm() === 155 && main.getHeightLabel() === "Height 155 cm", `height ${main.getHeightCm()} "${main.getHeightLabel()}", want 155`)
       badge2("h09", "2 · LH")
+      heightInShot()
       break
     case "s4-195":
       want(main.getHeightCm() === 195 && main.getHeightLabel() === "Height 195 cm", `height ${main.getHeightCm()} "${main.getHeightLabel()}", want 195`)
       badge2("h10", "2 · LH")
+      heightInShot()
       break
     case "s5-lf":
       want(main.getHeightCm() === 175, `height ${main.getHeightCm()}, want 175`)
@@ -123,9 +172,13 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
     case "s5-why":
       want(main.isWhyVisible() && main.getWhyHoldId() === "h11", `why-line shown ${main.isWhyVisible()} on ${main.getWhyHoldId()}`)
       want(main.getWhyText().indexOf("POCKET HOLD · HIGH STEP") >= 0, `why-line "${main.getWhyText()}"`)
+      // session 18: the ring under it is the asked hold's and wears the colour it explains
+      print(`[d1] s5-why: ${checkWhyAgrees(camera(), main, e, "s5-why")}`)
       break
     case "s6-away":
       want(main.isOffViewArrowVisible(), "no off-view arrow while looking away")
+      // session 18: it points at the next hold, off screen, with no panel in the way
+      print(`[d1] s6-away: ${checkArrowPointsAt(camera(), main, e, "s6-away")}`)
       break
     case "s6-back":
       want(!main.isOffViewArrowVisible(), "the off-view arrow stays after looking back")
@@ -186,6 +239,13 @@ export class D1DemoAutopilotScenario extends Scenario {
       seen.push({key, t: pilot.getTimelineTime(), errs: checkKey(key, main, pilot)})
     })
     let hiddenWhilePlaying = true
+    // session 18, sampled every frame of the take: On wall the panel never overlaps the one ring on
+    // screen; each time the height changes, the −/+ row is in the shot
+    const frameErrs: {[m: string]: number} = {}
+    const frameErr = (m: string) => { frameErrs[m] = (frameErrs[m] || 0) + 1 }
+    let wallFrames = 0, heightChanges = 0, heightInScene4 = 0
+    let lastHeight = main.getHeightLabel()
+    const rippleFrom = main.getRippleLog().length
     try {
       pilot.play(SPEED)
       if (!pilot.isPlaying()) throw new Error("play() did not start")
@@ -195,7 +255,25 @@ export class D1DemoAutopilotScenario extends Scenario {
         for (const so of findSceneObjectsByName(name)) if (so.enabled) hiddenWhilePlaying = false
       }
       const t0 = getTime()
-      while (pilot.isPlaying() && getTime() - t0 < 60) await frames(1)
+      while (pilot.isPlaying() && getTime() - t0 < 60) {
+        await frames(1)
+        if (main.getView() === "wall" && activeRingBox(camera())) {
+          wallFrames++
+          const fe: string[] = []
+          checkRowClearOfRing(camera(), fe, `t=${pilot.getTimelineTime().toFixed(1)} on wall`)
+          if (fe.length) frameErr(fe[0].replace(/^t=[\d.]+ /, "") + ` (first at t=${pilot.getTimelineTime().toFixed(1)})`)
+        }
+        const h = main.getHeightLabel()
+        if (h !== lastHeight) {
+          heightChanges++
+          lastHeight = h
+          // scene 4 is the height beat; scene 5 sets 175 again while the eye walks back to 2.5 m
+          const tl = pilot.getTimelineTime()
+          const off = tl >= SCENES[4].start && tl < SCENES[5].start ? notOnScreen(["HeightDown", "HeightLabel", "HeightUp"], camera()) : []
+          if (tl >= SCENES[4].start && tl < SCENES[5].start) heightInScene4++
+          if (off.length) frameErr(`height changed to "${h}" at t=${pilot.getTimelineTime().toFixed(1)} with not in view: ${off.join(", ")}`)
+        }
+      }
       if (pilot.isPlaying()) errs.push(`still playing after 60 s at x${SPEED}`)
     } finally {
       unsub()
@@ -210,6 +288,19 @@ export class D1DemoAutopilotScenario extends Scenario {
       print(`[d1] ${s.key} t=${s.t.toFixed(1)}: ${s.errs.length ? "FAIL " + s.errs.join("; ") : "ok"}`)
       for (const m of s.errs) errs.push(`${s.key}: ${m}`)
     }
+    const fm = Object.keys(frameErrs)
+    print(`[d1] every frame: ${wallFrames} On wall frames, panel vs ring ${fm.filter((m) => m.indexOf("overlaps") >= 0).length ? "OVERLAP" : "clear"}; ` +
+      `${heightInScene4} height changes in scene 4, the −/+ row ${fm.filter((m) => m.indexOf("height") >= 0).length ? "OUT of shot" : "in shot"} at each`)
+    for (const m of fm) errs.push(`${m} (${frameErrs[m]} frames)`)
+    if (wallFrames < 10) errs.push(`only ${wallFrames} On wall frames sampled`)
+    if (heightChanges !== 16 || heightInScene4 !== 12) errs.push(`${heightChanges} height changes seen (${heightInScene4} in scene 4); the timeline makes 16 (12)`)
+
+    // session 18: every pinch of the take shows the ripple where it lands, in order
+    const ripples = main.getRippleLog().slice(rippleFrom).map((r) => r.target)
+    const wantRipples = ACTIONS.map(rippleTarget)
+    print(`[d1] ripples: ${ripples.length} of ${wantRipples.length} pinches`)
+    if (ripples.join() !== wantRipples.join()) errs.push(`ripples ${ripples.join(",")}; want ${wantRipples.join(",")}`)
+
     const log = pilot.getSceneLog()
     print(`[d1] scenes ${log.map((l) => `${l.n}@${l.t.toFixed(1)}`).join(" ")}`)
     if (log.map((l) => l.n).join() !== SCENES.map((s) => s.n).join()) errs.push(`scene log ${log.map((l) => l.n).join(",")}, want 0-7 in order`)
