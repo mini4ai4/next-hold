@@ -10,8 +10,8 @@ import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLDS, HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {
-  LIMB_WORDS, camera, frames, getMain, makeReference, mustFind, pinch, pinchCapture,
-  planeDistanceToHold, restorePreset,
+  LIMB_WORDS, camera, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture,
+  planeDistanceToHold, presetProblem, restorePreset,
 } from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 
@@ -97,27 +97,54 @@ export class C4SuggestionScenario extends Scenario {
     if (!inView0) errs.push(`setup: open suggestion ${best0.holdId} is not in view per the camera`)
     if (main.isOffViewArrowVisible() || mustFind("OffViewArrowMesh").enabled) errs.push("arrow visible while the suggestion is in view")
 
-    // ── make an out-of-view hold the suggestion: one move within the problem after which the
-    //    reference's best move is a hold the camera can't see (before the marked problem this
+    // ── make an out-of-view hold the suggestion: the shortest run of moves within the problem
+    //    (up to three) after which the reference's best move is a hold the camera can't see.
+    //    Since the marked problem and the upward goal no single move does it (before them it
     //    was RF -> h15, which is not in the problem) ──
-    let mover = "", dest = ""
-    for (const l of ["RF", "LF", "RH", "LH"]) {
-      for (const r of ref.evaluate(l as any, pos0).results) {
-        const b = ref.bestMove({...pos0, [l]: r.holdId})
-        if (b && !holdInView(b.holdId)) { mover = l; dest = r.holdId; break }
+    print(`[C4] problem holds out of view: ${presetProblem().filter((id) => !holdInView(id)).join(",") || "none"}`)
+    type Step = {limb: string; holdId: string}
+    let path: Step[] | null = null
+    let frontier: {pos: RefPosition; steps: Step[]}[] = [{pos: pos0, steps: []}]
+    const seen: {[k: string]: boolean} = {[fmtPos(pos0)]: true}
+    for (let depth = 0; depth < 3 && !path; depth++) {
+      const next: {pos: RefPosition; steps: Step[]}[] = []
+      for (const node of frontier) {
+        for (const l of ["RF", "LF", "RH", "LH"]) {
+          for (const r of ref.evaluate(l as any, node.pos).results) {
+            const pos = {...node.pos, [l]: r.holdId} as RefPosition
+            const k = fmtPos(pos)
+            if (seen[k]) continue
+            seen[k] = true
+            const steps = node.steps.concat([{limb: l, holdId: r.holdId}])
+            const b = ref.bestMove(pos)
+            if (b && !holdInView(b.holdId)) { path = steps; break }
+            next.push({pos, steps})
+          }
+          if (path) break
+        }
+        if (path) break
       }
-      if (mover) break
+      frontier = next
     }
-    if (!mover) errs.push("setup: no single move inside the problem leads to an off-view suggestion")
-    await pinch("Toggle_" + mover)
-    await frames(2)
-    await pinch("Hold_" + dest)
-    await frames(3) // the arrow updates one frame after a change
+    if (!path) {
+      errs.push("setup: no run of up to three moves inside the problem leads to an off-view suggestion")
+      expect(errs.length, "criterion 4 mismatches:\n" + errs.join("\n")).toBe(0)
+      return
+    }
+    const moves = path.map((s) => s.limb + "->" + s.holdId).join(", ")
+    for (const s of path) {
+      await pinch("Toggle_" + s.limb)
+      await frames(2)
+      await pinch("Hold_" + s.holdId)
+      await frames(3) // the arrow updates one frame after a change
+    }
     const pos1 = main.getPosition() as RefPosition
     const best1 = ref.bestMove(pos1)!
     const sug1 = main.getSuggestion()
-    print(`[C4] after ${mover}->${dest}: Lens suggests ${sug1 ? sug1.limb + "->" + sug1.holdId : "none"}, reference ${best1.limb}->${best1.holdId}`)
-    if (pos1[mover] !== dest) errs.push(`${mover} did not move to ${dest} (${pos1[mover]})`)
+    print(`[C4] after ${moves}: Lens suggests ${sug1 ? sug1.limb + "->" + sug1.holdId : "none"}, reference ${best1.limb}->${best1.holdId}`)
+    for (const s of path) if (pos1[s.limb] !== s.holdId && path.filter((o) => o.limb === s.limb).pop() === s) {
+      errs.push(`${s.limb} did not move to ${s.holdId} (${pos1[s.limb]})`)
+    }
     if (!sug1 || sug1.holdId !== best1.holdId || sug1.limb !== best1.limb) errs.push(`off-view: Lens suggestion differs from reference`)
     checkGlow(main, best1.holdId, errs, "off-view")
     if (labelText() !== LIMB_WORDS[best1.limb]) errs.push(`off-view label "${labelText()}", want "${LIMB_WORDS[best1.limb]}"`)
