@@ -77,7 +77,7 @@
     - '// @ui {"widget":"group_end"}'
     - '// @ui {"widget":"separator"}'
     - '// @ui {"widget":"group_start", "label":"Settings"}'
-    - '// @input float climberHeightCm = 175 {"hint":"Climber height in cm. Reach = height x 0.44 (175 cm -> 77 cm); feet use the same reach.", "widget":"slider", "min":120, "max":210, "step":1}'
+    - '// @input float climberHeightCm = 175 {"hint":"Climber height in cm at open; the climber changes it in the Lens (Height − / +, 150-200 cm in 5 cm steps). Arm reach = height x 0.44 (175 cm -> 77 cm); feet reach 1.25 x that from the hip.", "widget":"slider", "min":150, "max":200, "step":5}'
     - "// @input float rowDropCm = 20 {\"hint\":\"How far below the lower hand hold the control row's centre sits, in cm\", \"widget\":\"slider\", \"min\":10, \"max\":40, \"step\":0.5}"
     - '// @input vec4 greenColor = "{0.4,1,0.5,1}" {"hint":"Green ring: secure grip for you, from where you are now (score >= 0.7)", "widget":"color"}'
     - '// @input vec4 yellowColor = "{1,0.88,0.3,1}" {"hint":"Yellow ring: possible but harder (score 0.4 - 0.7)", "widget":"color"}'

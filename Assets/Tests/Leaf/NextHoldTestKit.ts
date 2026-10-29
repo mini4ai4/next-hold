@@ -16,7 +16,8 @@ import {GLOW_PROFILE, HOVER_PROFILE, RING_PROFILE} from "../../Scripts/Wall/Proc
 import {RefColour, RefLimb, RefPosition, RefPt, ReferenceRule, REF_LIMBS} from "./NextHoldReferenceRule"
 
 /** Brief: a 175 cm climber has 77 cm of reach (height x 0.44). Fixed here, not read from the Lens. */
-export const BRIEF_REACH = 175 * 0.44
+export const BRIEF_HEIGHT = 175
+export const BRIEF_REACH = BRIEF_HEIGHT * 0.44
 
 export const LIMB_WORDS: {[l: string]: string} = {LH: "L hand", RH: "R hand", LF: "L foot", RF: "R foot"}
 
@@ -109,9 +110,10 @@ export function problemHoldCoords(): {[id: string]: RefPt} {
   return out
 }
 
-/** The reference rule as the Lens must apply it at the preset: over the problem's holds, toward its top hold. */
-export function makeReference(): ReferenceRule {
-  return new ReferenceRule(problemHoldCoords(), presetTypes(), BRIEF_REACH, PRESET_TOP)
+/** The reference rule as the Lens must apply it at the preset: over the problem's holds, toward its
+ *  top hold, for a climber of `heightCm` (the brief's 175 unless given). */
+export function makeReference(heightCm = BRIEF_HEIGHT): ReferenceRule {
+  return new ReferenceRule(problemHoldCoords(), presetTypes(), heightCm * 0.44, PRESET_TOP)
 }
 
 export function presetPosition(): RefPosition {
@@ -517,6 +519,9 @@ export function ghostPathDots(n: number): vec2[] {
  * pressHold so the Lens re-runs its auto-select exactly as at open.
  */
 export async function restorePreset(main: NextHoldMain): Promise<void> {
+  // the brief's 175 cm climber (the height setting is Lens state; a scenario may have changed it)
+  for (let i = 0; i < 20 && main.getHeightCm() !== BRIEF_HEIGHT; i++) main.pressHeight(main.getHeightCm() > BRIEF_HEIGHT ? -1 : 1)
+  if (main.getHeightCm() !== BRIEF_HEIGHT) throw new Error("restorePreset: height " + main.getHeightCm())
   restoreProblem(main)
   if (main.getMode() !== "climb") main.pressMode()
   if (main.isAskArmed()) main.pressAsk()

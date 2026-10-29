@@ -23,7 +23,8 @@
 // getTorso(), getGroundViewCm(), getGroundSizedCm(), getRingLineWidth(), getFigureMask().
 // Test hook: setSizingCamera(cam) sizes Ground from another camera's distance.
 // Action API mirrors a pinch: pressHold(id), pressLimb(limb), pressAsk(),
-// pressMode(), pressView(), pickType(type), pressStart(), pressTop().
+// pressMode(), pressView(), pressHeight(±1), pickType(type), pressStart(), pressTop().
+// The climber's height (150-200 cm, set in the Lens) is state too: every reach is a share of it.
 //
 // View (Ground / On wall) is display only: both views share the same state and
 // scoring; switching it re-pushes the overlay in the same frame. It follows the
@@ -49,9 +50,9 @@ const WHY_HALF_W = 21.5
  *  title, five type buttons, the Start / Top row, gaps and padding tall */
 const PICKER_HALF_W = 10.5
 const PICKER_HALF_H = 24
-/** half the control row block (three rows of 5 cm buttons + the note + padding), until its layout reports a size */
+/** half the control row block (four rows of 5 cm buttons + the note + padding), until its layout reports a size */
 const ROW_HALF_W = 15.4
-const ROW_HALF_H = 11.6
+const ROW_HALF_H = 14.5
 /** Ground: gap (cm) between the problem's outermost ring and the control row beside it */
 const ROW_SIDE_GAP = 4
 
@@ -83,7 +84,12 @@ const LABEL_GAP = 2.4
 const LABEL_HALF_W = 7
 const LABEL_HALF_H = 2
 
-const LIMB_LABEL: {[l: string]: string} = {LH: "L hand", RH: "R hand", LF: "L foot", RF: "R foot"}
+/** the in-Lens height setting: range and step (cm) */
+export const HEIGHT_MIN_CM = 150
+export const HEIGHT_MAX_CM = 200
+export const HEIGHT_STEP_CM = 5
+
+const LIMB_LABEL: {[l: string]: string} ={LH: "L hand", RH: "R hand", LF: "L foot", RF: "R foot"}
 const HAND_LIMBS: Limb[] = ["LH", "RH"]
 
 @component
@@ -119,8 +125,8 @@ export class NextHoldMain extends BaseScriptComponent {
   @ui.separator
   @ui.group_start("Settings")
   @input
-  @hint("Climber height in cm at open. Arm reach = height x 0.44 (175 cm -> 77 cm); feet reach 1.25 x that from the hip.")
-  @widget(new SliderWidget(120, 210, 1))
+  @hint("Climber height in cm at open; the climber changes it in the Lens (Height − / +, 150-200 cm in 5 cm steps). Arm reach = height x 0.44 (175 cm -> 77 cm); feet reach 1.25 x that from the hip.")
+  @widget(new SliderWidget(150, 200, 5))
   climberHeightCm: number = 175
 
   @input
@@ -161,6 +167,8 @@ export class NextHoldMain extends BaseScriptComponent {
   private topFlag: string | null = null
   private position: Position = {LH: null, RH: null, LF: null, RF: null}
   private mode: Mode = "climb"
+  /** the climber's height (cm): every reach is a share of it. Starts at the Inspector value. */
+  private heightCm = 175
   private view: View = "ground"
   /** which side of the two thresholds the eye was last on; null = it hasn't crossed either yet */
   private distanceView: View | null = null
@@ -194,6 +202,7 @@ export class NextHoldMain extends BaseScriptComponent {
     for (const id of PRESET_START) this.startFlags[id] = true
     this.topFlag = PRESET_TOP
     this.position = {...PRESET_POSITION}
+    this.heightCm = Math.min(HEIGHT_MAX_CM, Math.max(HEIGHT_MIN_CM, this.climberHeightCm))
 
     this.wall.build()
     this.visuals = new NextHoldWallVisuals(
@@ -226,6 +235,8 @@ export class NextHoldMain extends BaseScriptComponent {
       this.controlRow.onAskPressed.add(() => this.pressAsk())
       this.controlRow.onModePressed.add(() => this.pressMode())
       this.controlRow.onViewPressed.add(() => this.pressView())
+      this.controlRow.onHeightStep.add((d) => this.pressHeight(d))
+      this.controlRow.setHeight(this.heightCm)
       this.typePicker.onTypePicked.add((t) => this.pickType(t))
       this.typePicker.onStartPressed.add(() => this.pressStart())
       this.typePicker.onTopPressed.add(() => this.pressTop())
@@ -330,6 +341,19 @@ export class NextHoldMain extends BaseScriptComponent {
   pressView(): void {
     if (!this.ready) return
     this.setView(this.view === "ground" ? "wall" : "ground")
+  }
+
+  /** Height − / +: one 5 cm step, kept in 150-200 cm. The wall recolours for the new body in the
+   *  same frame; the selected limb stays (the climber chose it), the position doesn't change. */
+  pressHeight(step: number): void {
+    if (!this.ready || step === 0) return
+    const snapped = Math.round(this.heightCm / HEIGHT_STEP_CM) * HEIGHT_STEP_CM
+    const next = Math.min(HEIGHT_MAX_CM, Math.max(HEIGHT_MIN_CM, snapped + (step > 0 ? 1 : -1) * HEIGHT_STEP_CM))
+    if (next === this.heightCm) return
+    this.heightCm = next
+    this.controlRow.setHeight(this.heightCm)
+    this.callouts.hideWhy()
+    this.recompute(false)
   }
 
   /** Only what is shown changes: no rescoring, same state, same frame. */
@@ -621,7 +645,7 @@ export class NextHoldMain extends BaseScriptComponent {
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────
-  private reach(): number { return this.climberHeightCm * 0.44 }
+  private reach(): number { return this.heightCm * 0.44 }
   /** The holds the rule sees: the problem's, plus any hold a limb is on (the centre of mass needs it). */
   private scoredHolds(): Holds {
     const out: Holds = {}
@@ -707,6 +731,9 @@ export class NextHoldMain extends BaseScriptComponent {
   getPosition(): Position { return {...this.position} }
   getSelectedLimb(): Limb { return this.selected }
   getReach(): number { return this.reach() }
+  /** the climber's height (cm) the rule is using, and as the panel shows it */
+  getHeightCm(): number { return this.heightCm }
+  getHeightLabel(): string { return this.controlRow.getHeightLabel() }
   getHoldIds(): string[] { return Object.keys(this.holds) }
   getHoldType(id: string): string | null { return this.holdTypes[id] || null }
   getHoldWallPosition(id: string): {x: number; y: number} | null { return this.holds[id] ? {...this.holds[id]} : null }

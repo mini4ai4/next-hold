@@ -1,15 +1,15 @@
 // NextHoldControlRowUI — the compact control row on the wall plane (brief:
 // "Control row"). Four limb toggles (LH, RH, LF, RF), a '?' button, a
-// Setup/Climb mode switch and a Ground / On wall view switch, plus the small
-// not-a-spotter note underneath.
+// Setup/Climb mode switch, a Ground / On wall view switch and the climber's
+// height (− / +), plus the small not-a-spotter note underneath.
 //
 // Owns: the row's UIKit widgets and their lit/unlit look. Passive view.
-// Main -> UI: setSelectedLimb(), setAskArmed(), setMode(), setView(), placeAt().
-// UI -> Main: onLimbPressed, onAskPressed, onModePressed, onViewPressed.
+// Main -> UI: setSelectedLimb(), setAskArmed(), setMode(), setView(), setHeight(), placeAt().
+// UI -> Main: onLimbPressed, onAskPressed, onModePressed, onViewPressed, onHeightStep (-1 / +1).
 // Must not: hold climbing state or decide anything; Main owns all state.
 //
 // Stable scene names for tests: Toggle_LH, Toggle_RH, Toggle_LF, Toggle_RF,
-// AskButton, ModeSwitch, ViewToggle, SafetyNote.
+// AskButton, ModeSwitch, ViewToggle, HeightDown, HeightUp, HeightLabel, SafetyNote.
 
 import {BackPlate} from "SpectaclesUIKit.lspkg/Scripts/BackPlate"
 import {Button} from "SpectaclesUIKit.lspkg/Scripts/Components/Button/Button"
@@ -94,10 +94,13 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
   private _onAskPressed = new Event<void>()
   private _onModePressed = new Event<void>()
   private _onViewPressed = new Event<void>()
+  private _onHeightStep = new Event<number>()
   get onLimbPressed(): PublicApi<string> { return this._onLimbPressed.publicApi() }
   get onAskPressed(): PublicApi<void> { return this._onAskPressed.publicApi() }
   get onModePressed(): PublicApi<void> { return this._onModePressed.publicApi() }
   get onViewPressed(): PublicApi<void> { return this._onViewPressed.publicApi() }
+  /** −1 or +1: one step down or up (Main decides the step and the range) */
+  get onHeightStep(): PublicApi<number> { return this._onHeightStep.publicApi() }
 
   private limbButtons: {[limb: string]: Button} = {}
   private askButton: Button
@@ -105,6 +108,7 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
   private modeLabel: Text
   private viewButton: Button
   private viewLabel: Text
+  private heightLabel: Text
   private backPlate: BackPlate
 
   private selectedLimb: string | null = null
@@ -186,6 +190,23 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
         this.resync.reset(0)
       })
     })
+    // the climber's height: reach comes from it, so a step recolours the wall for that body
+    const stepW = this.buttonHeight
+    const heightW = rowW - 2 * (stepW + this.buttonGap)
+    this.flexChild(content, {w: rowW, h: this.buttonHeight}, (rowSO) => {
+      rowSO.name = "HeightRow"
+      const row = this.makeFlex(rowSO, FlexDirection.Row, rowW, this.buttonHeight, this.buttonGap)
+      // the signs are thin glyphs: drawn at title size so they read as large as the letters
+      const down = this.addButton(row, "HeightDown", "−", stepW, this.buttonHeight, "Title1", false)
+      down.btn.onTriggerUp.add(() => this._onHeightStep.invoke(-1))
+      this.flexChild(row, {w: heightW, h: this.buttonHeight}, (so) => {
+        so.name = "HeightLabel"
+        this.heightLabel = this.addButtonLabel(so, "Height 175 cm", heightW, "Headline2")
+        this.heightLabel.getSceneObject().getTransform().setLocalPosition(new vec3(0, 0, LAYOUT_Z_LIFT))
+      })
+      const up = this.addButton(row, "HeightUp", "+", stepW, this.buttonHeight, "Title1", false)
+      up.btn.onTriggerUp.add(() => this._onHeightStep.invoke(+1))
+    })
 
     this.flexChild(content, {w: rowW, h: 3.6}, (noteSO) => {
       noteSO.name = "SafetyNote"
@@ -228,6 +249,13 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
     this.view = view
     this.applyStates()
   }
+
+  setHeight(cm: number): void {
+    if (this.heightLabel) this.heightLabel.text = "Height " + Math.round(cm) + " cm"
+  }
+
+  /** Read-back for tests: the height as shown. */
+  getHeightLabel(): string { return this.heightLabel ? this.heightLabel.text : "" }
 
   /** Move the row (Main computes where) and size it: scale 1 = its 110 cm size; Ground draws it
    *  larger from further back so it reads the same. */
@@ -272,7 +300,7 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
 
   // ── builders ──────────────────────────────────────────────────────────────
   private addButton(parent: SceneObject, name: string, label: string, w: number, h: number,
-                    role: TextRole): {btn: Button; label: Text} {
+                    role: TextRole, toggleable = true): {btn: Button; label: Text} {
     let btn: Button
     let text: Text
     this.flexChild(parent, {w, h}, (so) => {
@@ -280,7 +308,7 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
       btn = so.createComponent(Button.getTypeName()) as Button
       btn.setVariant(BUTTON_VARIANT)
       btn.size = new vec3(w, h, 1)
-      btn.setIsToggleable(true)
+      btn.setIsToggleable(toggleable)
       text = this.addButtonLabel(so, label, w - 0.5, role)
     })
     return {btn, label: text}
