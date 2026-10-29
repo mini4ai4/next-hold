@@ -1,8 +1,9 @@
-// Strict review B, "body readability": a thin, light stick figure on the wall
-// plane joins the four limb markers to a torso point at the centre of mass the
-// scoring uses. After a limb moves, the figure's end points match the limb
-// positions in the same frame.
-// End points are read from what renders: each Figure_<limb> line is a unit
+// Strict review B, "body readability", redrawn in session 15 so it reads as a
+// person, not an X: a head, a spine from the shoulders to the hips, and each limb
+// in two segments bent out at the elbow or knee, ending on its hold. Shoulders and
+// hips come from the scoring's own anchors. Thinner and softer than the rings.
+// After a limb moves, the figure follows in the same frame.
+// End points are read from what renders: each Figure_<line> is a unit
 // mesh along local +X, so its world start is the transform applied to (0,0,0)
 // and its world end the transform applied to (1,0,0). The expected centre of
 // mass comes from the test's own port of scoring.js (NextHoldReferenceRule).
@@ -19,7 +20,7 @@ import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
 import {HOVER_PROFILE} from "../../Scripts/Wall/ProceduralTextures"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
-import {camera, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, restorePreset} from "./NextHoldTestKit"
+import {AT_110, camera, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, restorePreset} from "./NextHoldTestKit"
 import {REF_LIMBS, RefPosition} from "./NextHoldReferenceRule"
 
 const TOL = 0.5 // cm in the wall plane
@@ -55,9 +56,12 @@ function outside(poly: {x: number; y: number}[], p: {x: number; y: number}): num
   return worst
 }
 
-/** brightness (0..1) of the rendered Figure_<limb> line at t along it, from its mesh's centre vertices */
-function lineBrightness(limb: string): (t: number) => number {
-  const mesh = (mustFind("Figure_" + limb).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh
+/** every figure line: two segments per limb, the spine, the shoulder and hip lines */
+const LINES = REF_LIMBS.map((l) => l + "_Upper").concat(REF_LIMBS.map((l) => l + "_Lower"), ["Spine", "Shoulders", "Hips"])
+
+/** brightness (0..1) of the rendered Figure_<name> line at t along it, from its mesh's centre vertices */
+function lineBrightness(name: string): (t: number) => number {
+  const mesh = (mustFind("Figure_" + name).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh
   const pos = mesh.getVertexDataForAttribute("position")
   const uv = mesh.getVertexDataForAttribute("texture0")
   const st: {t: number; f: number}[] = []
@@ -80,7 +84,7 @@ function checkFade(main: NextHoldMain, errs: string[], tag: string): number {
   const wallInv = mustFind("ClimbingWall (stand-in)").getTransform().getInvertedWorldTransform()
   let behind = 0
   const notes: string[] = []
-  for (const l of REF_LIMBS) {
+  for (const l of LINES) {
     const so = mustFind("Figure_" + l)
     if (!so.enabled) continue
     const m = so.getTransform().getWorldTransform()
@@ -98,14 +102,14 @@ function checkFade(main: NextHoldMain, errs: string[], tag: string): number {
     behind += inN
     if (badIn) errs.push(`${tag}: Figure_${l} shows (brightness > 0.1) at ${badIn} of ${inN} samples behind the control row`)
     if (badOut) errs.push(`${tag}: Figure_${l} is dimmed at ${badOut} samples more than ${CLEAR_CM} cm clear of the control row`)
-    notes.push(`${l} ${inN}/201 behind`)
+    if (inN) notes.push(`${l} ${inN}/201 behind`)
   }
-  const torso = mustFind("Figure_Torso")
-  if (torso.enabled) {
-    const tp = wallInv.multiplyPoint(torso.getTransform().getWorldPosition())
-    const ta = ((torso.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4).w
-    if (outside(plate, tp) <= 0 && ta > 0.1) errs.push(`${tag}: torso point is behind the control row but shows (alpha ${ta.toFixed(2)})`)
-    notes.push(`torso ${outside(plate, tp) <= 0 ? "behind" : (outside(plate, tp).toFixed(1) + " cm clear")}, alpha ${ta.toFixed(2)}`)
+  const head = mustFind("Figure_Head")
+  if (head.enabled) {
+    const hp = wallInv.multiplyPoint(head.getTransform().getWorldPosition())
+    const ha = ((head.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4).w
+    if (outside(plate, hp) <= 0 && ha > 0.1) errs.push(`${tag}: the head is behind the control row but shows (alpha ${ha.toFixed(2)})`)
+    notes.push(`head ${outside(plate, hp) <= 0 ? "behind" : (outside(plate, hp).toFixed(1) + " cm clear")}, alpha ${ha.toFixed(2)}`)
   }
   print(`[N8] ${tag}, fade behind the control row: ${notes.join(", ")}`)
   return behind
@@ -113,55 +117,99 @@ function checkFade(main: NextHoldMain, errs: string[], tag: string): number {
 
 interface FigSnap {
   pos: RefPosition
-  torso: vec3 | null
-  lines: {[limb: string]: {on: boolean; start: vec3; end: vec3; z: number}}
-  markers: {[limb: string]: vec3 | null}
+  /** wall cm: each figure line's start and end, whether it shows, and its distance off the wall */
+  lines: {[name: string]: {on: boolean; a: {x: number; y: number}; b: {x: number; y: number}; z: number}}
+  head: {on: boolean; c: {x: number; y: number}; r: number}
+  markers: {[limb: string]: {x: number; y: number} | null}
+}
+
+function toWallCm(p: vec3): {x: number; y: number; z: number} {
+  const l = mustFind("ClimbingWall (stand-in)").getTransform().getInvertedWorldTransform().multiplyPoint(p)
+  return {x: l.x + 120, y: l.y, z: l.z}
 }
 
 function snap(main: NextHoldMain): FigSnap {
-  const s: FigSnap = {pos: main.getPosition() as RefPosition, torso: null, lines: {}, markers: {}}
-  const t = mustFind("Figure_Torso")
-  s.torso = t.enabled ? t.getTransform().getWorldPosition() : null
-  const wallInv = mustFind("ClimbingWall (stand-in)").getTransform().getInvertedWorldTransform()
-  for (const l of REF_LIMBS) {
-    const so = mustFind("Figure_" + l)
+  const s: FigSnap = {pos: main.getPosition() as RefPosition, lines: {}, head: {on: false, c: {x: 0, y: 0}, r: 0}, markers: {}}
+  for (const n of LINES) {
+    const so = mustFind("Figure_" + n)
     const m = so.getTransform().getWorldTransform()
-    const start = m.multiplyPoint(vec3.zero())
-    s.lines[l] = {on: so.enabled, start, end: m.multiplyPoint(new vec3(1, 0, 0)), z: wallInv.multiplyPoint(start).z}
+    const a = toWallCm(m.multiplyPoint(vec3.zero())), b = toWallCm(m.multiplyPoint(new vec3(1, 0, 0)))
+    s.lines[n] = {on: so.enabled, a, b, z: a.z}
+  }
+  const head = mustFind("Figure_Head")
+  const hm = (head.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh
+  s.head = {on: head.enabled, c: toWallCm(head.getTransform().getWorldPosition()), r: (hm.aabbMax.x - hm.aabbMin.x) / 2}
+  for (const l of REF_LIMBS) {
     const mk = mustFind("Marker_" + l)
-    s.markers[l] = mk.enabled ? mk.getTransform().getWorldPosition() : null
+    s.markers[l] = mk.enabled ? toWallCm(mk.getTransform().getWorldPosition()) : null
   }
   return s
 }
 
-const planeD = (a: vec3, b: vec3) => Math.hypot(a.x - b.x, a.y - b.y)
+const d2 = (a: {x: number; y: number}, b: {x: number; y: number}) => Math.hypot(a.x - b.x, a.y - b.y)
 
-function check(s: FigSnap, errs: string[], tag: string): void {
-  const ref = makeReference()
+/**
+ * The figure reads as a person (session 15), against the test's own rule: shoulders at the
+ * shoulder anchors (centre of mass + (±18, 35)), hips at the rule's hip for each foot but at
+ * least 0.55 x reach under the shoulders, a spine from the middle of one to the middle of the
+ * other, a head above the spine, and each limb in two segments from its shoulder or hip that
+ * meet at a joint pushed out from the body (bent, not straight) and end on its hold and marker.
+ */
+function check(s: FigSnap, errs: string[], tag: string, heightCm = 175): void {
+  const ref = makeReference(heightCm)
+  const reach = heightCm * 0.44
   const com = ref.com(s.pos)
-  const wall = mustFind("ClimbingWall (stand-in)").getTransform().getWorldTransform()
-  const comW = wall.multiplyPoint(new vec3(com.x - 120, com.y, 0))
-  if (!s.torso) { errs.push(`${tag}: Figure_Torso hidden`); return }
-  const dT = planeD(s.torso, comW)
-  if (dT > TOL) errs.push(`${tag}: torso is ${dT.toFixed(2)} cm from the centre of mass (${com.x.toFixed(1)}, ${com.y.toFixed(1)})`)
-  const worst: string[] = []
+  const sh = {LH: ref.anchor("LH", com), RH: ref.anchor("RH", com)}
+  const top = Math.min(sh.LH.y, sh.RH.y) - 0.55 * reach
+  const hip = (l: "LF" | "RF") => { const h = ref.hip(l, s.pos, com); return {x: h.x, y: Math.min(h.y, top)} }
+  const hp = {LF: hip("LF"), RF: hip("RF")}
+  const mid = (p: {x: number; y: number}, q: {x: number; y: number}) => ({x: (p.x + q.x) / 2, y: (p.y + q.y) / 2})
+  const neck = mid(sh.LH, sh.RH), pelvis = mid(hp.LF, hp.RF)
+  const near = (name: string, got: {x: number; y: number}, want: {x: number; y: number}, what: string) => {
+    const d = d2(got, want)
+    if (d > TOL) errs.push(`${tag}: ${name} ${what} is ${d.toFixed(2)} cm off (${got.x.toFixed(1)}, ${got.y.toFixed(1)} vs ${want.x.toFixed(1)}, ${want.y.toFixed(1)})`)
+    return d
+  }
+  let worst = 0
+  for (const [n, a, b] of [["Spine", neck, pelvis], ["Shoulders", sh.LH, sh.RH], ["Hips", hp.LF, hp.RF]] as [string, any, any][]) {
+    const line = s.lines[n]
+    if (!line.on) { errs.push(`${tag}: Figure_${n} hidden`); continue }
+    worst = Math.max(worst, near("Figure_" + n, line.a, a, "start"), near("Figure_" + n, line.b, b, "end"))
+  }
+  if (!s.head.on) errs.push(`${tag}: no head`)
+  else {
+    if (!(s.head.c.y - s.head.r > neck.y) || Math.abs(s.head.c.x - neck.x) > TOL) errs.push(`${tag}: the head (${s.head.c.x.toFixed(1)}, ${s.head.c.y.toFixed(1)}, r ${s.head.r.toFixed(1)}) is not just above the shoulders' middle (${neck.x.toFixed(1)}, ${neck.y.toFixed(1)})`)
+    const smallest = Math.min(...Object.keys(HOLD_SIZE).map((t) => (HOLD_SIZE as any)[t].ringR))
+    if (s.head.r >= smallest) errs.push(`${tag}: the head (r ${s.head.r.toFixed(1)} cm) is as big as a ring (smallest r ${smallest})`)
+  }
+  const bends: string[] = []
   for (const l of REF_LIMBS) {
-    const line = s.lines[l]
     const hold = s.pos[l]
-    if (!line.on) { errs.push(`${tag}: Figure_${l} hidden`); continue }
+    const up = s.lines[l + "_Upper"], lo = s.lines[l + "_Lower"]
+    if (hold == null) { if (up.on || lo.on) errs.push(`${tag}: ${l} is off the wall but its figure limb shows`); continue }
+    if (!up.on || !lo.on) { errs.push(`${tag}: Figure_${l} upper ${up.on} lower ${lo.on}`); continue }
+    const root = l === "LH" || l === "RH" ? sh[l as "LH" | "RH"] : hp[l as "LF" | "RF"]
+    const holdW = toWallCm(mustFind("Hold_" + hold).getTransform().getWorldPosition())
+    worst = Math.max(worst,
+      near(`Figure_${l}_Upper`, up.a, root, "start (shoulder / hip)"),
+      near(`Figure_${l}_Lower`, lo.a, up.b, "start (the joint the upper segment ends on)"),
+      near(`Figure_${l}_Lower`, lo.b, holdW, "end (Hold_" + hold + ")"))
     const marker = s.markers[l]
-    if (!marker) { errs.push(`${tag}: Marker_${l} hidden`); continue }
-    const holdW = mustFind("Hold_" + hold).getTransform().getWorldPosition()
-    const dS = planeD(line.start, comW), dM = planeD(line.end, marker), dH = planeD(line.end, holdW)
-    if (dS > TOL) errs.push(`${tag}: Figure_${l} starts ${dS.toFixed(2)} cm from the torso point`)
-    if (dM > TOL) errs.push(`${tag}: Figure_${l} ends ${dM.toFixed(2)} cm from Marker_${l}`)
-    if (dH > TOL) errs.push(`${tag}: Figure_${l} ends ${dH.toFixed(2)} cm from Hold_${hold}`)
+    if (!marker) errs.push(`${tag}: Marker_${l} hidden`)
+    else worst = Math.max(worst, near(`Figure_${l}_Lower`, lo.b, marker, "end (its marker)"))
+    // bent: the joint stands off the straight root-hold line, on the body's outer side
+    const span = d2(root, holdW)
+    const off = ((holdW.x - root.x) * (up.b.y - root.y) - (holdW.y - root.y) * (up.b.x - root.x)) / Math.max(span, 1e-6)
+    const outward = (up.b.x - (root.x + holdW.x) / 2) * (l === "LH" || l === "LF" ? -1 : 1)
+    const limbLen = l === "LH" || l === "RH" ? reach : 1.25 * reach
+    if (span < limbLen && (Math.abs(off) < 0.05 * span || outward < -TOL)) errs.push(`${tag}: ${l}'s joint is not bent out from the body (off the line by ${off.toFixed(2)} cm over ${span.toFixed(1)}, outward ${outward.toFixed(2)})`)
     // on the wall plane: behind the holds' fronts, not out toward the face
     const front = HOLD_SIZE[holdById(hold as string)!.type].d
-    if (line.z < 0 || line.z > Math.min(1, front)) errs.push(`${tag}: Figure_${l} sits ${line.z.toFixed(2)} cm off the wall`)
-    worst.push(`${l}->${hold} ${Math.max(dS, dM, dH).toFixed(2)}`)
+    for (const seg of [up, lo]) if (seg.z < 0 || seg.z > Math.min(1, front)) errs.push(`${tag}: Figure_${l} sits ${seg.z.toFixed(2)} cm off the wall`)
+    bends.push(`${l}->${hold} bend ${Math.abs(off).toFixed(1)} cm`)
   }
-  print(`[N8] ${tag}: ${fmtPos(s.pos)}, torso (${com.x.toFixed(1)}, ${com.y.toFixed(1)}) off by ${dT.toFixed(2)} cm; end point errors ${worst.join(", ")}`)
+  print(`[N8] ${tag}: ${fmtPos(s.pos)}, neck (${neck.x.toFixed(1)}, ${neck.y.toFixed(1)}), pelvis (${pelvis.x.toFixed(1)}, ${pelvis.y.toFixed(1)}), ` +
+    `head r ${s.head.r.toFixed(1)}; worst point error ${worst.toFixed(2)} cm; ${bends.join(", ")}`)
 }
 
 @component
@@ -182,16 +230,28 @@ export class N8StickFigureScenario extends Scenario {
     await frames(3)
     if (checkFade(main, errs, "on wall, preset") === 0) errs.push("on wall, preset: no figure line passes behind the control row; the fade check proves nothing")
 
-    // thin and light: every channel bright on the additive display, not opaque
-    for (const n of ["Figure_Torso", ...REF_LIMBS.map((l) => "Figure_" + l)]) {
-      const c = (mustFind(n).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4
-      if (Math.min(c.x, c.y, c.z) < 0.8 || c.w > 0.9) errs.push(`${n} colour ${c} is not light and soft`)
+    // thinner and lower-contrast than the rings (session 15): the figure's line is narrower than the
+    // rings' crisp line at 110 cm (and the rings' grows with distance in Ground, the figure's does
+    // not), and its alpha is half or less of a ring's, so it is never the heaviest shape on the wall
+    const ringLine = AT_110.ringLine
+    let ringAlpha = 1
+    for (const id of main.getProblemHolds()) {
+      const so = mustFind("Ring_" + id)
+      if (so.enabled) ringAlpha = Math.min(ringAlpha, ((so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4).w)
     }
-    const v = mustFind("Figure_LH").getComponent("Component.RenderMeshVisual") as RenderMeshVisual
-    const lo = v.mesh.aabbMin, hi = v.mesh.aabbMax
-    const width = hi.y - lo.y
-    print(`[N8] line width ${width.toFixed(2)} cm`)
-    if (width > 2.5) errs.push(`stick lines are ${width.toFixed(2)} cm wide (want thin, <= 2.5 cm)`)
+    const widths: number[] = []
+    for (const n of LINES.concat(["Head"])) {
+      const so = mustFind("Figure_" + n)
+      const rmv = so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual
+      const c = rmv.mainMaterial.mainPass.baseColor as vec4
+      if (Math.min(c.x, c.y, c.z) < 0.8 || c.w > 0.5 * ringAlpha + 1e-6) errs.push(`Figure_${n} colour ${c}: want light and at most half a ring's alpha (${ringAlpha})`)
+      if (n === "Head" || !so.enabled) continue
+      // across the line: the unit mesh's height, times the segment's scale across
+      widths.push((rmv.mesh.aabbMax.y - rmv.mesh.aabbMin.y) * so.getTransform().getLocalScale().y)
+    }
+    const width = Math.max(...widths)
+    print(`[N8] figure line ${width.toFixed(2)} cm wide (ring line ${ringLine} cm at 110 cm, wider further back), alpha <= half a ring's`)
+    if (!(width < ringLine)) errs.push(`stick lines are ${width.toFixed(2)} cm wide, not thinner than the rings' ${ringLine} cm line`)
 
     // ── a real pinch moves a limb: the figure follows in the same frame ──
     const sug = main.getSuggestion()!
@@ -205,8 +265,8 @@ export class N8StickFigureScenario extends Scenario {
     else {
       if (got.value.pos[sug.limb] !== sug.holdId) errs.push(`pinch frame: ${sug.limb} on ${got.value.pos[sug.limb]}, want ${sug.holdId}`)
       check(got.value, errs, `pinch frame, ${sug.limb} -> ${sug.holdId}`)
-      const before = s0.lines[sug.limb].end, after = got.value.lines[sug.limb].end
-      if (planeD(before, after) < 1) errs.push(`pinch frame: Figure_${sug.limb} end did not move`)
+      const before = s0.lines[sug.limb + "_Lower"].b, after = got.value.lines[sug.limb + "_Lower"].b
+      if (d2(before, after) < 1) errs.push(`pinch frame: Figure_${sug.limb}_Lower end did not move`)
     }
 
     // ── a foot this time, and back in Ground (the figure shows in both) ──

@@ -35,9 +35,10 @@ import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interactio
 import {ClimbingWall} from "./Wall/ClimbingWall"
 import {HOLDS, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP, HOLD_SIZE, holdById} from "./Wall/WallLayout"
 import {
-  Evaluation, HoldTypes, Holds, LIMBS, Limb, Position, ScoreResult, bestMove, centreOfMass, evaluate, sequence,
+  Evaluation, HoldTypes, Holds, LEG_REACH, LIMBS, Limb, Position, ScoreResult, bestMove, centreOfMass, evaluate, hipOf,
+  sequence, shoulderOf,
 } from "./NextHoldScoring"
-import {DESIGN_VIEW_CM, NextHoldWallVisuals, OverlayState, RingColour, WallPt, minReadSize, ringLineWidth} from "./NextHoldWallVisuals"
+import {DESIGN_VIEW_CM, FigureBody, NextHoldWallVisuals, OverlayState, RingColour, WallPt, minReadSize, ringLineWidth} from "./NextHoldWallVisuals"
 import {NextHoldControlRowUI} from "./NextHoldControlRowUI"
 import {NextHoldTypePickerUI} from "./NextHoldTypePickerUI"
 import {NextHoldCalloutUI} from "./NextHoldCalloutUI"
@@ -88,6 +89,11 @@ const LABEL_HALF_H = 2
 export const HEIGHT_MIN_CM = 150
 export const HEIGHT_MAX_CM = 200
 export const HEIGHT_STEP_CM = 5
+
+/** stick figure: the shortest spine (shoulders to hips) as a share of reach (42 cm at 175 cm), and
+ *  the head's radius as a share of height (6 cm at 175 cm) */
+export const FIGURE_TORSO = 0.55
+export const FIGURE_HEAD = 0.034
 
 const LIMB_LABEL: {[l: string]: string} ={LH: "L hand", RH: "R hand", LF: "L foot", RF: "R foot"}
 const HAND_LIMBS: Limb[] = ["LH", "RH"]
@@ -450,6 +456,7 @@ export class NextHoldMain extends BaseScriptComponent {
       const h = this.holds[sug.holdId]
       const r = this.ringRadius(sug.holdId)
       this.callouts.showSuggestion(this.labelPos(sug.holdId), this.wallRot(), LIMB_LABEL[sug.limb])
+      body: this.figureBody(holds, reach),
       this.offViewArrow.setTarget(this.wall.wallToWorld(h.x, h.y, 0), sug.limb + ":" + sug.holdId, r)
     } else {
       this.callouts.hideSuggestion()
@@ -658,6 +665,23 @@ export class NextHoldMain extends BaseScriptComponent {
   }
   private wallRot(): quat { return this.wall.getTransform().getWorldRotation() }
   /** Slide a point (in camera space) so a panel halfW x halfH cm around it stays inside the view. */
+  /**
+   * The stick figure's body, from the scoring's own: shoulders where the hands reach from
+   * (shoulderOf), hips where the feet reach from (hipOf), but never closer than FIGURE_TORSO x
+   * reach under the shoulders, so the body never folds into a dot. An arm is `reach` long, a leg
+   * LEG_REACH x that: the same lengths the colours use. The head scales with height.
+   */
+  private figureBody(holds: Holds, reach: number): FigureBody {
+    const com = centreOfMass(this.position, holds)
+    const sL = shoulderOf("LH", com), sR = shoulderOf("RH", com)
+    const hip = (l: Limb) => {
+      const h = hipOf(l, this.position, holds, com, reach)
+      return {x: h.x, y: Math.min(h.y, Math.min(sL.y, sR.y) - FIGURE_TORSO * reach)}
+    }
+    return {shoulders: {L: sL, R: sR}, hips: {L: hip("LF"), R: hip("RF")}, armLength: reach,
+            legLength: LEG_REACH * reach, headR: FIGURE_HEAD * this.heightCm}
+  }
+
   private keepInView(p: vec3, halfW: number, halfH = 0): vec3 {
     const cam = WorldCameraFinderProvider.getInstance()
     const camComp = cam ? cam.getComponent() : null
@@ -742,6 +766,8 @@ export class NextHoldMain extends BaseScriptComponent {
   getHoldWorldPosition(id: string): vec3 | null {
     const h = this.holds[id]
     return h ? this.wall.wallToWorld(h.x, h.y, 0) : null
+  /** the stick figure's body as drawn: shoulders, hips, arm and leg length, head radius (wall cm) */
+  getFigureBody(): FigureBody | null { return this.overlay && this.overlay.body ? this.overlay.body : null }
   }
   /** Ring colour for the selected limb, or null when the hold shows no ring. */
   getHoldColour(id: string): RingColour | null {

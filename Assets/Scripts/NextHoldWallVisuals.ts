@@ -8,9 +8,10 @@
 // the hold's ring; GhostHoldRing_2..3 when that hold has no ring of its own because
 // a limb is on it now; the pill and that ring wear the step's own green / yellow / red),
 // the dotted GhostPath_1 (glow -> badge 2) and GhostPath_2 (badge 2 -> 3),
-// and the stick figure: Figure_LH / RH / LF / RF lines from
-// Figure_Torso to each limb's hold, faded where they pass behind the control
-// row) and their colours. One cloned material per overlay.
+// and the stick figure: Figure_Head, Figure_Spine / Shoulders / Hips and two
+// segments per limb, Figure_<limb>_Upper / _Lower, bent at the elbow or knee and
+// ending on the limb's hold, faded where they pass behind the control row) and
+// their colours. One cloned material per overlay.
 // The ring line, glow and ghost badges are sized for the view distance in the state
 // (viewCm, in Ground the eye's measured distance): from further back they grow so
 // they read as they do at 110 cm.
@@ -59,6 +60,9 @@ export interface OverlayState {
   labelScale?: number
   /** stick figure: the torso point in wall cm (the centre of mass the scoring uses); null = no figure */
   torso: {x: number; y: number} | null
+  /** the stick figure's body in wall cm, from the scoring (Main): shoulders, hips, and how long an
+   *  arm and a leg are (each drawn as two equal segments, bent at the elbow / knee); null = no figure */
+  body?: FigureBody | null
 }
 
 export interface FigureBody {
@@ -132,15 +136,24 @@ const GHOST_PATH_GAP = 0.8
 export const ORDER_PATH = 1
 export const ORDER_GHOST = 2
 export const ORDER_GHOST_NUMBER = 3
-/** stick figure: thin light lines on the wall plane, under the rings and the markers */
-const FIGURE_COLOR = new vec4(0.95, 0.94, 0.88, 0.8)
+/** stick figure (session 15): a person, not an X. Head, spine from the shoulders to the hips, and each
+ *  limb in two segments bent at the elbow / knee, ending on its hold. Thin and soft: a 1 cm line
+ *  (the rings' crisp line is 1.6 cm and grows with distance, the figure's does not) at a lower
+ *  alpha than any ring, so it is never the heaviest shape on the wall. Under the rings and markers. */
+const FIGURE_COLOR = new vec4(0.92, 0.92, 0.86, 0.5)
 const FIGURE_Z = 0.25
-const FIGURE_TORSO_R = 2.2
+/** the line mesh is 1.8 cm across (the hover profile); drawn at this share of it: ~1.0 cm */
+const FIGURE_LINE_SCALE = 0.55
+/** figure line names: two per limb, the spine, the shoulder and the hip lines */
+export const FIGURE_LIMB_PARTS = ["Upper", "Lower"]
+export const FIGURE_BODY_LINES = ["Spine", "Shoulders", "Hips"]
+/** the head's alpha is a step below the lines' (it is a filled disc) */
+const FIGURE_HEAD_ALPHA = 0.4
 /** where the figure passes behind the control row it fades out: fully faded from GAP cm
  *  outside the panel's outline (as seen from the eye) inward, ramping back up over RAMP cm */
 const FIGURE_FADE_GAP = 1.5
 const FIGURE_FADE_RAMP = 4
-/** torso alpha when the torso point itself is behind the panel */
+/** the head's alpha, as a share of its own, when it is behind the panel */
 const FIGURE_TORSO_HIDDEN = 0.05
 /** glow breathing: alpha range of the suggestion's halo */
 const GLOW_MIN = 0.6
@@ -218,6 +231,28 @@ export function clipConvex(poly: WallPt[], a: WallPt, b: WallPt, margin: number)
   return {t0, t1}
 }
 
+/** how far an elbow or knee sits out from the straight line, as a share of the limb's span */
+export const FIGURE_BEND = 0.14
+
+/**
+ * Elbow or knee of a limb drawn from root to end: at the middle, pushed out from the body toward
+ * `side` (-1 = the body's left, +1 = its right) by FIGURE_BEND x the span, as a climber's elbows
+ * and knees go. A sketch, not a skeleton: the bend reads as a limb, and never flings a joint wide.
+ * A limb at full stretch (span >= 2 x seg) is straight; one lying flat across bends downward.
+ */
+export function figureJoint(root: WallPt, end: WallPt, seg: number, side: number): WallPt {
+  const dx = end.x - root.x, dy = end.y - root.y
+  const d = Math.hypot(dx, dy)
+  const mid = {x: (root.x + end.x) / 2, y: (root.y + end.y) / 2}
+  if (d < 1e-6) return {x: root.x + side * FIGURE_BEND * seg, y: root.y}
+  if (d >= 2 * seg) return mid
+  let nx = -dy / d, ny = dx / d
+  const flip = Math.abs(nx) > 1e-3 ? nx * side < 0 : ny > 0
+  if (flip) { nx = -nx; ny = -ny }
+  const h = FIGURE_BEND * d
+  return {x: mid.x + h * nx, y: mid.y + h * ny}
+}
+
 /** a placed badge: its centre, the hold it belongs to, its angle (rad) and distance from that hold,
  *  and its pill's half straight length L and end radius R (cm) */
 interface GhostAt {x: number; y: number; hold: HoldDef; a: number; d: number; L: number; R: number}
@@ -258,8 +293,10 @@ export class NextHoldWallVisuals {
   /** path 1 joins the glow (step 1) to badge 2, path 2 badge 2 to badge 3 */
   private ghostPaths: {so: SceneObject; rmv: RenderMeshVisual}[] = []
   private dotMeshes: {[k: string]: RenderMesh} = {}
-  private figure: {[limb: string]: {so: SceneObject; rmv: RenderMeshVisual}} = {}
-  private torso: {so: SceneObject; mat: Material}
+  /** figure lines by name: "LH_Upper", "LH_Lower", ..., "Spine", "Shoulders", "Hips" */
+  private figure: {[name: string]: {so: SceneObject; rmv: RenderMeshVisual}} = {}
+  private head: {so: SceneObject; mat: Material; rmv: RenderMeshVisual}
+  private headMeshes: {[r: string]: RenderMesh} = {}
   /** the control row's outline on the wall as seen from the eye (wall cm), or null */
   private figureMask: WallPt[] | null = null
   private lineMeshes: {[k: string]: RenderMesh} = {}
@@ -333,20 +370,19 @@ export class NextHoldWallVisuals {
       this.ghosts.push({ring, label, holdRing})
     }
 
-    // stick figure: one unit-long line mesh along +X, stretched and turned per limb
+    // stick figure: one unit-long line mesh along +X, stretched and turned per segment
     const lineMesh = this.lineMesh([{t: 0, f: 1}, {t: 1, f: 1}])
-    for (const limb of ["LH", "RH", "LF", "RF"]) {
-      const f = this.makeVisual("Figure_" + limb, lineMesh)
+    const names = [] as string[]
+    for (const limb of ["LH", "RH", "LF", "RF"]) for (const part of FIGURE_LIMB_PARTS) names.push(limb + "_" + part)
+    for (const n of names.concat(FIGURE_BODY_LINES)) {
+      const f = this.makeVisual("Figure_" + n, lineMesh)
       f.mat.mainPass.baseColor = FIGURE_COLOR
       f.so.enabled = false
-      this.figure[limb] = {so: f.so, rmv: f.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual}
+      this.figure[n] = {so: f.so, rmv: f.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual}
     }
-    const torsoGeo = new UVGeo()
-    addProfileAnnulus(torsoGeo, 0, FIGURE_TORSO_R, 32, profileV(ProfileRow.Marker))
-    const torso = this.makeVisual("Figure_Torso", toMesh(torsoGeo))
-    torso.mat.mainPass.baseColor = FIGURE_COLOR
-    torso.so.enabled = false
-    this.torso = torso
+    const head = this.makeVisual("Figure_Head", this.headMesh(6))
+    head.so.enabled = false
+    this.head = {...head, rmv: head.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual}
 
     const disc = new UVGeo()
     addProfileAnnulus(disc, 0, MARKER_R, 40, profileV(ProfileRow.Marker))
@@ -459,6 +495,8 @@ export class NextHoldWallVisuals {
       }
       at.push({x: best.x, y: best.y, hold: h, a: best.a, d: best.d, L: badgeL, R: badgeR})
       ;(g.ring.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.pillMesh(badgeL, badgeR)
+      // the tag's outline says how secure its move is at its turn; the text stays light to read
+      g.ring.mat.mainPass.baseColor = this.colours[step.colour]
       g.label.text.size = GHOST_NUMBER_SIZE * gk
       g.label.text.text = (i + 2) + " · " + step.limb
       g.ring.so.getTransform().setLocalPosition(this.wallToLocal(best.x, best.y, RING_Z + 0.15))
@@ -498,8 +536,6 @@ export class NextHoldWallVisuals {
       m.so.getTransform().setLocalPosition(this.wallToLocal(h.x, h.y, HOLD_SIZE[h.type].d * 1.4 + 1 + nudge))
       const k = limb === s.selectedLimb ? MARKER_SELECTED : MARKER_DIM
       m.mat.mainPass.baseColor = new vec4(k, k, k, 1)
-      // the tag's outline says how secure its move is at its turn; the text stays light to read
-      g.ring.mat.mainPass.baseColor = this.colours[step.colour]
     }
   }
 
@@ -572,30 +608,67 @@ export class NextHoldWallVisuals {
     if (this.state) this.applyFigure(this.state)
   }
 
-  /** Stick figure: a line from the torso point to each limb's hold; a limb off the wall has none. */
+  /**
+   * Stick figure: a person. Spine from the middle of the shoulders to the middle of the hips, a
+   * shoulder line and a hip line, a small head above the shoulders, and each limb on the wall in
+   * two equal segments from its shoulder (hands) or hip (feet), bent outward at the elbow or knee
+   * (see figureJoint), ending on its hold. A limb off the wall has none.
+   */
   private applyFigure(s: OverlayState): void {
-    const t = s.torso
-    this.torso.so.enabled = !!t
-    if (t) {
-      this.torso.so.getTransform().setLocalPosition(this.wallToLocal(t.x, t.y, FIGURE_Z + 0.02))
-      const hidden = this.figureMask && insideConvex(this.figureMask, t, FIGURE_FADE_GAP + FIGURE_TORSO_R)
-      const c = FIGURE_COLOR
-      this.torso.mat.mainPass.baseColor = new vec4(c.x, c.y, c.z, hidden ? c.w * FIGURE_TORSO_HIDDEN : c.w)
-    }
+    const b = s.body || null
+    for (const n of Object.keys(this.figure)) this.figure[n].so.enabled = false
+    this.head.so.enabled = !!b
+    if (!b) return
+    const mid = (p: WallPt, q: WallPt): WallPt => ({x: (p.x + q.x) / 2, y: (p.y + q.y) / 2})
+    const neck = mid(b.shoulders.L, b.shoulders.R), pelvis = mid(b.hips.L, b.hips.R)
+    this.figureLine("Spine", neck, pelvis)
+    this.figureLine("Shoulders", b.shoulders.L, b.shoulders.R)
+    this.figureLine("Hips", b.hips.L, b.hips.R)
+    const centreX = (neck.x + pelvis.x) / 2
     for (const limb of ["LH", "RH", "LF", "RF"]) {
-      const f = this.figure[limb]
       const id = s.position[limb]
       const h = id ? this.holdDef(id) : null
-      f.so.enabled = !!t && !!h
-      if (!t || !h) continue
-      const dx = h.x - t.x, dy = h.y - t.y
-      const len = Math.max(0.01, Math.hypot(dx, dy))
-      const tr = f.so.getTransform()
-      tr.setLocalPosition(this.wallToLocal(t.x, t.y, FIGURE_Z))
-      tr.setLocalRotation(quat.fromEulerAngles(0, 0, Math.atan2(dy, dx)))
-      tr.setLocalScale(new vec3(len, 1, 1))
-      f.rmv.mesh = this.lineMesh(this.fadeStations(t, h, len))
+      if (!h) continue
+      const hand = limb === "LH" || limb === "RH"
+      const left = limb === "LH" || limb === "LF"
+      const root = hand ? (left ? b.shoulders.L : b.shoulders.R) : (left ? b.hips.L : b.hips.R)
+      const joint = figureJoint(root, h, (hand ? b.armLength : b.legLength) / 2, root.x < centreX ? -1 : root.x > centreX ? 1 : left ? -1 : 1)
+      this.figureLine(limb + "_Upper", root, joint)
+      this.figureLine(limb + "_Lower", joint, h)
     }
+    // the head: a small soft disc above the shoulders, faded where it is behind the control row
+    const head = {x: neck.x, y: neck.y + b.headR * 1.5}
+    this.head.rmv.mesh = this.headMesh(b.headR)
+    this.head.so.getTransform().setLocalPosition(this.wallToLocal(head.x, head.y, FIGURE_Z + 0.02))
+    const hidden = this.figureMask && insideConvex(this.figureMask, head, FIGURE_FADE_GAP + b.headR)
+    const c = FIGURE_COLOR
+    this.head.mat.mainPass.baseColor = new vec4(c.x, c.y, c.z, hidden ? FIGURE_HEAD_ALPHA * FIGURE_TORSO_HIDDEN : FIGURE_HEAD_ALPHA)
+  }
+
+  /** one thin figure line from a to b (wall cm), faded where it passes behind the control row */
+  private figureLine(name: string, a: WallPt, b: WallPt): void {
+    const f = this.figure[name]
+    const dx = b.x - a.x, dy = b.y - a.y
+    const len = Math.max(0.01, Math.hypot(dx, dy))
+    const tr = f.so.getTransform()
+    tr.setLocalPosition(this.wallToLocal(a.x, a.y, FIGURE_Z))
+    tr.setLocalRotation(quat.fromEulerAngles(0, 0, Math.atan2(dy, dx)))
+    tr.setLocalScale(new vec3(len, FIGURE_LINE_SCALE, 1))
+    f.rmv.mesh = this.lineMesh(this.fadeStations(a, b, len))
+    f.so.enabled = true
+  }
+
+  /** solid disc of radius r for the head (the marker profile's solid centre, as the path's dots), so
+   *  it can't be read as a ring around a hold */
+  private headMesh(r: number): RenderMesh {
+    const key = r.toFixed(2)
+    if (!this.headMeshes[key]) {
+      if (Object.keys(this.headMeshes).length > 16) this.headMeshes = {}
+      const g = new UVGeo()
+      addProfileAnnulus(g, 0, r, 32, profileV(ProfileRow.Marker), [0, 0, 0], 1, 1, 0, 0, 0.34)
+      this.headMeshes[key] = toMesh(g)
+    }
+    return this.headMeshes[key]
   }
 
   /**
