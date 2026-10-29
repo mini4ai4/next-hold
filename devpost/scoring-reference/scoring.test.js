@@ -55,5 +55,32 @@ check("every candidate hold gets one colour", allColoured);
 check("a best next move is suggested and in reach", ev.suggestion && ev.suggestion.score > 0, ev.suggestion);
 check("suggestion is the jug 'up'", ev.suggestion && ev.suggestion.holdId === "up", ev.suggestion);
 
+// ---- the upward goal (a top hold) -------------------------------------------
+// No top hold: the goal is neutral, so everything above is unchanged.
+check("no top hold: goalFactor 1, rank = score", upRes.parts.goalFactor === 1 && upRes.rank === upRes.score, upRes);
+
+// Two jugs both in comfortable reach of the RH shoulder, above the COM, no crossing:
+// same grip, same score. With a top hold up the wall, the higher one ranks better.
+const gHolds = { ...holds, hiJug: { x: 165, y: 175 }, loJug: { x: 165, y: 125 }, top: { x: 150, y: 280 } };
+const gTypes = { ...holdTypes, hiJug: "jug", loJug: "jug", top: "jug" };
+const hi = S.scoreHold({ limb: "RH", holdId: "hiJug", holds: gHolds, holdTypes: gTypes, position, reach: REACH, top: "top" });
+const lo = S.scoreHold({ limb: "RH", holdId: "loJug", holds: gHolds, holdTypes: gTypes, position, reach: REACH, top: "top" });
+check("same-grip jugs: equal score, the higher one nearer the top ranks better",
+  hi.score === lo.score && hi.rank > lo.rank, { hi: hi.rank, lo: lo.rank });
+check("the goal never changes the colour (both jugs stay green)", hi.colour === "green" && lo.colour === "green");
+const gEv = S.evaluate({ holds: gHolds, holdTypes: gTypes, position, limb: "RH", reach: REACH, top: "top" });
+// three green jugs (up at y 190, hiJug 175, loJug 125): the higher, the better ranked
+const gRank = {};
+for (const r of gEv.results) gRank[r.holdId] = r.rank;
+check("with a top hold, green jugs rank by height: up > hiJug > loJug, suggestion up",
+  gRank.up > gRank.hiJug && gRank.hiJug > gRank.loJug && gEv.suggestion && gEv.suggestion.holdId === "up", gRank);
+check("colour is still grip x reach x balance for every hold", gEv.results.every((r) => r.colour === S.colourFor(r.score)));
+check("goalFactor stays within 0.5..1", gEv.results.every((r) => r.parts.goalFactor >= 0.5 && r.parts.goalFactor <= 1));
+
+// Out of reach stays red even when the hold IS the top: the goal can't lift it.
+const farTop = S.scoreHold({ limb: "RH", holdId: "far", holds, holdTypes, position, reach: REACH, top: "far" });
+check("out of reach stays red and ranks 0, even as the top hold",
+  farTop.colour === "red" && farTop.score === 0 && farTop.rank === 0 && farTop.parts.goalFactor > 0.75, farTop);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

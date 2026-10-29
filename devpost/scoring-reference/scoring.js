@@ -69,6 +69,26 @@ function balanceFactor(limb, target, position, holds, com) {
   return f;
 }
 
+// Goal: among moves of similar quality, the hold that gets you higher and closer
+// to the problem's top hold ranks better.
+//   progress = (height gained + distance to the top saved) / (2 x reach), in -1..1
+//   goalFactor = 0.75 + 0.25 x progress            (0.5 = a full move away, 1 = a full move up)
+// "From" is the hold the moving limb is on now (its anchor if it is off the wall).
+// No top hold -> 1. The goal only ranks moves: it never changes the colour, which
+// stays grip x reach x balance, so an out-of-reach hold is still score 0 -> red,
+// and it ranks last (rank = score x goalFactor = 0).
+const GOAL_WEIGHT = 0.25;
+
+function goalFactor(limb, target, position, holds, top, reach, com) {
+  if (top == null || !holds[top]) return 1.0;
+  const on = position[limb];
+  const from = on != null && holds[on] ? holds[on] : shoulderOf(limb, com);
+  const t = holds[top];
+  const gained = (target.y - from.y) + (dist(from, t) - dist(target, t));
+  const progress = Math.max(-1, Math.min(1, gained / (2 * reach)));
+  return 1.0 - GOAL_WEIGHT + GOAL_WEIGHT * progress;
+}
+
 function colourFor(score) {
   if (score >= 0.7) return "green";
   if (score >= 0.4) return "yellow";
@@ -76,7 +96,8 @@ function colourFor(score) {
 }
 
 // Score one candidate hold for the limb that would move to it.
-function scoreHold({ limb, holdId, holds, holdTypes, position, reach }) {
+// score (-> colour) = grip x reach x balance; rank (-> the suggestion) = score x goal.
+function scoreHold({ limb, holdId, holds, holdTypes, position, reach, top = null }) {
   const target = holds[holdId];
   const quality = GRIP[holdTypes[holdId]] ?? 0.5;
   const com = centreOfMass(position, holds);
@@ -85,6 +106,8 @@ function scoreHold({ limb, holdId, holds, holdTypes, position, reach }) {
   const rf = reachFactor(d, reach);
   const bf = balanceFactor(limb, target, position, holds, com);
   const score = quality * rf * bf;
+  const gf = goalFactor(limb, target, position, holds, top, reach, com);
+  const rank = score * gf;
 
   // human-readable "why" (shown only on the suggested hold / on ask)
   const why = [];
@@ -93,18 +116,18 @@ function scoreHold({ limb, holdId, holds, holdTypes, position, reach }) {
   else if (rf < 1) why.push("a long reach");
   if (bf < 1) why.push("committing balance");
 
-  return { holdId, limb, score, colour: colourFor(score), why: why.join(", "),
-           parts: { quality, reachFactor: rf, balanceFactor: bf, dist: d } };
+  return { holdId, limb, score, colour: colourFor(score), rank, why: why.join(", "),
+           parts: { quality, reachFactor: rf, balanceFactor: bf, goalFactor: gf, dist: d } };
 }
 
-// Colour every reachable candidate hold, and pick the single best next move.
-function evaluate({ holds, holdTypes, position, limb, reach }) {
+// Colour every reachable candidate hold, and pick the single best next move (by rank).
+function evaluate({ holds, holdTypes, position, limb, reach, top = null }) {
   const occupied = new Set([position.LH, position.RH, position.LF, position.RF]);
   const results = Object.keys(holds)
     .filter((id) => !occupied.has(id))
-    .map((holdId) => scoreHold({ limb, holdId, holds, holdTypes, position, reach }));
-  const best = results.reduce((b, r) => (r.score > (b?.score ?? -1) ? r : b), null);
+    .map((holdId) => scoreHold({ limb, holdId, holds, holdTypes, position, reach, top }));
+  const best = results.reduce((b, r) => (r.rank > (b?.rank ?? -1) ? r : b), null);
   return { results, suggestion: best && best.score > 0 ? best : null };
 }
 
-module.exports = { GRIP, reachFactor, balanceFactor, colourFor, scoreHold, evaluate };
+module.exports = { GRIP, GOAL_WEIGHT, reachFactor, balanceFactor, goalFactor, colourFor, scoreHold, evaluate };

@@ -108,9 +108,9 @@ export function problemHoldCoords(): {[id: string]: RefPt} {
   return out
 }
 
-/** The reference rule as the Lens must apply it at the preset: over the problem's holds. */
+/** The reference rule as the Lens must apply it at the preset: over the problem's holds, toward its top hold. */
 export function makeReference(): ReferenceRule {
-  return new ReferenceRule(problemHoldCoords(), presetTypes(), BRIEF_REACH)
+  return new ReferenceRule(problemHoldCoords(), presetTypes(), BRIEF_REACH, PRESET_TOP)
 }
 
 export function presetPosition(): RefPosition {

@@ -4,9 +4,23 @@ This folder proves the **Next Hold** colour rule works *before* CLAD builds the 
 the design brief's done-criteria rest on a rule that's been run, not guessed.
 
 - `scoring.js` — a pure-JS reference of the green/yellow/red rule from `../IDEA.md`
-  (grip quality × reach factor × balance factor → green ≥ 0.7, yellow 0.4–0.7, red < 0.4).
-- `scoring.test.js` — 11 assertions tying the rule to the brief's done-criteria. Run:
-  `node scoring.test.js` → **11 passed, 0 failed**.
+  (grip quality × reach factor × balance factor → green ≥ 0.7, yellow 0.4–0.7, red < 0.4),
+  plus the upward goal (below).
+- `scoring.test.js` — 18 assertions tying the rule to the brief's done-criteria. Run:
+  `node scoring.test.js` → **18 passed, 0 failed**.
+
+## The upward goal (added 28 Oct, after the pre-submission review)
+Among moves of similar quality, a hold that gets you higher and closer to the problem's
+top hold should rank better. `goalFactor = 0.75 + 0.25 × progress`, where progress is
+(height gained + distance to the top saved) ÷ (2 × reach), clamped to −1…1, measured from
+the hold the moving limb is on now. No top hold → 1.
+
+The goal only **ranks**: `rank = score × goalFactor` picks the suggestion, while the
+colour still comes from `score` alone. So green keeps meaning "secure grip for you, from
+where you are now", and out of reach is still score 0 → red, ranked last, even when that
+hold is the top. Without it the rule kept suggesting "back down to the hold you just left"
+after a good move up (a jug going down beat a pinch going up), so a look-ahead over the best
+move went up, down, up.
 
 ## What this is and isn't
 This is **design work**, kept deliberately separate from the submission's Lens code. The

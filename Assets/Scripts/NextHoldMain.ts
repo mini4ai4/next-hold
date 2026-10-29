@@ -282,11 +282,13 @@ export class NextHoldMain extends BaseScriptComponent {
   private recompute(autoSelect: boolean): void {
     const reach = this.reach()
     const holds = this.scoredHolds()
+    // the problem's top hold pulls the suggestion upward (ranking only, never the colour)
+    const goalTop = this.getTopHold()
     if (autoSelect) {
-      const best = bestMove({holds, holdTypes: this.holdTypes, position: this.position, reach})
+      const best = bestMove({holds, holdTypes: this.holdTypes, position: this.position, reach, top: goalTop})
       if (best) this.selected = best.limb
     }
-    this.evaluation = evaluate({holds, holdTypes: this.holdTypes, position: this.position, limb: this.selected, reach})
+    this.evaluation = evaluate({holds, holdTypes: this.holdTypes, position: this.position, limb: this.selected, reach, top: goalTop})
     this.byHold = {}
     for (const r of this.evaluation.results) this.byHold[r.holdId] = r
 
@@ -294,14 +296,13 @@ export class NextHoldMain extends BaseScriptComponent {
     const rings: {[id: string]: RingColour | null} = {}
     const marks: {[id: string]: boolean} = {}
     const tags: {[id: string]: string} = {}
-    const top = this.getTopHold()
     for (const id of Object.keys(this.holds)) {
       rings[id] = climb && this.byHold[id] ? this.byHold[id].colour : null
       // outside setup the holds that aren't in the problem stay visible, but dim
       this.wall.setHoldDim(id, climb && !this.problem[id])
       if (climb || !this.problem[id]) continue
       marks[id] = true
-      const tag = (this.startFlags[id] ? ["START"] : []).concat(top === id ? ["TOP"] : [])
+      const tag = (this.startFlags[id] ? ["START"] : []).concat(goalTop === id ? ["TOP"] : [])
       if (tag.length) tags[id] = tag.join(" · ")
     }
     const sug = climb ? this.evaluation.suggestion : null

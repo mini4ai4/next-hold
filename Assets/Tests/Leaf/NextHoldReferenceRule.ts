@@ -4,7 +4,8 @@
 // compute the expected colour / score / why for every hold with this file and
 // compare that to what the Lens renders. Do not import the Lens scoring here.
 // bestMove() follows the brief: evaluate all four limbs, keep the single best
-// (limb, hold) by score, first limb wins ties in LH, RH, LF, RF order.
+// (limb, hold) by rank (score x the upward goal toward the top hold), first
+// limb wins ties in LH, RH, LF, RF order. The colour stays from the score.
 
 export type RefLimb = "LH" | "RH" | "LF" | "RF"
 export type RefColour = "green" | "yellow" | "red"
@@ -19,17 +20,22 @@ export interface RefResult {
   limb: RefLimb
   score: number
   colour: RefColour
+  /** score x goalFactor: what the suggestion is picked by */
+  rank: number
   why: string
   dist: number
   reachFactor: number
   balanceFactor: number
+  goalFactor: number
 }
 
 export class ReferenceRule {
+  /** top: the problem's top hold (the upward goal); null = no goal, rank = score */
   constructor(
     private holds: {[id: string]: RefPt},
     private types: {[id: string]: string},
     private reach: number,
+    private top: string | null = null,
   ) {}
 
   com(p: RefPosition): RefPt {
@@ -74,12 +80,22 @@ export class ReferenceRule {
     }
 
     const s = q * rf * bf
+    // upward goal: (height gained + distance to the top saved) / (2 x reach), from the limb's hold
+    let gf = 1.0
+    const top = this.top != null ? this.holds[this.top] : undefined
+    if (top) {
+      const on = p[limb]
+      const from = on != null && this.holds[on] ? this.holds[on] : a
+      const dt = (u: RefPt) => Math.sqrt((u.x - top.x) * (u.x - top.x) + (u.y - top.y) * (u.y - top.y))
+      const progress = Math.max(-1, Math.min(1, ((t.y - from.y) + (dt(from) - dt(t))) / (2 * this.reach)))
+      gf = 0.75 + 0.25 * progress
+    }
     const why: string[] = [q >= 0.9 ? "good jug" : this.types[holdId]]
     if (rf === 0) why.push("out of reach")
     else if (rf < 1) why.push("a long reach")
     if (bf < 1) why.push("committing balance")
     const colour: RefColour = s >= 0.7 ? "green" : s >= 0.4 ? "yellow" : "red"
-    return {holdId, limb, score: s, colour, why: why.join(", "), dist: d, reachFactor: rf, balanceFactor: bf}
+    return {holdId, limb, score: s, colour, rank: s * gf, why: why.join(", "), dist: d, reachFactor: rf, balanceFactor: bf, goalFactor: gf}
   }
 
   /** Every hold no limb is on, scored for `limb`. */
@@ -89,7 +105,7 @@ export class ReferenceRule {
     const results: RefResult[] = []
     for (const id of Object.keys(this.holds)) if (!occ[id]) results.push(this.score(limb, id, p))
     let best: RefResult | null = null
-    for (const r of results) if (r.score > (best ? best.score : -1)) best = r
+    for (const r of results) if (r.rank > (best ? best.rank : -1)) best = r
     return {results, suggestion: best && best.score > 0 ? best : null}
   }
 
@@ -97,8 +113,13 @@ export class ReferenceRule {
     let best: RefResult | null = null
     for (const l of REF_LIMBS) {
       const s = this.evaluate(l, p).suggestion
-      if (s && s.score > (best ? best.score : -1)) best = s
+      if (s && s.rank > (best ? best.rank : -1)) best = s
     }
     return best
+  }
+
+  /** the same rule without the upward goal (to show what the goal changes) */
+  withoutGoal(): ReferenceRule {
+    return new ReferenceRule(this.holds, this.types, this.reach, null)
   }
 }

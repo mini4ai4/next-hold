@@ -2,9 +2,10 @@
 // Run from the project root:  node tests/scoring.port.test.mjs
 // (Node 22.6+ strips the TS types natively.)
 //
-// 1. Re-runs the 11 reference checks from devpost/scoring-reference against the port.
-// 2. Equivalence: port == reference for every hold x every limb on the Lens wall.
-// 3. bestMove(): returns the max-score (limb, hold) across all four limbs.
+// 1. Re-runs the reference checks from devpost/scoring-reference (colour rule and
+//    upward goal) against the port.
+// 2. Equivalence: port == reference for every hold x every limb x several top holds on the Lens wall.
+// 3. bestMove(): returns the max-rank (limb, hold) across all four limbs.
 // 4. Demo layout: the preset problem shows green, yellow and red from the start.
 import { createRequire } from "node:module";
 import * as P from "../Assets/Scripts/NextHoldScoring.ts";
@@ -47,6 +48,24 @@ const ev = P.evaluate({ holds, holdTypes, position, limb: "RH", reach: REACH });
 check("every candidate hold gets one colour", ev.results.every((r) => ["green", "yellow", "red"].includes(r.colour)));
 check("a best next move is suggested and in reach", ev.suggestion && ev.suggestion.score > 0, ev.suggestion);
 check("suggestion is the jug 'up'", ev.suggestion && ev.suggestion.holdId === "up", ev.suggestion);
+// the reference's upward-goal checks, against the port
+check("no top hold: goalFactor 1, rank = score", upRes.parts.goalFactor === 1 && upRes.rank === upRes.score, upRes);
+const gHolds = { ...holds, hiJug: { x: 165, y: 175 }, loJug: { x: 165, y: 125 }, top: { x: 150, y: 280 } };
+const gTypes = { ...holdTypes, hiJug: "jug", loJug: "jug", top: "jug" };
+const hi = P.scoreHold({ limb: "RH", holdId: "hiJug", holds: gHolds, holdTypes: gTypes, position, reach: REACH, top: "top" });
+const lo = P.scoreHold({ limb: "RH", holdId: "loJug", holds: gHolds, holdTypes: gTypes, position, reach: REACH, top: "top" });
+check("same-grip jugs: equal score, the higher one nearer the top ranks better", hi.score === lo.score && hi.rank > lo.rank);
+check("the goal never changes the colour (both jugs stay green)", hi.colour === "green" && lo.colour === "green");
+const gEv = P.evaluate({ holds: gHolds, holdTypes: gTypes, position, limb: "RH", reach: REACH, top: "top" });
+const gRank = {};
+for (const r of gEv.results) gRank[r.holdId] = r.rank;
+check("with a top hold, green jugs rank by height: up > hiJug > loJug, suggestion up",
+  gRank.up > gRank.hiJug && gRank.hiJug > gRank.loJug && gEv.suggestion && gEv.suggestion.holdId === "up", gRank);
+check("colour is still grip x reach x balance for every hold", gEv.results.every((r) => r.colour === P.colourFor(r.score)));
+check("goalFactor stays within 0.5..1", gEv.results.every((r) => r.parts.goalFactor >= 0.5 && r.parts.goalFactor <= 1));
+const farTop = P.scoreHold({ limb: "RH", holdId: "far", holds, holdTypes, position, reach: REACH, top: "far" });
+check("out of reach stays red and ranks 0, even as the top hold",
+  farTop.colour === "red" && farTop.score === 0 && farTop.rank === 0 && farTop.parts.goalFactor > 0.75, farTop);
 
 // ---- 2. port == reference on the real Lens wall ------------------------------
 const wHolds = {}, wTypes = {};
@@ -54,21 +73,24 @@ for (const h of HOLDS) { wHolds[h.id] = { x: h.x, y: h.y }; wTypes[h.id] = h.typ
 const wPos = { ...PRESET_POSITION };
 let same = true, firstDiff = null;
 const positions = [wPos, { ...wPos, RF: null }, { ...wPos, LH: null }, { LH: "h10", RH: "h11", LF: "h16", RF: "h14" }];
+const tops = [null, PRESET_TOP, "h24", "lf"];
 for (const pos of positions) {
   for (const limb of P.LIMBS) {
-    const a = R.evaluate({ holds: wHolds, holdTypes: wTypes, position: pos, limb, reach: CLIMBER_REACH });
-    const b = P.evaluate({ holds: wHolds, holdTypes: wTypes, position: pos, limb, reach: CLIMBER_REACH });
-    if (JSON.stringify(a) !== JSON.stringify(b)) { same = false; firstDiff = firstDiff || { limb, pos }; }
+    for (const top of tops) {
+      const a = R.evaluate({ holds: wHolds, holdTypes: wTypes, position: pos, limb, reach: CLIMBER_REACH, top });
+      const b = P.evaluate({ holds: wHolds, holdTypes: wTypes, position: pos, limb, reach: CLIMBER_REACH, top });
+      if (JSON.stringify(a) !== JSON.stringify(b)) { same = false; firstDiff = firstDiff || { limb, pos, top }; }
+    }
   }
 }
-check("port output identical to reference (4 positions x 4 limbs x all holds)", same, firstDiff);
+check("port output identical to reference (4 positions x 4 limbs x 4 tops x all holds)", same, firstDiff);
 
 // ---- 3. bestMove ------------------------------------------------------------
-function bruteBest(h, t, pos, reach) {
+function bruteBest(h, t, pos, reach, top = null) {
   let best = null;
   for (const limb of ["LH", "RH", "LF", "RF"]) {
-    for (const r of R.evaluate({ holds: h, holdTypes: t, position: pos, limb, reach }).results) {
-      if (r.score > 0 && (!best || r.score > best.score)) best = r;
+    for (const r of R.evaluate({ holds: h, holdTypes: t, position: pos, limb, reach, top }).results) {
+      if (r.score > 0 && (!best || r.rank > best.rank)) best = r;
     }
   }
   return best;
@@ -77,11 +99,13 @@ const bm = P.bestMove({ holds, holdTypes, position, reach: REACH });
 check("bestMove on reference wall = RH -> up", bm && bm.limb === "RH" && bm.holdId === "up", bm);
 let bmOk = true;
 for (const pos of positions) {
-  const got = P.bestMove({ holds: wHolds, holdTypes: wTypes, position: pos, reach: CLIMBER_REACH });
-  const want = bruteBest(wHolds, wTypes, pos, CLIMBER_REACH);
-  if (!got || !want || got.score !== want.score) bmOk = false;
+  for (const top of tops) {
+    const got = P.bestMove({ holds: wHolds, holdTypes: wTypes, position: pos, reach: CLIMBER_REACH, top });
+    const want = bruteBest(wHolds, wTypes, pos, CLIMBER_REACH, top);
+    if (!got || !want || got.rank !== want.rank) bmOk = false;
+  }
 }
-check("bestMove score = max over all limbs and holds (4 positions)", bmOk);
+check("bestMove rank = max over all limbs and holds (4 positions x 4 tops)", bmOk);
 check("bestMove returns null when nothing is reachable",
   P.bestMove({ holds: { a: { x: 0, y: 0 }, b: { x: 500, y: 500 } }, holdTypes: { a: "jug", b: "jug" },
                position: { LH: "a", RH: null, LF: null, RF: null }, reach: 77 }) === null);
@@ -106,6 +130,18 @@ const com = P.centreOfMass(wPos, pHolds);
 const greenJug = sel.results.some((r) => wTypes[r.holdId] === "jug" && r.colour === "green" && r.parts.reachFactor === 1 && pHolds[r.holdId].y > com.y);
 check("a jug within 80% reach above the COM is green", greenJug);
 check("an out-of-reach hold is red", sel.results.some((r) => r.parts.reachFactor === 0 && r.colour === "red"));
+
+// the upward goal on the preset problem: after RH -> up, the old rule says "RH back down to rh";
+// with the top hold it says a move that keeps climbing
+const afterUp = { ...wPos, RH: "up" };
+const noGoal = P.bestMove({ holds: pHolds, holdTypes: wTypes, position: afterUp, reach: CLIMBER_REACH });
+const withGoal = P.bestMove({ holds: pHolds, holdTypes: wTypes, position: afterUp, reach: CLIMBER_REACH, top: PRESET_TOP });
+console.log(`  after RH -> up: without the goal ${noGoal.limb} -> ${noGoal.holdId}; with it ${withGoal.limb} -> ${withGoal.holdId}`);
+check("preset problem: without the goal the best move after RH -> up is back down to rh", noGoal.limb === "RH" && noGoal.holdId === "rh", noGoal);
+check("preset problem: with the goal it climbs on (higher target, not back to rh)",
+  withGoal.holdId !== "rh" && pHolds[withGoal.holdId].y > pHolds[afterUp[withGoal.limb]].y, withGoal);
+const presetGoal = P.bestMove({ holds: pHolds, holdTypes: wTypes, position: wPos, reach: CLIMBER_REACH, top: PRESET_TOP });
+check("preset problem with the goal still opens on RH -> up", presetGoal.limb === "RH" && presetGoal.holdId === "up", presetGoal);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

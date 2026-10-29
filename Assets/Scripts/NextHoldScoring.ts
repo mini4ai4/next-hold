@@ -1,7 +1,7 @@
-// NextHoldScoring — the green / yellow / red rule, ported line-for-line from
-// devpost/scoring-reference/scoring.js (11/11 checks). Same constants, same
+// NextHoldScoring — the green / yellow / red rule and the upward goal, ported
+// line-for-line from devpost/scoring-reference/scoring.js. Same constants, same
 // "why" strings. Adds bestMove(): evaluate() for all four limbs, return the
-// single best (limb, hold).
+// single best (limb, hold) by rank.
 //
 // Owns: pure scoring maths only. No Lens globals, no scene access, so it can
 // be unit-checked outside Lens Studio (tests/scoring.port.test.mjs).
@@ -21,10 +21,13 @@ export type Position = { LH: string | null; RH: string | null; LF: string | null
 export interface ScoreResult {
   holdId: string;
   limb: Limb;
+  /** grip x reach x balance: decides the colour */
   score: number;
   colour: Colour;
+  /** score x goalFactor: decides the suggestion */
+  rank: number;
   why: string;
-  parts: { quality: number; reachFactor: number; balanceFactor: number; dist: number };
+  parts: { quality: number; reachFactor: number; balanceFactor: number; goalFactor: number; dist: number };
 }
 
 export interface Evaluation {
@@ -93,6 +96,27 @@ export function balanceFactor(limb: Limb, target: Pt, position: Position, holds:
   return f;
 }
 
+// Goal: among moves of similar quality, the hold that gets you higher and closer
+// to the problem's top hold ranks better.
+//   progress = (height gained + distance to the top saved) / (2 x reach), in -1..1
+//   goalFactor = 0.75 + 0.25 x progress            (0.5 = a full move away, 1 = a full move up)
+// "From" is the hold the moving limb is on now (its anchor if it is off the wall).
+// No top hold -> 1. The goal only ranks moves: it never changes the colour, which
+// stays grip x reach x balance, so an out-of-reach hold is still score 0 -> red,
+// and it ranks last (rank = score x goalFactor = 0).
+export const GOAL_WEIGHT = 0.25;
+
+export function goalFactor(limb: Limb, target: Pt, position: Position, holds: Holds, top: string | null,
+                           reach: number, com: Pt): number {
+  if (top == null || !holds[top]) return 1.0;
+  const on = position[limb];
+  const from = on != null && holds[on] ? holds[on] : shoulderOf(limb, com);
+  const t = holds[top];
+  const gained = (target.y - from.y) + (dist(from, t) - dist(target, t));
+  const progress = Math.max(-1, Math.min(1, gained / (2 * reach)));
+  return 1.0 - GOAL_WEIGHT + GOAL_WEIGHT * progress;
+}
+
 export function colourFor(score: number): Colour {
   if (score >= 0.7) return "green";
   if (score >= 0.4) return "yellow";
@@ -106,11 +130,15 @@ export interface ScoreArgs {
   holdTypes: HoldTypes;
   position: Position;
   reach: number;
+  /** the problem's top hold; null/absent = no goal (goalFactor 1) */
+  top?: string | null;
 }
 
 // Score one candidate hold for the limb that would move to it.
+// score (-> colour) = grip x reach x balance; rank (-> the suggestion) = score x goal.
 export function scoreHold(a: ScoreArgs): ScoreResult {
   const { limb, holdId, holds, holdTypes, position, reach } = a;
+  const top = a.top ?? null;
   const target = holds[holdId];
   const quality = GRIP[holdTypes[holdId]] ?? 0.5;
   const com = centreOfMass(position, holds);
@@ -119,6 +147,8 @@ export function scoreHold(a: ScoreArgs): ScoreResult {
   const rf = reachFactor(d, reach);
   const bf = balanceFactor(limb, target, position, holds, com);
   const score = quality * rf * bf;
+  const gf = goalFactor(limb, target, position, holds, top, reach, com);
+  const rank = score * gf;
 
   // human-readable "why" (shown only on the suggested hold / on ask)
   const why: string[] = [];
@@ -127,8 +157,8 @@ export function scoreHold(a: ScoreArgs): ScoreResult {
   else if (rf < 1) why.push("a long reach");
   if (bf < 1) why.push("committing balance");
 
-  return { holdId, limb, score, colour: colourFor(score), why: why.join(", "),
-           parts: { quality, reachFactor: rf, balanceFactor: bf, dist: d } };
+  return { holdId, limb, score, colour: colourFor(score), rank, why: why.join(", "),
+           parts: { quality, reachFactor: rf, balanceFactor: bf, goalFactor: gf, dist: d } };
 }
 
 export interface EvaluateArgs {
@@ -137,27 +167,37 @@ export interface EvaluateArgs {
   position: Position;
   limb: Limb;
   reach: number;
+  top?: string | null;
 }
 
-// Colour every reachable candidate hold, and pick the single best next move.
+// Colour every reachable candidate hold, and pick the single best next move (by rank).
 export function evaluate(a: EvaluateArgs): Evaluation {
   const { holds, holdTypes, position, limb, reach } = a;
+  const top = a.top ?? null;
   const occupied = new Set<string | null>([position.LH, position.RH, position.LF, position.RF]);
   const results = Object.keys(holds)
     .filter((id) => !occupied.has(id))
-    .map((holdId) => scoreHold({ limb, holdId, holds, holdTypes, position, reach }));
-  const best = results.reduce<ScoreResult | null>((b, r) => (r.score > (b?.score ?? -1) ? r : b), null);
+    .map((holdId) => scoreHold({ limb, holdId, holds, holdTypes, position, reach, top }));
+  const best = results.reduce<ScoreResult | null>((b, r) => (r.rank > (b?.rank ?? -1) ? r : b), null);
   return { results, suggestion: best && best.score > 0 ? best : null };
 }
 
+export interface MoveArgs {
+  holds: Holds;
+  holdTypes: HoldTypes;
+  position: Position;
+  reach: number;
+  top?: string | null;
+}
+
 // Addition on top of the reference: run evaluate() for all four limbs and
-// return the single best (limb, hold) by score. Ties keep the earlier limb in
+// return the single best (limb, hold) by rank. Ties keep the earlier limb in
 // LH, RH, LF, RF order. null when no limb has a hold with score > 0.
-export function bestMove(a: { holds: Holds; holdTypes: HoldTypes; position: Position; reach: number }): ScoreResult | null {
+export function bestMove(a: MoveArgs): ScoreResult | null {
   let best: ScoreResult | null = null;
   for (const limb of LIMBS) {
-    const s = evaluate({ holds: a.holds, holdTypes: a.holdTypes, position: a.position, limb, reach: a.reach }).suggestion;
-    if (s && s.score > (best?.score ?? -1)) best = s;
+    const s = evaluate({ holds: a.holds, holdTypes: a.holdTypes, position: a.position, limb, reach: a.reach, top: a.top }).suggestion;
+    if (s && s.rank > (best?.rank ?? -1)) best = s;
   }
   return best;
 }
