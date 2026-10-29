@@ -13,12 +13,13 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    the colours and the 1-2-3 change for a taller or shorter climber (at 155 cm step 2 is the pinch h09, from 185 cm
    the jug h10).
 3. Walk back with WASD past 1.2 m and the Lens shows **Ground**: every ring of the problem, the next moves as
-   "2 · LH", "3 · LF" (each tag in its own move's colour), and "TOP". Walk in under 80 cm and it shows **On wall**:
-   one ring and its label. The Ground / On wall button overrides until you next cross one of those distances.
+   "2 · LH", "3 · LF" (each tag, and the ring under it, in its own move's colour), and "TOP". Walk in under 80 cm
+   and it shows **On wall**: one ring, its label, and a stick figure for your body (hidden in Ground). The Ground / On wall button overrides until you next cross one of those distances.
 
 ## Tests
 - LEAF: open the LEAF panel and run all seventeen scenarios (one per done criterion in `devpost/design-brief.md`, plus one per review fix).
-  The raw output of the last full run: `devpost/LEAF_RUN_2026-10-29.txt`.
+  The raw output of the last full run (17 of 17 pass, session 16): `devpost/LEAF_RUN_2026-10-29.txt`, copied out of
+  the Lens Studio log with `node tests/extract_leaf_run.mjs <log> <first line>`.
 - Scoring port: `node tests/scoring.port.test.mjs` (57 checks, including the 1-2-3 search against a brute force).
 - Reference rule, written before the build: `node devpost/scoring-reference/scoring.test.js` (27 checks). This is
   pre-written design code; CLAD ported it to TypeScript.
