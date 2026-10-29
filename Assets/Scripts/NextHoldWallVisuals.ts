@@ -4,7 +4,8 @@
 // Owns: runtime-built overlay meshes under the wall (Ring_<id>, Marker_<limb>,
 // SuggestGlow, HoverRing, setup mode's Mark_<id> "in your problem" ring and
 // Tag_<id> START / TOP text, the sequence preview's Ghost_1..3 rings with their
-// GhostNumber_1..3) and their colours. One cloned material per overlay.
+// GhostNumber_1..3, and the stick figure: Figure_LH / RH / LF / RF lines from
+// Figure_Torso to each limb's hold) and their colours. One cloned material per overlay.
 // Main pushes state in with apply(); this class never scores or decides.
 // Plain class (not a component): Main creates it once in onAwake.
 
@@ -36,6 +37,8 @@ export interface OverlayState {
   ghosts: string[]
   /** size of the ghost badges (ring and number) against their on-wall size; absent = 1 */
   ghostScale?: number
+  /** stick figure: the torso point in wall cm (the centre of mass the scoring uses); null = no figure */
+  torso: {x: number; y: number} | null
 }
 
 export interface OverlayColours {
@@ -65,6 +68,10 @@ const GHOST_NUMBER_COLOR = new vec4(0.95, 0.98, 1.0, 1)
 const GHOST_NUMBER_SIZE = 56
 /** a ghost sits as a badge on the hold's upper side; a second ghost on the same hold takes the next angle */
 const GHOST_ANGLES_DEG = [45, 135, 90]
+/** stick figure: thin light lines on the wall plane, under the rings and the markers */
+const FIGURE_COLOR = new vec4(0.95, 0.94, 0.88, 0.8)
+const FIGURE_Z = 0.25
+const FIGURE_TORSO_R = 2.2
 /** glow breathing: alpha range of the suggestion's halo */
 const GLOW_MIN = 0.6
 const GLOW_MAX = 1.0
@@ -93,6 +100,8 @@ export class NextHoldWallVisuals {
   private textGroup: SceneObject
   private tags: {[id: string]: {so: SceneObject; text: Text}} = {}
   private ghosts: {ring: {so: SceneObject; mat: Material}; label: {so: SceneObject; text: Text}}[] = []
+  private figure: {[limb: string]: SceneObject} = {}
+  private torso: SceneObject
   private state: OverlayState | null = null
   private ringMeshes: {[r: string]: RenderMesh} = {}
   private thinMeshes: {[r: string]: RenderMesh} = {}
@@ -150,6 +159,21 @@ export class NextHoldWallVisuals {
       this.ghosts.push({ring, label})
     }
 
+    // stick figure: one unit-long line mesh along +X, stretched and turned per limb
+    const lineMesh = toMesh(this.lineGeo())
+    for (const limb of ["LH", "RH", "LF", "RF"]) {
+      const f = this.makeVisual("Figure_" + limb, lineMesh)
+      f.mat.mainPass.baseColor = FIGURE_COLOR
+      f.so.enabled = false
+      this.figure[limb] = f.so
+    }
+    const torsoGeo = new UVGeo()
+    addProfileAnnulus(torsoGeo, 0, FIGURE_TORSO_R, 32, profileV(ProfileRow.Marker))
+    const torso = this.makeVisual("Figure_Torso", toMesh(torsoGeo))
+    torso.mat.mainPass.baseColor = FIGURE_COLOR
+    torso.so.enabled = false
+    this.torso = torso.so
+
     const disc = new UVGeo()
     addProfileAnnulus(disc, 0, MARKER_R, 40, profileV(ProfileRow.Marker))
     const discMesh = toMesh(disc)
@@ -203,6 +227,8 @@ export class NextHoldWallVisuals {
       g.label.so.getTransform().setLocalPosition(this.wallToLocal(x, y, RING_Z + 0.3))
     }
 
+    this.applyFigure(s)
+
     const glowHold = s.glowHoldId ? this.holdDef(s.glowHoldId) : null
     const glowColour = s.glowHoldId ? s.rings[s.glowHoldId] : null
     if (glowHold && glowColour) {
@@ -227,6 +253,25 @@ export class NextHoldWallVisuals {
       m.so.getTransform().setLocalPosition(this.wallToLocal(h.x, h.y, HOLD_SIZE[h.type].d * 1.4 + 1 + nudge))
       const k = limb === s.selectedLimb ? MARKER_SELECTED : MARKER_DIM
       m.mat.mainPass.baseColor = new vec4(k, k, k, 1)
+    }
+  }
+
+  /** Stick figure: a line from the torso point to each limb's hold; a limb off the wall has none. */
+  private applyFigure(s: OverlayState): void {
+    const t = s.torso
+    this.torso.enabled = !!t
+    if (t) this.torso.getTransform().setLocalPosition(this.wallToLocal(t.x, t.y, FIGURE_Z + 0.02))
+    for (const limb of ["LH", "RH", "LF", "RF"]) {
+      const so = this.figure[limb]
+      const id = s.position[limb]
+      const h = id ? this.holdDef(id) : null
+      so.enabled = !!t && !!h
+      if (!t || !h) continue
+      const dx = h.x - t.x, dy = h.y - t.y
+      const tr = so.getTransform()
+      tr.setLocalPosition(this.wallToLocal(t.x, t.y, FIGURE_Z))
+      tr.setLocalRotation(quat.fromEulerAngles(0, 0, Math.atan2(dy, dx)))
+      tr.setLocalScale(new vec3(Math.max(0.01, Math.hypot(dx, dy)), 1, 1))
     }
   }
 
@@ -312,6 +357,19 @@ export class NextHoldWallVisuals {
     const {span, coreAt, coreW} = HOVER_PROFILE
     const rIn = r + 2.4 - (coreAt + coreW / 2)
     return this.cachedAnnulus(cache, rIn, rIn + span, ProfileRow.Hover)
+  }
+
+  /** Unit line along +X, 1.8 cm wide: the hover profile runs edge -> crisp centre -> edge across it. */
+  private lineGeo(): UVGeo {
+    const {span, coreAt, coreW} = HOVER_PROFILE
+    const half = coreAt + coreW / 2
+    const g = new UVGeo()
+    const v = profileV(ProfileRow.Hover)
+    const a0 = g.vert([0, -half, 0], 0, v), a1 = g.vert([0, 0, 0], half / span, v), a2 = g.vert([0, half, 0], 0, v)
+    const b0 = g.vert([1, -half, 0], 0, v), b1 = g.vert([1, 0, 0], half / span, v), b2 = g.vert([1, half, 0], 0, v)
+    g.tri(a0, b0, b1); g.tri(a0, b1, a1)
+    g.tri(a1, b1, b2); g.tri(a1, b2, a2)
+    return g
   }
 
   /** thin crisp ring (hover profile) with its core centred on radius r */

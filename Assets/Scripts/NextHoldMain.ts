@@ -19,7 +19,8 @@
 // getLabelOpacity(), getLabelText(), getWhyText(), isWhyVisible(),
 // isAskArmed(), isOffViewArrowVisible(), isTypePickerVisible(), getHoldType(id),
 // isInProblem(id), getProblemHolds(), getStartHolds(), getTopHold(), isHoldDim(id),
-// isMarkVisible(id), getTagText(id), getPreview(), getGhostHold(n), getView().
+// isMarkVisible(id), getTagText(id), getPreview(), getGhostHold(n), getView(),
+// getTorso().
 // Action API mirrors a pinch: pressHold(id), pressLimb(limb), pressAsk(),
 // pressMode(), pressView(), pickType(type), pressStart(), pressTop().
 //
@@ -30,7 +31,7 @@ import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interactio
 import {ClimbingWall} from "./Wall/ClimbingWall"
 import {HOLDS, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP, HOLD_SIZE, holdById} from "./Wall/WallLayout"
 import {
-  Evaluation, HoldTypes, Holds, LIMBS, Limb, Position, ScoreResult, bestMove, evaluate, sequence,
+  Evaluation, HoldTypes, Holds, LIMBS, Limb, Position, ScoreResult, bestMove, centreOfMass, evaluate, sequence,
 } from "./NextHoldScoring"
 import {NextHoldWallVisuals, OverlayState, RingColour} from "./NextHoldWallVisuals"
 import {NextHoldControlRowUI} from "./NextHoldControlRowUI"
@@ -346,6 +347,8 @@ export class NextHoldMain extends BaseScriptComponent {
       marks,
       tags,
       ghosts: this.preview.map((m) => m.holdId),
+      // the body: the centre of mass the scoring itself uses for this position
+      torso: centreOfMass(this.position, holds),
     }
     this.pushOverlay()
 
@@ -476,6 +479,8 @@ export class NextHoldMain extends BaseScriptComponent {
   isReady(): boolean { return this.ready }
   getMode(): Mode { return this.mode }
   getView(): View { return this.view }
+  /** the torso point of the stick figure, in wall cm (null before the first recompute) */
+  getTorso(): {x: number; y: number} | null { return this.overlay && this.overlay.torso ? {...this.overlay.torso} : null }
   getPosition(): Position { return {...this.position} }
   getSelectedLimb(): Limb { return this.selected }
   getReach(): number { return this.reach() }
