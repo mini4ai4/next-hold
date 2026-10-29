@@ -15,7 +15,7 @@ Corner note on preview scenes: "Lens Studio preview. Hold recognition and body p
 | 3 | Pinch "?", then the ring on the pinch hold h09: the line "PINCH HOLD · LONG REACH". | "Ask why, and it tells you in plain words." |
 | 4 | Setup mode: pinch a hold, the type picker appears, pick "crimp", back to climb, the ring changes. | "On real glasses it would recognise the holds. In the preview, you mark them yourself, which is the stand-in the rules suggest." |
 | 5 | The brief in the editor (`devpost/design-brief.md`): the one spatial moment, the done criteria. | "We planned it with the plan-lens skill: one spatial moment, five things the Lens has to do, each checkable." |
-| 6 | Terminal and editor: CLAD building; then the LEAF run, 6 of 6 pass; the scoring tests, 18 of 18. | "CLAD built it through the Lens Studio MCP, and every done criterion has a LEAF test. All six pass." |
+| 6 | Terminal and editor: CLAD building; then the LEAF run, 15 of 15 pass; the scoring port, 42 of 42; the reference rule, 22 of 22. | "CLAD built it through the Lens Studio MCP, and every done criterion has a LEAF test. All fifteen pass." |
 | 7 | The field-of-view frame: before (both hands cut off) → after (one hand, the suggestion, the control row). | "The narrow view decided the design. Both hands never fit, so the Lens shows what you look at when you choose a move." |
 | 8 | Before/after of the wall: grey box → birch ply and glowing rings. | "On a see-through display dark is invisible, so the wall is light wood and the rings glow." |
 | 9 | End card: wordmark, "A bouldering coach on SPECS", "Indoor bouldering and top-rope. Not a spotter." | "So you keep climbing instead of guessing. Next Hold never says safe. It shows you your next hold." |
