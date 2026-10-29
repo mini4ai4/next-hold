@@ -1,4 +1,4 @@
-# Devpost draft: Next Hold (v0, 27.10). Learn AR with SPECS. Entrant: to confirm with Roma.
+# Devpost draft: Next Hold (v1, 29.10, after the strict review). Learn AR with SPECS. Entrant: Roman Pryvrotskyi (individual).
 
 ## Tagline
 A bouldering coach that colours the holds you can reach next, right on the wall, while your hands stay on it.
@@ -16,6 +16,9 @@ Move a hand or a foot and every ring recolours in the same frame, and the Lens p
 ## Who it's for
 Indoor boulderers, especially newer ones, who stall halfway up a problem because they can't see their options from where they hang. A phone can't help there: you'd have to let go of the wall to look at it, and a beta video has to be studied before you start, not while you're on the problem.
 
+## How it's different from a light-up wall
+Gyms already light up holds: LED training boards and projected walls show a set problem to everyone who looks. Next Hold is the other way round. It doesn't show *the* route, it shows *your* options: which holds are good for your body, from where you hang right now, on your own glasses, on any wall. Two people on the same problem see different colours.
+
 ## Why it needs glasses
 - **It draws in the world.** The rings sit flat on the holds themselves, at real size, not on a panel.
 - **It leaves your body free.** Hands stay on the holds, eyes stay up the wall.
@@ -28,8 +31,10 @@ The preview can't recognise a real wall or track a body, so, as the rules sugges
 - **Hold recognition** is a setup mode: pinch a hold and pick its type (jug, crimp, pinch, pocket, sloper).
 - **Body position** is four limb toggles, LH, RH, LF and RF. Pick one, pinch a hold, and that limb moves there.
 
+On real SPECS, the limb toggles would be body tracking, so climbing itself takes no pinches at all: you move, and the rings follow. Asking "why" would be a look-and-dwell on a ring. Both are our design for the device, and both are "feel unproven" until we can try them on a wall.
+
 ## How we built it
-We planned it with the `plan-lens` skill, which wrote `devpost/design-brief.md`, and built it with CLAD through the Lens Studio MCP. The scoring rule came first, as a small tested reference in plain JavaScript (`devpost/scoring-reference/`, 11 checks), and CLAD ported it to TypeScript; the port passes 18 checks, including the best-move search. Every done criterion in the brief has a LEAF scenario, and all six pass in the preview.
+We planned it with the `plan-lens` skill, which wrote `devpost/design-brief.md`, and built it with CLAD through the Lens Studio MCP, in six sessions logged in `devpost/BUILD_LOG.md`. The scoring rule came first, as a small tested reference in plain JavaScript we wrote before the build (`devpost/scoring-reference/`, 11 checks), and CLAD ported it to TypeScript; the port passes 18 checks, including the best-move search. Every done criterion in the brief has a LEAF scenario, and all six pass in the preview.
 
 **Logic proven** (tests and preview): the colours match the rule, a move recomputes everything in one frame, an out-of-reach hold is always red, the suggestion and its label, the "why" line.
 **Feel unproven** (only real glasses can tell): whether rings read well mid-climb, real hold detection, hand tracking on a wall, and looking up through a narrow view.
