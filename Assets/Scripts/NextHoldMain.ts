@@ -19,9 +19,12 @@
 // getLabelOpacity(), getLabelText(), getWhyText(), isWhyVisible(),
 // isAskArmed(), isOffViewArrowVisible(), isTypePickerVisible(), getHoldType(id),
 // isInProblem(id), getProblemHolds(), getStartHolds(), getTopHold(), isHoldDim(id),
-// isMarkVisible(id), getTagText(id), getPreview(), getGhostHold(n).
+// isMarkVisible(id), getTagText(id), getPreview(), getGhostHold(n), getView().
 // Action API mirrors a pinch: pressHold(id), pressLimb(limb), pressAsk(),
-// pressMode(), pickType(type), pressStart(), pressTop().
+// pressMode(), pressView(), pickType(type), pressStart(), pressTop().
+//
+// View (Ground / On wall) is display only: both views share the same state and
+// scoring; switching it re-pushes the overlay in the same frame.
 
 import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
 import {ClimbingWall} from "./Wall/ClimbingWall"
@@ -29,7 +32,7 @@ import {HOLDS, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP, HOLD_S
 import {
   Evaluation, HoldTypes, Holds, LIMBS, Limb, Position, ScoreResult, bestMove, evaluate, sequence,
 } from "./NextHoldScoring"
-import {NextHoldWallVisuals, RingColour} from "./NextHoldWallVisuals"
+import {NextHoldWallVisuals, OverlayState, RingColour} from "./NextHoldWallVisuals"
 import {NextHoldControlRowUI} from "./NextHoldControlRowUI"
 import {NextHoldTypePickerUI} from "./NextHoldTypePickerUI"
 import {NextHoldCalloutUI} from "./NextHoldCalloutUI"
@@ -42,11 +45,18 @@ const WHY_HALF_W = 21.5
  *  title, five type buttons, the Start / Top row, gaps and padding tall */
 const PICKER_HALF_W = 10.5
 const PICKER_HALF_H = 24
-/** half the control row block (two rows of 5 cm buttons + the note + padding), until its layout reports a size */
+/** half the control row block (three rows of 5 cm buttons + the note + padding), until its layout reports a size */
 const ROW_HALF_W = 15.4
-const ROW_HALF_H = 8.7
+const ROW_HALF_H = 11.6
 
 export type Mode = "climb" | "setup"
+/** What is shown, never what is scored. "ground": standing back at the base, every ring of the
+ *  problem and the ghosts 1-2-3. "wall": face ~40 cm from the wall, only the suggested ring. */
+export type View = "ground" | "wall"
+
+/** Text and badges are sized for ~110 cm (the UI type scale). From the ground (~180 cm) the
+ *  ghost badges grow by this much so their number still reads at least as large as Body text. */
+const GROUND_BADGE_SCALE = 1.25
 
 const LIMB_LABEL: {[l: string]: string} = {LH: "L hand", RH: "R hand", LF: "L foot", RF: "R foot"}
 const HAND_LIMBS: Limb[] = ["LH", "RH"]
@@ -126,6 +136,9 @@ export class NextHoldMain extends BaseScriptComponent {
   private topFlag: string | null = null
   private position: Position = {LH: null, RH: null, LF: null, RF: null}
   private mode: Mode = "climb"
+  private view: View = "ground"
+  /** the full overlay for the current state; the view decides how much of it is pushed */
+  private overlay: OverlayState | null = null
   private selected: Limb = "RH"
   private askArmed = false
   private evaluation: Evaluation = {results: [], suggestion: null}
@@ -179,6 +192,7 @@ export class NextHoldMain extends BaseScriptComponent {
       this.controlRow.onLimbPressed.add((l) => this.pressLimb(l as Limb))
       this.controlRow.onAskPressed.add(() => this.pressAsk())
       this.controlRow.onModePressed.add(() => this.pressMode())
+      this.controlRow.onViewPressed.add(() => this.pressView())
       this.typePicker.onTypePicked.add((t) => this.pickType(t))
       this.typePicker.onStartPressed.add(() => this.pressStart())
       this.typePicker.onTopPressed.add(() => this.pressTop())
@@ -257,6 +271,14 @@ export class NextHoldMain extends BaseScriptComponent {
     this.recompute(false) // switching back to climb recomputes everything
   }
 
+  /** Ground <-> On wall. Only what is shown changes: no rescoring, same state, same frame. */
+  pressView(): void {
+    if (!this.ready) return
+    this.view = this.view === "ground" ? "wall" : "ground"
+    this.controlRow.setView(this.view)
+    this.pushOverlay()
+  }
+
   pickType(type: string): void {
     if (!this.ready || this.mode !== "setup" || !this.pickerHold) return
     this.holdTypes[this.pickerHold] = type
@@ -315,19 +337,21 @@ export class NextHoldMain extends BaseScriptComponent {
     this.preview = climb && sug
       ? sequence({holds, holdTypes: this.holdTypes, position: this.position, reach, top: goalTop, limb: this.selected})
       : []
-    this.visuals.apply({
+    this.overlay = {
       rings,
       glowHoldId: sug ? sug.holdId : null,
-      position: this.position,
+      position: {...this.position},
       selectedLimb: this.selected,
       showMarkers: true,
       marks,
       tags,
       ghosts: this.preview.map((m) => m.holdId),
-    })
+    }
+    this.pushOverlay()
 
     this.controlRow.setSelectedLimb(this.selected)
     this.controlRow.setMode(this.mode)
+    this.controlRow.setView(this.view)
     this.placeControlRow()
 
     if (sug) {
@@ -340,6 +364,19 @@ export class NextHoldMain extends BaseScriptComponent {
       this.callouts.hideSuggestion()
       this.offViewArrow.setTarget(null, "")
     }
+  }
+
+  /** Push the overlay through the view: On wall keeps only the suggested ring (and its glow), no ghosts. */
+  private pushOverlay(): void {
+    const s = this.overlay
+    if (!s) return
+    if (this.view === "ground") {
+      this.visuals.apply({...s, ghostScale: GROUND_BADGE_SCALE})
+      return
+    }
+    const rings: {[id: string]: RingColour | null} = {}
+    if (s.glowHoldId) rings[s.glowHoldId] = s.rings[s.glowHoldId] || null
+    this.visuals.apply({...s, rings, ghosts: [], ghostScale: 1})
   }
 
   /** Centred between the two hand holds, below the lower one; slides when a hand moves. */
@@ -438,6 +475,7 @@ export class NextHoldMain extends BaseScriptComponent {
   // ── public read API (LEAF / tests) ────────────────────────────────────────
   isReady(): boolean { return this.ready }
   getMode(): Mode { return this.mode }
+  getView(): View { return this.view }
   getPosition(): Position { return {...this.position} }
   getSelectedLimb(): Limb { return this.selected }
   getReach(): number { return this.reach() }
@@ -471,6 +509,7 @@ export class NextHoldMain extends BaseScriptComponent {
   getWhyHoldId(): string | null { return this.callouts.getWhyHoldId() }
   isAskArmed(): boolean { return this.askArmed }
   isAskLit(): boolean { return this.controlRow.isAskLit() }
+  getViewLabel(): string { return this.controlRow.getViewLabel() }
   getLitLimb(): string | null { return this.controlRow.getLitLimb() }
   isOffViewArrowVisible(): boolean { return this.offViewArrow.isArrowVisible() }
   isTypePickerVisible(): boolean { return this.typePicker.isVisible() }

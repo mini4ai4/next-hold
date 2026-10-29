@@ -34,6 +34,8 @@ export interface OverlayState {
   tags: {[id: string]: string}
   /** sequence preview: the holds of the next moves in order (ghost 1, 2, 3); empty = none */
   ghosts: string[]
+  /** size of the ghost badges (ring and number) against their on-wall size; absent = 1 */
+  ghostScale?: number
 }
 
 export interface OverlayColours {
@@ -120,6 +122,13 @@ export class NextHoldWallVisuals {
       this.marks[h.id] = mark
     }
 
+    // the glow is built before the text so it renders under it: ghost 1 always sits on the
+    // glow's target ring, and drawn later the ring ran through ghost 1's number
+    const glowMeshes: {[r: string]: RenderMesh} = {}
+    const glowVis = this.makeVisual("SuggestGlow", this.glowMesh(glowMeshes, 10))
+    glowVis.so.enabled = false
+    this.glow = {...glowVis, meshes: glowMeshes, rmv: glowVis.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual}
+
     // text on the wall (setup tags) lives under a world-space canvas, like the UI modules' text
     this.textGroup = global.scene.createSceneObject("OverlayText")
     this.textGroup.setParent(this.group)
@@ -150,11 +159,6 @@ export class NextHoldWallVisuals {
       this.markers[limb] = m
     }
 
-    const glowMeshes: {[r: string]: RenderMesh} = {}
-    const glowVis = this.makeVisual("SuggestGlow", this.glowMesh(glowMeshes, 10))
-    glowVis.so.enabled = false
-    this.glow = {...glowVis, meshes: glowMeshes, rmv: glowVis.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual}
-
     const hoverMeshes: {[r: string]: RenderMesh} = {}
     const hoverVis = this.makeVisual("HoverRing", this.hoverMesh(hoverMeshes, 12))
     hoverVis.mat.mainPass.baseColor = HOVER_COLOR
@@ -178,6 +182,7 @@ export class NextHoldWallVisuals {
     // ghost n: a small numbered ring on the upper side of the n-th look-ahead hold,
     // on the radius of the suggestion glow's outer ring so it reads as a badge on it
     const onHold: {[id: string]: number} = {}
+    const gk = s.ghostScale || 1
     for (let i = 0; i < GHOST_COUNT; i++) {
       const g = this.ghosts[i]
       const id = i < s.ghosts.length ? s.ghosts[i] : null
@@ -192,6 +197,8 @@ export class NextHoldWallVisuals {
       const a = (deg * Math.PI) / 180
       const d = HOLD_SIZE[h.type].ringR + RING_W / 2 + GLOW_PROFILE.ringAt + GLOW_PROFILE.ringW / 2
       const x = h.x + d * Math.cos(a), y = h.y + d * Math.sin(a)
+      ;(g.ring.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.thinRingMesh(GHOST_R * gk)
+      g.label.text.size = GHOST_NUMBER_SIZE * gk
       g.ring.so.getTransform().setLocalPosition(this.wallToLocal(x, y, RING_Z + 0.15))
       g.label.so.getTransform().setLocalPosition(this.wallToLocal(x, y, RING_Z + 0.3))
     }

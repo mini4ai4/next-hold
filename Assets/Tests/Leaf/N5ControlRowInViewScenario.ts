@@ -12,7 +12,7 @@ import {camera, frames, getMain, mustFind, pinch, restorePreset} from "./NextHol
 
 /** the wall root's preset place (BUILD_LOG session 5); this item must not move it */
 const WALL_ROOT = new vec3(-10.5, -166, -125)
-const CONTROLS = ["Toggle_LF", "Toggle_RF", "ModeSwitch", "SafetyNote", "Toggle_LH", "Toggle_RH", "AskButton"]
+const CONTROLS = ["Toggle_LF", "Toggle_RF", "ModeSwitch", "ViewToggle", "SafetyNote", "Toggle_LH", "Toggle_RH", "AskButton"]
 
 function visualsUnder(so: SceneObject, out: BaseMeshVisual[]): BaseMeshVisual[] {
   if (!so.isEnabledInHierarchy) return out
@@ -73,7 +73,7 @@ export class N5ControlRowInViewScenario extends Scenario {
     if (sug) {
       await pinch("Hold_" + sug.holdId)
       await frames(3)
-      for (const c of ["Toggle_LF", "Toggle_RF", "ModeSwitch", "SafetyNote"]) {
+      for (const c of ["Toggle_LF", "Toggle_RF", "ModeSwitch", "ViewToggle", "SafetyNote"]) {
         for (const e of outOfView(c)) errs.push(`after ${sug.limb} -> ${sug.holdId}: ${e}`)
       }
     }

@@ -1,14 +1,15 @@
 // NextHoldControlRowUI — the compact control row on the wall plane (brief:
-// "Control row"). Four limb toggles (LH, RH, LF, RF), a '?' button and a
-// Setup/Climb mode switch, plus the small not-a-spotter note underneath.
+// "Control row"). Four limb toggles (LH, RH, LF, RF), a '?' button, a
+// Setup/Climb mode switch and a Ground / On wall view switch, plus the small
+// not-a-spotter note underneath.
 //
 // Owns: the row's UIKit widgets and their lit/unlit look. Passive view.
-// Main -> UI: setSelectedLimb(), setAskArmed(), setMode(), placeAt().
-// UI -> Main: onLimbPressed, onAskPressed, onModePressed.
+// Main -> UI: setSelectedLimb(), setAskArmed(), setMode(), setView(), placeAt().
+// UI -> Main: onLimbPressed, onAskPressed, onModePressed, onViewPressed.
 // Must not: hold climbing state or decide anything; Main owns all state.
 //
 // Stable scene names for tests: Toggle_LH, Toggle_RH, Toggle_LF, Toggle_RF,
-// AskButton, ModeSwitch, SafetyNote.
+// AskButton, ModeSwitch, ViewToggle, SafetyNote.
 
 import {BackPlate} from "SpectaclesUIKit.lspkg/Scripts/BackPlate"
 import {Button} from "SpectaclesUIKit.lspkg/Scripts/Components/Button/Button"
@@ -79,24 +80,37 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
   @input
   @hint("Mode switch label while in setup mode")
   setupLabel: string = "Setup"
+
+  @input
+  @hint("View switch label while every ring and the ghosts show (standing back at the base)")
+  groundLabel: string = "Ground"
+
+  @input
+  @hint("View switch label while only the suggested hold shows (on the wall)")
+  onWallLabel: string = "On wall"
   @ui.group_end
 
   private _onLimbPressed = new Event<string>()
   private _onAskPressed = new Event<void>()
   private _onModePressed = new Event<void>()
+  private _onViewPressed = new Event<void>()
   get onLimbPressed(): PublicApi<string> { return this._onLimbPressed.publicApi() }
   get onAskPressed(): PublicApi<void> { return this._onAskPressed.publicApi() }
   get onModePressed(): PublicApi<void> { return this._onModePressed.publicApi() }
+  get onViewPressed(): PublicApi<void> { return this._onViewPressed.publicApi() }
 
   private limbButtons: {[limb: string]: Button} = {}
   private askButton: Button
   private modeButton: Button
   private modeLabel: Text
+  private viewButton: Button
+  private viewLabel: Text
   private backPlate: BackPlate
 
   private selectedLimb: string | null = null
   private askArmed = false
   private mode = "climb"
+  private view = "ground"
   private resync: DelayedCallbackEvent
 
   onAwake() {
@@ -123,6 +137,7 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
 
     // Two rows of three (hands above feet) so the block fits inside the SPECS
     // view at ~1 m; a single 6-button row is ~60 cm, wider than the view there.
+    // The view switch gets a third row of its own.
     const n = 3
     const rowW = n * this.buttonWidth + (n - 1) * this.buttonGap
     const addLimb = (row: SceneObject, limb: string) => {
@@ -155,6 +170,19 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
       this.modeLabel = mode.label
       mode.btn.onTriggerUp.add(() => {
         this._onModePressed.invoke()
+        this.resync.reset(0)
+      })
+    })
+    // one view switch, two buttons wide so "On wall" fits at the button text size
+    const viewW = 2 * this.buttonWidth + this.buttonGap
+    this.flexChild(content, {w: rowW, h: this.buttonHeight}, (rowSO) => {
+      rowSO.name = "ViewRow"
+      const row = this.makeFlex(rowSO, FlexDirection.Row, rowW, this.buttonHeight, this.buttonGap)
+      const view = this.addButton(row, "ViewToggle", this.groundLabel, viewW, this.buttonHeight, "Headline2")
+      this.viewButton = view.btn
+      this.viewLabel = view.label
+      view.btn.onTriggerUp.add(() => {
+        this._onViewPressed.invoke()
         this.resync.reset(0)
       })
     })
@@ -196,6 +224,11 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
     this.applyStates()
   }
 
+  setView(view: string): void {
+    this.view = view
+    this.applyStates()
+  }
+
   /** Move the row (Main computes the anchor between the hands). */
   placeAt(worldPos: vec3, worldRot: quat): void {
     const tr = this.getTransform()
@@ -224,7 +257,12 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
     if (this.askButton) this.askButton.isOn = this.askArmed
     if (this.modeButton) this.modeButton.isOn = this.mode === "setup"
     if (this.modeLabel) this.modeLabel.text = this.mode === "setup" ? this.setupLabel : this.climbLabel
+    if (this.viewButton) this.viewButton.isOn = this.view === "wall"
+    if (this.viewLabel) this.viewLabel.text = this.view === "wall" ? this.onWallLabel : this.groundLabel
   }
+
+  /** Read-back for tests: the view switch's label as shown. */
+  getViewLabel(): string { return this.viewLabel ? this.viewLabel.text : "" }
 
   // ── builders ──────────────────────────────────────────────────────────────
   private addButton(parent: SceneObject, name: string, label: string, w: number, h: number,

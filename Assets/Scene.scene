@@ -8,7 +8,7 @@
     - !<own> 7b9f0342-dc37-48d2-a878-ac94548e406f
     - !<own> 83c02cea-65be-423d-b576-a3403b1e3726
     - !<own> 8f046347-e78a-47d4-ac15-2c52c50edff3
-    - !<own> 9d914d3a-f76e-42c5-9403-6d3aef6c1008
+    - !<own> 590cfc58-ca28-4aa9-88c0-e7a76bcde67b
   layers: !<Layers/267ee9a7-aff2-4f9d-9a49-f71214747d03>
     userLayers:
       - id: 1
@@ -516,22 +516,6 @@
     - !<own> a6af4948-9adc-4052-ae22-db902dd2764e
   Components:
     []
-- !<ScriptComponent/1437a4b0-eda5-4d50-8955-90646f2ef1cb>
-  PrefabRemaps:
-    []
-  Name: AgentInspectScript
-  Enabled: true
-  ScriptAsset: !<reference> 0b25079c-f5bf-4c6d-96c4-f43b89dfa213
-  ScriptInputsDefault:
-    {}
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      {}
-  ScriptTypes:
-    "":
-      {}
 - !<SceneObject/181c239f-175e-4912-94fc-d37a2599b2d6>
   PrefabRemaps:
     []
@@ -939,6 +923,22 @@
     - !<own> 54130007-65c1-48d3-b9df-0866d8112e01
   Components:
     []
+- !<ScriptComponent/3d0b77b1-00b4-4aa2-b554-65f46e5b79ed>
+  PrefabRemaps:
+    []
+  Name: AgentInspectScript
+  Enabled: true
+  ScriptAsset: !<reference> 0b25079c-f5bf-4c6d-96c4-f43b89dfa213
+  ScriptInputsDefault:
+    {}
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      {}
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/3de2c7ea-1525-465a-9056-68565a4014a7>
   PrefabRemaps:
     []
@@ -1104,6 +1104,22 @@
     - !<own> bf2095b6-c6f8-48c8-b840-e0a6cec0dc99
   Components:
     []
+- !<SceneObject/590cfc58-ca28-4aa9-88c0-e7a76bcde67b>
+  PrefabRemaps:
+    []
+  Name: AiPreviewAgent Handler
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 3d0b77b1-00b4-4aa2-b554-65f46e5b79ed
+    - !<own> ff703610-1725-4c53-b9fa-8093c97173ee
 - !<ScriptComponent/5f153ad7-2baa-4fd9-a298-0dcfad86da3b>
   PrefabRemaps:
     []
@@ -1574,6 +1590,8 @@
     safetyNote: true
     climbLabel: true
     setupLabel: true
+    groundLabel: true
+    onWallLabel: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -1584,6 +1602,8 @@
       safetyNote: Bouldering / top-rope aid only. Not a spotter or instructor.
       climbLabel: Climb
       setupLabel: Setup
+      groundLabel: Ground
+      onWallLabel: On wall
   ScriptTypes:
     "":
       {}
@@ -1835,22 +1855,6 @@
   ScriptTypes:
     "":
       {}
-- !<SceneObject/9d914d3a-f76e-42c5-9403-6d3aef6c1008>
-  PrefabRemaps:
-    []
-  Name: AiPreviewAgent Handler
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 1437a4b0-eda5-4d50-8955-90646f2ef1cb
-    - !<own> cae0c298-9d80-485f-a93e-888ab9f71d81
 - !<SceneObject/9e373d68-993f-4c8f-83a0-6644f1d9fefd>
   PrefabRemaps:
     []
@@ -2273,22 +2277,6 @@
     - !<own> 0a0e1d78-8246-4f5b-ab1a-fdc51837956d
   Components:
     []
-- !<ScriptComponent/cae0c298-9d80-485f-a93e-888ab9f71d81>
-  PrefabRemaps:
-    []
-  Name: AgentInteractScript
-  Enabled: true
-  ScriptAsset: !<reference> 29091811-e792-46be-bfa4-28ddec5f11be
-  ScriptInputsDefault:
-    {}
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      {}
-  ScriptTypes:
-    "":
-      {}
 - !<Skin/ccf4d3bc-d3c2-4580-b9c5-62f164ef7eef>
   PrefabRemaps:
     []
@@ -2953,6 +2941,22 @@
       labelFadeSeconds: 0.500000
       labelColor: !<Vec4> {x: 0.920000, y: 1.000000, z: 0.950000, w: 1.000000}
       whyColor: !<Vec4> {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/ff703610-1725-4c53-b9fa-8093c97173ee>
+  PrefabRemaps:
+    []
+  Name: AgentInteractScript
+  Enabled: true
+  ScriptAsset: !<reference> 29091811-e792-46be-bfa4-28ddec5f11be
+  ScriptInputsDefault:
+    {}
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      {}
   ScriptTypes:
     "":
       {}

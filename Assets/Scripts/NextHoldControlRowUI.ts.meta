@@ -32,6 +32,8 @@
     buttonHeight: false
     buttonWidth: false
     climbLabel: false
+    groundLabel: false
+    onWallLabel: false
     safetyNote: false
     setupLabel: false
   ScriptTypesHidden:
@@ -49,6 +51,8 @@
       safetyNote: Bouldering / top-rope aid only. Not a spotter or instructor.
       climbLabel: Climb
       setupLabel: Setup
+      groundLabel: Ground
+      onWallLabel: On wall
   ScriptTypes:
     -
       {}
@@ -62,4 +66,6 @@
     - "// @input string safetyNote = \"Bouldering / top-rope aid only. Not a spotter or instructor.\" {\"hint\":\"Not-a-spotter note shown under the row. Never use the word 'safe'.\"}"
     - '// @input string climbLabel = "Climb" {"hint":"Mode switch label while in climb mode"}'
     - '// @input string setupLabel = "Setup" {"hint":"Mode switch label while in setup mode"}'
+    - '// @input string groundLabel = "Ground" {"hint":"View switch label while every ring and the ghosts show (standing back at the base)"}'
+    - '// @input string onWallLabel = "On wall" {"hint":"View switch label while only the suggested hold shows (on the wall)"}'
     - '// @ui {"widget":"group_end"}'

@@ -177,7 +177,7 @@ export function camera(): Camera {
 
 /**
  * Scenarios share one live Lens. Put it back to the open state (climb mode,
- * '?' off, preset position, best move auto-selected) through the ACTION API.
+ * Ground view, '?' off, preset position, best move auto-selected) through the ACTION API.
  * This is setup, not the behaviour under test. The last call is always a
  * pressHold so the Lens re-runs its auto-select exactly as at open.
  */
@@ -185,6 +185,7 @@ export async function restorePreset(main: NextHoldMain): Promise<void> {
   restoreProblem(main)
   if (main.getMode() !== "climb") main.pressMode()
   if (main.isAskArmed()) main.pressAsk()
+  if (main.getView() !== "ground") main.pressView()
   const target = presetPosition()
   // a free hold of the problem to park a limb on (the Lens ignores holds outside the problem)
   const spare = (cur: RefPosition) =>
