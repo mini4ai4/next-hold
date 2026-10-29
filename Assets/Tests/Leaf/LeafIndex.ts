@@ -10,6 +10,7 @@ import {N1MarkProblemScenario} from "./N1MarkProblemScenario"
 import {N2UpwardGoalScenario} from "./N2UpwardGoalScenario"
 import {N3SequencePreviewScenario} from "./N3SequencePreviewScenario"
 import {N4WhyWordingScenario} from "./N4WhyWordingScenario"
+import {N5ControlRowInViewScenario} from "./N5ControlRowInViewScenario"
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -25,5 +26,6 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "r2-upward-goal", typename: N2UpwardGoalScenario.getTypeName()},
     {id: "r3-sequence-preview", typename: N3SequencePreviewScenario.getTypeName()},
     {id: "r4-why-wording", typename: N4WhyWordingScenario.getTypeName()},
+    {id: "r5-control-row-in-view", typename: N5ControlRowInViewScenario.getTypeName()},
   ]
 }

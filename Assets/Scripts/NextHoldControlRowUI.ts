@@ -92,6 +92,7 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
   private askButton: Button
   private modeButton: Button
   private modeLabel: Text
+  private backPlate: BackPlate
 
   private selectedLimb: string | null = null
   private askArmed = false
@@ -101,6 +102,7 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
   onAwake() {
     this.sceneObject.createComponent("Component.Canvas")
     const backPlate = this.sceneObject.createComponent(BackPlate.getTypeName()) as BackPlate
+    this.backPlate = backPlate
 
     const content = this.obj(this.sceneObject, "Content", new vec3(0, 0, 0.6))
     const flex = content.createComponent(FlexLayout.getTypeName()) as FlexLayout
@@ -199,6 +201,12 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
     const tr = this.getTransform()
     tr.setWorldPosition(worldPos)
     tr.setWorldRotation(worldRot)
+  }
+
+  /** The whole block (both rows of buttons and the note) in cm, as laid out; null before the first layout. */
+  getSize(): vec2 | null {
+    const s = this.backPlate ? this.backPlate.size : null
+    return s && s.x > 0 && s.y > 0 ? s : null
   }
 
   /** Read-back for tests. */

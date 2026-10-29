@@ -42,6 +42,9 @@ const WHY_HALF_W = 21.5
  *  title, five type buttons, the Start / Top row, gaps and padding tall */
 const PICKER_HALF_W = 10.5
 const PICKER_HALF_H = 24
+/** half the control row block (two rows of 5 cm buttons + the note + padding), until its layout reports a size */
+const ROW_HALF_W = 15.4
+const ROW_HALF_H = 8.7
 
 export type Mode = "climb" | "setup"
 
@@ -349,7 +352,12 @@ export class NextHoldMain extends BaseScriptComponent {
     }
     x = Math.min(220, Math.max(20, x))
     y = Math.max(12, y)
-    this.controlRow.placeAt(this.wall.wallToWorld(x, y, 10), this.wallRot())
+    // keep the whole block inside the view, both rows and the note under them, not just its
+    // centre: at the preset the LF / RF / Climb row and the note fell below the narrow view
+    const size = this.controlRow.getSize()
+    const halfW = size ? size.x / 2 : ROW_HALF_W
+    const halfH = size ? size.y / 2 : ROW_HALF_H
+    this.controlRow.placeAt(this.keepInView(this.wall.wallToWorld(x, y, 10), halfW, halfH), this.wallRot())
   }
 
   private showWhyFor(id: string, r: ScoreResult): void {
