@@ -201,3 +201,33 @@ export function bestMove(a: MoveArgs): ScoreResult | null {
   }
   return best;
 }
+
+// Sequence preview: a small look-ahead over bestMove. Step 1 is the move
+// suggested now (for `limb` if given: the selected limb's best, the glowing
+// ring; otherwise bestMove). Each later step is bestMove from the position the
+// earlier steps leave, leaving out moves that only undo an earlier step (a limb
+// going back to a hold it left in this look-ahead). It ends after a hand
+// reaches the top hold, or when no move is left.
+export function sequence(a: MoveArgs & { limb?: Limb | null; steps?: number }): ScoreResult[] {
+  const steps = a.steps ?? 3;
+  const out: ScoreResult[] = [];
+  let position: Position = { ...a.position };
+  const left: { [limb: string]: string[] } = { LH: [], RH: [], LF: [], RF: [] };
+  for (let i = 0; i < steps; i++) {
+    // bestMove (same order, same tie rule), without the undo moves
+    let m: ScoreResult | null = null;
+    for (const limb of i === 0 && a.limb ? [a.limb] : LIMBS) {
+      const ev = evaluate({ holds: a.holds, holdTypes: a.holdTypes, position, limb, reach: a.reach, top: a.top });
+      for (const r of ev.results) {
+        if (r.score > 0 && left[limb].indexOf(r.holdId) < 0 && r.rank > (m?.rank ?? -1)) m = r;
+      }
+    }
+    if (!m) break;
+    out.push(m);
+    const from = position[m.limb];
+    if (from != null) left[m.limb].push(from);
+    position = { ...position, [m.limb]: m.holdId };
+    if (a.top != null && m.holdId === a.top && HANDS.indexOf(m.limb) >= 0) break;
+  }
+  return out;
+}

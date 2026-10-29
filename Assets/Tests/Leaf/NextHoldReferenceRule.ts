@@ -118,6 +118,33 @@ export class ReferenceRule {
     return best
   }
 
+  /**
+   * Sequence preview, per the review: the next 2-3 moves by bestMove from `p`.
+   * Step 1 is `limb`'s suggestion when given (the glowing ring). A move that
+   * puts a limb back on a hold it left in this look-ahead is never chosen; the
+   * best other move is. Ends after a hand reaches the top.
+   */
+  sequence(p: RefPosition, limb: RefLimb | null = null, steps = 3): RefResult[] {
+    const out: RefResult[] = []
+    let pos: RefPosition = {...p}
+    const left: {[l: string]: string[]} = {LH: [], RH: [], LF: [], RF: []}
+    for (let i = 0; i < steps; i++) {
+      let m: RefResult | null = null
+      for (const l of i === 0 && limb ? [limb] : REF_LIMBS) {
+        for (const r of this.evaluate(l, pos).results) {
+          if (r.score > 0 && left[l].indexOf(r.holdId) < 0 && r.rank > (m ? m.rank : -1)) m = r
+        }
+      }
+      if (!m) break
+      out.push(m)
+      const from = pos[m.limb]
+      if (from != null) left[m.limb].push(from)
+      pos = {...pos, [m.limb]: m.holdId}
+      if (this.top != null && m.holdId === this.top && (m.limb === "LH" || m.limb === "RH")) break
+    }
+    return out
+  }
+
   /** the same rule without the upward goal (to show what the goal changes) */
   withoutGoal(): ReferenceRule {
     return new ReferenceRule(this.holds, this.types, this.reach, null)

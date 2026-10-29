@@ -8,6 +8,7 @@ import {C5AskWhyScenario} from "./C5AskWhyScenario"
 import {ReachIKScenario} from "./ReachIKScenario"
 import {N1MarkProblemScenario} from "./N1MarkProblemScenario"
 import {N2UpwardGoalScenario} from "./N2UpwardGoalScenario"
+import {N3SequencePreviewScenario} from "./N3SequencePreviewScenario"
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -21,5 +22,6 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "extra-ik-reach-controls", typename: ReachIKScenario.getTypeName()},
     {id: "r1-mark-problem", typename: N1MarkProblemScenario.getTypeName()},
     {id: "r2-upward-goal", typename: N2UpwardGoalScenario.getTypeName()},
+    {id: "r3-sequence-preview", typename: N3SequencePreviewScenario.getTypeName()},
   ]
 }

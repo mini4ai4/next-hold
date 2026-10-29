@@ -3,7 +3,8 @@
 //
 // Owns: runtime-built overlay meshes under the wall (Ring_<id>, Marker_<limb>,
 // SuggestGlow, HoverRing, setup mode's Mark_<id> "in your problem" ring and
-// Tag_<id> START / TOP text) and their colours. One cloned material per overlay.
+// Tag_<id> START / TOP text, the sequence preview's Ghost_1..3 rings with their
+// GhostNumber_1..3) and their colours. One cloned material per overlay.
 // Main pushes state in with apply(); this class never scores or decides.
 // Plain class (not a component): Main creates it once in onAwake.
 
@@ -31,6 +32,8 @@ export interface OverlayState {
   marks: {[id: string]: boolean}
   /** setup mode: tag text under a marked hold ("START", "TOP"); absent = no tag */
   tags: {[id: string]: string}
+  /** sequence preview: the holds of the next moves in order (ghost 1, 2, 3); empty = none */
+  ghosts: string[]
 }
 
 export interface OverlayColours {
@@ -52,6 +55,14 @@ const MARK_COLOR = new vec4(0.62, 0.86, 1.0, 1)
 const TAG_COLOR = new vec4(0.8, 0.93, 1.0, 1)
 /** Text sizes on the overlay canvas (same scale as the UI modules' 110 cm roles) */
 const TAG_SIZE = 44
+/** sequence preview: small, light ghost rings (they must read on the additive display) */
+const GHOST_COUNT = 3
+const GHOST_R = 3.4
+const GHOST_COLOR = new vec4(0.86, 0.93, 1.0, 0.95)
+const GHOST_NUMBER_COLOR = new vec4(0.95, 0.98, 1.0, 1)
+const GHOST_NUMBER_SIZE = 56
+/** a ghost sits as a badge on the hold's upper side; a second ghost on the same hold takes the next angle */
+const GHOST_ANGLES_DEG = [45, 135, 90]
 /** glow breathing: alpha range of the suggestion's halo */
 const GLOW_MIN = 0.6
 const GLOW_MAX = 1.0
@@ -79,6 +90,7 @@ export class NextHoldWallVisuals {
   private marks: {[id: string]: {so: SceneObject; mat: Material}} = {}
   private textGroup: SceneObject
   private tags: {[id: string]: {so: SceneObject; text: Text}} = {}
+  private ghosts: {ring: {so: SceneObject; mat: Material}; label: {so: SceneObject; text: Text}}[] = []
   private state: OverlayState | null = null
   private ringMeshes: {[r: string]: RenderMesh} = {}
   private thinMeshes: {[r: string]: RenderMesh} = {}
@@ -119,6 +131,16 @@ export class NextHoldWallVisuals {
       this.tags[h.id] = t
     }
 
+    for (let n = 1; n <= GHOST_COUNT; n++) {
+      const ring = this.makeVisual("Ghost_" + n, this.thinRingMesh(GHOST_R))
+      ring.mat.mainPass.baseColor = GHOST_COLOR
+      ring.so.enabled = false
+      const label = this.makeText("GhostNumber_" + n, vec3.zero(), GHOST_NUMBER_SIZE, GHOST_NUMBER_COLOR)
+      label.text.text = "" + n
+      label.so.enabled = false
+      this.ghosts.push({ring, label})
+    }
+
     const disc = new UVGeo()
     addProfileAnnulus(disc, 0, MARKER_R, 40, profileV(ProfileRow.Marker))
     const discMesh = toMesh(disc)
@@ -151,6 +173,27 @@ export class NextHoldWallVisuals {
       const tag = s.tags[h.id]
       this.tags[h.id].so.enabled = !!tag
       if (tag) this.tags[h.id].text.text = tag
+    }
+
+    // ghost n: a small numbered ring on the upper side of the n-th look-ahead hold,
+    // on the radius of the suggestion glow's outer ring so it reads as a badge on it
+    const onHold: {[id: string]: number} = {}
+    for (let i = 0; i < GHOST_COUNT; i++) {
+      const g = this.ghosts[i]
+      const id = i < s.ghosts.length ? s.ghosts[i] : null
+      const h = id ? this.holdDef(id) : null
+      g.ring.so.enabled = !!h
+      g.label.so.enabled = !!h
+      if (!h) continue
+      const k = onHold[h.id] || 0
+      onHold[h.id] = k + 1
+      let deg = GHOST_ANGLES_DEG[k % GHOST_ANGLES_DEG.length]
+      if (h.x > 205) deg = 180 - deg // keep a badge near the right edge on the wall
+      const a = (deg * Math.PI) / 180
+      const d = HOLD_SIZE[h.type].ringR + RING_W / 2 + GLOW_PROFILE.ringAt + GLOW_PROFILE.ringW / 2
+      const x = h.x + d * Math.cos(a), y = h.y + d * Math.sin(a)
+      g.ring.so.getTransform().setLocalPosition(this.wallToLocal(x, y, RING_Z + 0.15))
+      g.label.so.getTransform().setLocalPosition(this.wallToLocal(x, y, RING_Z + 0.3))
     }
 
     const glowHold = s.glowHoldId ? this.holdDef(s.glowHoldId) : null
@@ -221,6 +264,12 @@ export class NextHoldWallVisuals {
   tagText(id: string): string | null {
     const t = this.tags[id]
     return t && t.so.enabled ? t.text.text : null
+  }
+
+  /** the hold ghost n (1-based) sits on, or null when it is hidden */
+  ghostHold(n: number): string | null {
+    const g = this.ghosts[n - 1]
+    return g && g.ring.so.enabled && this.state ? this.state.ghosts[n - 1] : null
   }
 
   isGlowOn(id: string): boolean {

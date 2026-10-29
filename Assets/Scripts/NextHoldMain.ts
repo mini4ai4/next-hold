@@ -19,7 +19,7 @@
 // getLabelOpacity(), getLabelText(), getWhyText(), isWhyVisible(),
 // isAskArmed(), isOffViewArrowVisible(), isTypePickerVisible(), getHoldType(id),
 // isInProblem(id), getProblemHolds(), getStartHolds(), getTopHold(), isHoldDim(id),
-// isMarkVisible(id), getTagText(id).
+// isMarkVisible(id), getTagText(id), getPreview(), getGhostHold(n).
 // Action API mirrors a pinch: pressHold(id), pressLimb(limb), pressAsk(),
 // pressMode(), pickType(type), pressStart(), pressTop().
 
@@ -27,7 +27,7 @@ import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interactio
 import {ClimbingWall} from "./Wall/ClimbingWall"
 import {HOLDS, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP, HOLD_SIZE, holdById} from "./Wall/WallLayout"
 import {
-  Evaluation, HoldTypes, Holds, LIMBS, Limb, Position, ScoreResult, bestMove, evaluate,
+  Evaluation, HoldTypes, Holds, LIMBS, Limb, Position, ScoreResult, bestMove, evaluate, sequence,
 } from "./NextHoldScoring"
 import {NextHoldWallVisuals, RingColour} from "./NextHoldWallVisuals"
 import {NextHoldControlRowUI} from "./NextHoldControlRowUI"
@@ -127,6 +127,8 @@ export class NextHoldMain extends BaseScriptComponent {
   private askArmed = false
   private evaluation: Evaluation = {results: [], suggestion: null}
   private byHold: {[id: string]: ScoreResult} = {}
+  /** sequence preview: the next 2-3 moves from here (step 1 = the suggestion) */
+  private preview: ScoreResult[] = []
   private pickerHold: string | null = null
   private hovered: string | null = null
   private visuals: NextHoldWallVisuals
@@ -306,6 +308,10 @@ export class NextHoldMain extends BaseScriptComponent {
       if (tag.length) tags[id] = tag.join(" · ")
     }
     const sug = climb ? this.evaluation.suggestion : null
+    // look-ahead from the same position, in the same frame as the rings
+    this.preview = climb && sug
+      ? sequence({holds, holdTypes: this.holdTypes, position: this.position, reach, top: goalTop, limb: this.selected})
+      : []
     this.visuals.apply({
       rings,
       glowHoldId: sug ? sug.holdId : null,
@@ -314,6 +320,7 @@ export class NextHoldMain extends BaseScriptComponent {
       showMarkers: true,
       marks,
       tags,
+      ghosts: this.preview.map((m) => m.holdId),
     })
 
     this.controlRow.setSelectedLimb(this.selected)
@@ -468,6 +475,10 @@ export class NextHoldMain extends BaseScriptComponent {
   isHoldDim(id: string): boolean { return this.wall.isHoldDim(id) }
   isMarkVisible(id: string): boolean { return this.visuals ? this.visuals.isMarkVisible(id) : false }
   getTagText(id: string): string | null { return this.visuals ? this.visuals.tagText(id) : null }
+  /** sequence preview: the next moves shown as ghost rings 1, 2, 3 */
+  getPreview(): {limb: Limb; holdId: string}[] { return this.preview.map((m) => ({limb: m.limb, holdId: m.holdId})) }
+  /** the hold ghost ring n (1-based) is drawn on, or null when hidden */
+  getGhostHold(n: number): string | null { return this.visuals ? this.visuals.ghostHold(n) : null }
   isStartLit(): boolean { return this.typePicker.isStartLit() }
   isTopLit(): boolean { return this.typePicker.isTopLit() }
 }
