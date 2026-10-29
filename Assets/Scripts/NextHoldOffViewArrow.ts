@@ -7,7 +7,14 @@
 // Must not: choose the suggestion; Main does that.
 
 import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/CameraProvider/WorldCameraFinderProvider"
-import {GEO_LAYOUT, Geo, addArrow} from "./Wall/MeshKit"
+import {GEO_LAYOUT, Geo, addArrow, addDisc} from "./Wall/MeshKit"
+
+const ARROW_LEN = 5
+/** the dark disc behind the arrow: radius (cm) and colour */
+const BACK_R = 3.9
+const BACK_COLOR = new vec4(0.08, 0.1, 0.09, 0.6)
+/** over everything on the wall and the panels */
+const ORDER_ARROW = 20
 
 @component
 export class NextHoldOffViewArrow extends BaseScriptComponent {
@@ -59,7 +66,7 @@ export class NextHoldOffViewArrow extends BaseScriptComponent {
     this.arrow.setParent(this.sceneObject)
     const g = new Geo()
     g.bake = false
-    addArrow(g, 5, 3.6, [1, 1, 1, 1])
+    addArrow(g, ARROW_LEN, 3.6, [1, 1, 1, 1])
     const b = new MeshBuilder(GEO_LAYOUT)
     b.topology = MeshTopology.Triangles
     b.indexType = MeshIndexType.UInt16
@@ -73,6 +80,30 @@ export class NextHoldOffViewArrow extends BaseScriptComponent {
       mat.mainPass.baseColor = this.arrowColor
       mat.mainPass.depthTest = false // always readable at the edge of view
       rmv.mainMaterial = mat
+      rmv.setRenderOrder(ORDER_ARROW)
+      // a dark disc behind it, so the pale arrow reads over the light ply too; on the additive
+      // display dark draws as nothing and the arrow alone remains (as the label's dark outline)
+      const back = global.scene.createSceneObject("OffViewArrowBack")
+      back.setParent(this.arrow)
+      const bg = new Geo()
+      bg.bake = false
+      addDisc(bg, BACK_R, 32, [1, 1, 1, 1], -0.3)
+      const bb = new MeshBuilder(GEO_LAYOUT)
+      bb.topology = MeshTopology.Triangles
+      bb.indexType = MeshIndexType.UInt16
+      bb.appendVerticesInterleaved(bg.v)
+      bb.appendIndices(bg.i)
+      bb.updateMesh()
+      back.getTransform().setLocalPosition(new vec3(-ARROW_LEN / 2, 0, 0))
+      const brmv = back.createComponent("Component.RenderMeshVisual") as RenderMeshVisual
+      brmv.mesh = bb.getMesh()
+      const bmat = this.material.clone()
+      bmat.mainPass.baseColor = BACK_COLOR
+      bmat.mainPass.blendMode = BlendMode.Normal
+      bmat.mainPass.depthTest = false
+      bmat.mainPass.depthWrite = false
+      brmv.mainMaterial = bmat
+      brmv.setRenderOrder(ORDER_ARROW - 1)
     }
     this.arrow.enabled = false
 
