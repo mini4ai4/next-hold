@@ -40,3 +40,6 @@ The preview can't see a real wall or track a body, so hold recognition is a setu
 limb toggles. The logic is proven in tests and the preview; how it feels on a real wall needs real SPECS.
 
 Green never means "safe". It means "a secure grip for you, from where you are now".
+
+## License
+MIT, see `LICENSE`. Lens Studio templates and packages keep their own terms.
