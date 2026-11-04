@@ -24,7 +24,7 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
 
 ## Tests
 - LEAF: open the LEAF panel and run all twenty-three scenarios (one per done criterion in `devpost/design-brief.md`, one per review fix, and d1 for the demo autopilot).
-  The raw output of the last full run (23 of 23 pass, session 21): `devpost/LEAF_RUN_2026-11-04_s21.txt`, copied out of
+  The raw output of the last full run (23 of 23 pass, session 22): `devpost/LEAF_RUN_2026-11-04_s22.txt`, copied out of
   the Lens Studio log with `node tests/extract_leaf_run.mjs <log> <first line>`.
 - Scoring port: `node tests/scoring.port.test.mjs` (69 checks, including the 1-2-3 search against a brute force).
 - How often height changes the plan: `node tests/measure_heights.mjs 300 7` runs the Lens's own planner on 300 random
