@@ -6,8 +6,15 @@ the design brief's done-criteria rest on a rule that's been run, not guessed.
 - `scoring.js` — a pure-JS reference of the green/yellow/red rule from `../IDEA.md`
   (grip quality × reach factor × balance factor → green ≥ 0.7, yellow 0.4–0.7, red < 0.4),
   plus the upward goal (below).
-- `scoring.test.js` — 27 assertions tying the rule to the brief's done-criteria. Run:
-  `node scoring.test.js` → **27 passed, 0 failed**.
+- `scoring.test.js` — 35 assertions tying the rule to the brief's done-criteria. Run:
+  `node scoring.test.js` → **35 passed, 0 failed**.
+
+## A pinch only makes a green or yellow move (added 3 Nov, session 21)
+A pinch used to move the highest-ranked limb whatever its colour, so from the start a pinch on the
+top hold jumped the left hand there. Now `pinchMove` refuses a move that is red. With no limb
+chosen, `bestLimbFor` takes the highest rank among green and yellow moves: a red move can outrank a
+yellow one, because the goal only ranks, and that hold would be refused while a limb could make the
+move. With an override only the override's move counts.
 
 ## Feet reach like legs (added 29 Oct, session 14)
 Until then a foot used the arm's 77 cm reach. Now a foot reaches from the **hip** with the

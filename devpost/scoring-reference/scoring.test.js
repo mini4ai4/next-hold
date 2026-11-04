@@ -124,5 +124,42 @@ check("hands are unchanged: arm reach from the shoulder, no high step",
   upRes.parts.limbReach === REACH && upRes.parts.highStep === 1 &&
   Math.abs(upRes.parts.dist - Math.hypot(140 - (120 + 18), 190 - (96.25 + 35))) < 1e-9, upRes.parts);
 
+// ---- a pinch only makes a green or yellow move (session 21) -------------------
+const pm = (holdId, override = null, top = null, h = holds, t = holdTypes, p = position, reach = REACH) =>
+  S.pinchMove({ holdId, holds: h, holdTypes: t, position: p, reach, top, override });
+check("a hold red for every limb is refused", pm("far").moves === false && pm("far").result.colour === "red", pm("far"));
+const topFar = pm("top", null, "top", gHolds, gTypes);
+check("the top hold out of reach from the start is refused, however good the goal", topFar.moves === false, topFar);
+check("no override: the best limb moves", pm("up").moves === true && pm("up").limb === "RH", pm("up"));
+const redOver = pm("up", "LF");
+check("an override whose move is red is refused, though another limb could make the move",
+  redOver.moves === false && redOver.limb === "LF" && pm("up").moves === true, redOver);
+const goodOver = pm("up", "LH");
+check("an override whose move is green moves that limb, not the best limb",
+  goodOver.moves === true && goodOver.limb === "LH" && goodOver.result.colour !== "red", goodOver);
+// A red move can outrank a yellow one: the goal only ranks. (150 cm climber: reach 66.)
+const hHolds = { h10: { x: 72, y: 216 }, rh: { x: 150, y: 150 }, up: { x: 140, y: 190 }, rf: { x: 145, y: 45 },
+                 h16: { x: 70, y: 72 }, h20: { x: 98, y: 252 } };
+const hTypes = { h10: "jug", rh: "jug", up: "jug", rf: "jug", h16: "crimp", h20: "jug" };
+const hPos = { LH: "h10", RH: "rh", LF: "up", RF: "rf" };
+const hArgs = { holdId: "h16", holds: hHolds, holdTypes: hTypes, position: hPos, reach: 66, top: "h20" };
+const hRed = S.scoreHold({ ...hArgs, limb: "RF" }), hYellow = S.scoreHold({ ...hArgs, limb: "LF" });
+check("the case exists: a red move outranks a yellow one to the same hold",
+  hRed.colour === "red" && hYellow.colour === "yellow" && hRed.rank > hYellow.rank, { hRed, hYellow });
+const hMove = S.pinchMove(hArgs);
+check("then the yellow move is made: the hold isn't refused while a limb can make the move",
+  hMove.moves === true && hMove.limb === "LF" && S.bestLimbFor(hArgs).limb === "LF", hMove);
+// every hold, every position: refused exactly when no limb has a green or yellow move
+let pmOk = true;
+for (const p of [position, oneFoot, { ...position, LH: null }, hiHands]) {
+  for (const id of Object.keys(fHolds)) {
+    if (Object.values(p).includes(id)) continue;
+    const a = { holdId: id, holds: fHolds, holdTypes: fTypes, position: p, reach: REACH };
+    const any = ["LH", "RH", "LF", "RF"].some((limb) => S.scoreHold({ ...a, limb }).colour !== "red");
+    if (S.pinchMove(a).moves !== any) pmOk = false;
+  }
+}
+check("refused exactly when no limb has a green or yellow move (4 positions x all holds)", pmOk);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

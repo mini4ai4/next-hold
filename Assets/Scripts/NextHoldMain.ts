@@ -21,7 +21,9 @@
 // isInProblem(id), getProblemHolds(), getStartHolds(), getTopHold(), isHoldDim(id),
 // isMarkVisible(id), getTagText(id), getPreview(), getGhostHold(n), getView(),
 // getTorso(), getGroundViewCm(), getGroundSizedCm(), getRingLineWidth(), getFigureMask(), isTopped(), getToppedAt().
-// Test hook: setSizingCamera(cam) sizes Ground from another camera's distance.
+// Session 21: getRefusalLog(), getRingPulse().
+// Test hooks: setSizingCamera(cam) sizes Ground from another camera's distance; forceMove(limb, id)
+// sets a position up, red moves included (a pinch can't make those).
 // Action API mirrors a pinch: pressHold(id), pressLimb(limb), pressAsk(),
 // pressMode(), pressView(), pressHeight(±1), pickType(type), pressStart(), pressTop(), pressRemove(), pressDone().
 // The climber's height (150-200 cm, set in the Lens) is state too: every reach is a share of it.
@@ -35,8 +37,8 @@ import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interactio
 import {ClimbingWall} from "./Wall/ClimbingWall"
 import {HOLDS, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP, HOLD_SIZE, holdById} from "./Wall/WallLayout"
 import {
-  Evaluation, HoldTypes, Holds, LEG_REACH, LIMBS, Limb, Position, ScoreResult, bestLimbFor, bestMove, bestPerHold, centreOfMass,
-  evaluate, hipOf, sequence, shoulderOf,
+  Evaluation, HoldTypes, Holds, LEG_REACH, LIMBS, Limb, Position, ScoreResult, bestMove, bestPerHold, centreOfMass,
+  evaluate, hipOf, pinchMove, sequence, shoulderOf,
 } from "./NextHoldScoring"
 import {
   DESIGN_VIEW_CM, FigureBody, NextHoldWallVisuals, OverlayState, RingColour, TOPPED_TEXT, WallPt, minReadSize, readBoost, ringLineWidth,
@@ -104,6 +106,11 @@ const LABEL_GLOW_GAP = 1
  *  there is no next move (no glow, no 1-2-3, no arrow). A hand off the top hold climbs on as before. */
 export const TOPPED_SECONDS = 2
 export const TOPPED_FADE_SECONDS = 0.6
+
+/** session 21, a pinch no limb can make: nothing moves, the hold's ring pulses (NextHoldWallVisuals)
+ *  and the why-line says this for REFUSED_SECONDS. */
+export const REFUSED_TEXT = "OUT OF REACH"
+export const REFUSED_SECONDS = 1.5
 
 /** the in-Lens height setting: range and step (cm) */
 export const HEIGHT_MIN_CM = 150
@@ -220,6 +227,10 @@ export class NextHoldMain extends BaseScriptComponent {
   private toppedAt = -1
   /** the "TOPPED" tag is still up (it is dropped once it has faded out) */
   private toppedShown = false
+  /** getTime() when the why-line stops saying "OUT OF REACH" (-1: it isn't saying it) */
+  private refusedUntil = -1
+  /** every refused pinch (newest last), for the read API */
+  private refusalLog: {hold: string; time: number}[] = []
   /** the control row outline last pushed to the stick figure */
   private lastMask: WallPt[] | null = null
   /** the control row's laid-out size it was last placed with ("" = not laid out yet) */
@@ -297,6 +308,7 @@ export class NextHoldMain extends BaseScriptComponent {
       this.ripple.tick(getTime())
       if (!this.ready) return
       this.tickTopped(getTime())
+      this.tickRefused(getTime())
       // the row lays itself out late (after a start or a refresh): once its real size is known, or
       // whenever it changes, place it again, or in Ground it sits too close and covers a ring
       const size = this.controlRow.getSize()
@@ -358,16 +370,38 @@ export class NextHoldMain extends BaseScriptComponent {
       this.askArmed = false
       this.controlRow.setAskArmed(false)
       this.rippleHold(id)
-      this.showWhyFor(id, r)
+      this.refusedUntil = -1
+      this.showWhyFor(id, r.why)
       return
     }
     if (this.isOccupied(id)) return // the reference doesn't score occupied holds
-    this.rippleHold(id)
-    const wasTopped = this.isTopped()
     // session 20: hands stay on the holds, no limb has to be chosen first: the best limb for this
-    // hold moves, unless a toggle picked one. The move uses up the override.
-    const limb = this.override || bestLimbFor({holds: this.scoredHolds(), holdTypes: this.holdTypes, position: this.position,
-      reach: this.reach(), top: this.getTopHold(), holdId: id}).limb
+    // hold moves, unless a toggle picked one. Session 21: only if that move is green or yellow.
+    const move = pinchMove({holds: this.scoredHolds(), holdTypes: this.holdTypes, position: this.position,
+      reach: this.reach(), top: this.getTopHold(), holdId: id, override: this.override})
+    if (!move.moves) {
+      this.refusePinch(id)
+      return
+    }
+    this.moveLimb(move.limb, id)
+  }
+
+  /** Nothing moves and nothing recomputes (an override stays: no move used it up). No ripple, which
+   *  marks a pinch taken: the hold's own ring pulses and the why-line says why, for a moment. */
+  private refusePinch(id: string): void {
+    this.refusalLog.push({hold: id, time: getTime()})
+    if (this.refusalLog.length > 200) this.refusalLog.shift()
+    this.visuals.pulseRing(id)
+    this.refusedUntil = getTime() + REFUSED_SECONDS
+    this.showWhyFor(id, REFUSED_TEXT)
+  }
+
+  /** The move itself. The move uses up the override. */
+  private moveLimb(limb: Limb, id: string): void {
+    this.rippleHold(id)
+    this.visuals.stopPulse()
+    this.refusedUntil = -1
+    const wasTopped = this.isTopped()
     this.position[limb] = id
     this.override = null
     // a hand just reached the top hold: the problem is done, "TOPPED" from this frame
@@ -378,6 +412,12 @@ export class NextHoldMain extends BaseScriptComponent {
     }
     this.callouts.hideWhy()
     this.recompute()
+  }
+
+  /** Tests only: set a position up, whatever its colour (a pinch can only make green or yellow moves). */
+  forceMove(limb: Limb, id: string): void {
+    if (!this.ready || !this.holds[id] || LIMBS.indexOf(limb) < 0) return
+    this.moveLimb(limb, id)
   }
 
   /** A toggle is an override: the next pinch on a hold moves this limb, and until then the rings and
@@ -408,6 +448,7 @@ export class NextHoldMain extends BaseScriptComponent {
     if (!this.ready) return
     this.rippleButton("ModeSwitch")
     this.mode = this.mode === "climb" ? "setup" : "climb"
+    this.visuals.stopPulse()
     this.askArmed = false
     this.controlRow.setAskArmed(false)
     this.callouts.hideWhy()
@@ -509,6 +550,13 @@ export class NextHoldMain extends BaseScriptComponent {
     }
     this.toppedShown = false
     this.recompute()
+  }
+
+  /** "OUT OF REACH" comes down by itself; any other why-line stays until something closes it. */
+  private tickRefused(time: number): void {
+    if (this.refusedUntil < 0 || time < this.refusedUntil) return
+    this.refusedUntil = -1
+    this.callouts.hideWhy()
   }
 
   // ── recompute: same frame as the change ──────────────────────────────────
@@ -617,9 +665,11 @@ export class NextHoldMain extends BaseScriptComponent {
     if (s.glowHoldId) this.callouts.moveSuggestion(this.labelPos(s.glowHoldId), this.wallRot())
     // the panels follow the view: beside the problem and sized for the distance in Ground
     this.placeControlRow()
+    // the why-line follows the view too, and keeps saying what it was saying
     const whyId = this.callouts.getWhyHoldId()
     const whyScore = whyId ? this.shownScore(whyId) : null
-    if (this.callouts.isWhyVisible() && whyId && whyScore) this.showWhyFor(whyId, whyScore)
+    const whyText = this.refusedUntil >= 0 ? REFUSED_TEXT : whyScore ? whyScore.why : null
+    if (this.callouts.isWhyVisible() && whyId && whyText) this.showWhyFor(whyId, whyText)
   }
 
   /**
@@ -868,10 +918,10 @@ export class NextHoldMain extends BaseScriptComponent {
    * wins (else the clearest). From 2.5 m it is drawn 2.3x: slid into view below h11 it lay across
    * rh's green ring and read as that hold's caption.
    */
-  private showWhyFor(id: string, r: ScoreResult): void {
+  private showWhyFor(id: string, why: string): void {
     const h = this.holds[id]
     const k = this.panelScale()
-    const halfW = whyHalfWidth(r.why) * k, halfH = WHY_HALF_H * k
+    const halfW = whyHalfWidth(why) * k, halfH = WHY_HALF_H * k
     const eye = this.eyeOnWall()
     const s = this.seenScale(eye, PANEL_Z)
     const hw = halfW * s, hh = halfH * s
@@ -912,7 +962,7 @@ export class NextHoldMain extends BaseScriptComponent {
       if (clear >= 0) { best = {p, clear}; break }
       if (!best || clear > best.clear) best = {p, clear}
     }
-    this.callouts.showWhy(this.wall.wallToWorld(best!.p.x, best!.p.y, PANEL_Z), this.wallRot(), r.why, id, k)
+    this.callouts.showWhy(this.wall.wallToWorld(best!.p.x, best!.p.y, PANEL_Z), this.wallRot(), why, id, k)
   }
 
   /** a hold's ring as drawn, its line (and its glow, if it glows) included (wall cm) */
@@ -1128,6 +1178,10 @@ export class NextHoldMain extends BaseScriptComponent {
   getRippleBandWidth(): number { return this.ripple ? this.ripple.getBandWidth() : 0 }
   /** getTime() when a hand reached the top hold, or -1 when not topped out */
   getToppedAt(): number { return this.toppedAt }
+  /** every refused pinch (newest last): which hold, and when */
+  getRefusalLog(): {hold: string; time: number}[] { return this.refusalLog.slice() }
+  /** the ring pulsing now and how large it is drawn (1 = its own size), or null */
+  getRingPulse(): {hold: string; scale: number} | null { return this.visuals ? this.visuals.getPulse() : null }
 }
 
 /** gap (cm) between a box (centre c, half sizes hw x hh) and a circle; < 0 when they overlap */

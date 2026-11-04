@@ -153,17 +153,20 @@ for (const pos of positions) {
   for (const top of tops) {
     const got = P.bestPerHold({ holds: wHolds, holdTypes: wTypes, position: pos, reach: CLIMBER_REACH, top });
     for (const g of got) {
-      // the reference's own scores, every limb: the highest rank, the earlier limb on a tie
-      let want = null;
+      // the reference's own scores, every limb: the highest rank among green or yellow moves (of all
+      // of them if there are none), the earlier limb on a tie
+      let want = null, wantSecure = null;
       for (const limb of ["LH", "RH", "LF", "RF"]) {
         const r = R.scoreHold({ limb, holdId: g.holdId, holds: wHolds, holdTypes: wTypes, position: pos, reach: CLIMBER_REACH, top });
         if (!want || r.rank > want.rank) want = r;
+        if (r.colour !== "red" && (!wantSecure || r.rank > wantSecure.rank)) wantSecure = r;
       }
+      want = wantSecure || want;
       if (JSON.stringify(g) !== JSON.stringify(want)) { perHoldOk = false; firstPerHold = firstPerHold || { g, want }; }
     }
   }
 }
-check("bestPerHold = the highest-ranked limb for each hold by the reference's own scores (4 positions x 4 tops)", perHoldOk, firstPerHold);
+check("bestPerHold = the highest-ranked secure limb for each hold by the reference's own scores (4 positions x 4 tops)", perHoldOk, firstPerHold);
 let holdsAgree = true;
 for (const pos of positions) {
   for (const top of tops) {
@@ -176,6 +179,58 @@ check("the best move's limb is the best limb for its hold: a pinch on the glow m
 check("bestPerHold skips the holds a limb is on", P.bestPerHold({ holds: wHolds, holdTypes: wTypes, position: wPos, reach: CLIMBER_REACH }).every((r) => !Object.values(wPos).includes(r.holdId)));
 const nobody = P.bestLimbFor({ holds: wHolds, holdTypes: wTypes, position: wPos, reach: CLIMBER_REACH, holdId: "h24" });
 check("no limb reaches it: the first limb, score 0, red", nobody.limb === "LH" && nobody.score === 0 && nobody.colour === "red", nobody);
+
+// ---- 3c. a pinch only makes a green or yellow move (session 21) ---------------
+let pmSame = true, firstPm = null;
+for (const pos of positions) {
+  for (const top of tops) {
+    for (const override of [null, ...P.LIMBS]) {
+      for (const holdId of Object.keys(wHolds)) {
+        if (Object.values(pos).includes(holdId)) continue;
+        const a = { holdId, holds: wHolds, holdTypes: wTypes, position: pos, reach: CLIMBER_REACH, top, override };
+        const got = P.pinchMove(a), want = R.pinchMove(a);
+        if (JSON.stringify(got) !== JSON.stringify(want)) { pmSame = false; firstPm = firstPm || { a, got, want }; }
+      }
+    }
+  }
+}
+check("pinchMove == the reference's (4 positions x 4 tops x 5 overrides x all holds)", pmSame, firstPm);
+const pmArgs = { holds: pHoldsAll(), holdTypes: wTypes, position: wPos, reach: CLIMBER_REACH, top: PRESET_TOP };
+function pHoldsAll() { const o = {}; for (const id of PRESET_PROBLEM) o[id] = wHolds[id]; return o; }
+const pmTop = P.pinchMove({ ...pmArgs, holdId: PRESET_TOP });
+check("from the start the top hold is refused: no limb has a green or yellow move", pmTop.moves === false && pmTop.result.colour === "red", pmTop);
+check("from the start 'up' moves RH", P.pinchMove({ ...pmArgs, holdId: "up" }).moves && P.pinchMove({ ...pmArgs, holdId: "up" }).limb === "RH");
+const pmRedOver = P.pinchMove({ ...pmArgs, holdId: "up", override: "LF" });
+check("an override whose move is red is refused, though RH could make the move", pmRedOver.moves === false && pmRedOver.limb === "LF", pmRedOver);
+const pmOver = P.pinchMove({ ...pmArgs, holdId: "up", override: "LH" });
+check("an override whose move is green moves that limb, not the best limb", pmOver.moves === true && pmOver.limb === "LH", pmOver);
+// a red move can outrank a yellow one, as the goal only ranks: the hold isn't refused, the yellow move is made
+const pmLow = { ...pmArgs, reach: 150 * 0.44, position: { LH: "h10", RH: "rh", LF: "up", RF: "rf" }, holdId: "h16" };
+const lowRed = P.scoreHold({ ...pmLow, limb: "RF" }), lowYellow = P.scoreHold({ ...pmLow, limb: "LF" });
+check("on the Lens's wall a red move can outrank a yellow one (150 cm)", lowRed.colour === "red" && lowYellow.colour === "yellow" && lowRed.rank > lowYellow.rank, { lowRed, lowYellow });
+check("then the pinch makes the yellow move, and the ring (bestLimbFor) shows it", P.pinchMove(pmLow).moves && P.pinchMove(pmLow).limb === "LF" && P.bestLimbFor(pmLow).colour === "yellow", P.pinchMove(pmLow));
+// from every position a climber can reach at any height: a move exists, so the new rule strands no one
+let stuck = null, seenStates = 0;
+{
+  const seen = new Set(), queue = [[{ ...wPos }, 175]];
+  seen.add(JSON.stringify(queue[0]));
+  while (queue.length) {
+    const [pos, h] = queue.shift();
+    seenStates++;
+    const a = { ...pmArgs, position: pos, reach: h * 0.44 };
+    const moves = [];
+    for (const holdId of PRESET_PROBLEM) {
+      if (Object.values(pos).includes(holdId)) continue;
+      for (const limb of P.LIMBS) { const m = P.pinchMove({ ...a, holdId, override: limb }); if (m.moves) moves.push(m); }
+    }
+    if (!moves.length) stuck = stuck || { pos, h };
+    const push = (p, n) => { const k = JSON.stringify([p, n]); if (!seen.has(k)) { seen.add(k); queue.push([p, n]); } };
+    for (const m of moves) push({ ...pos, [m.limb]: m.result.holdId }, h);
+    for (const n of [h - 5, h + 5]) if (n >= 150 && n <= 200) push(pos, n);
+  }
+}
+console.log(`  every state a climber can reach on the preset problem: ${seenStates}`);
+check("no reachable position on the preset problem, at any height, leaves a climber with no legal move", stuck === null && seenStates > 1000, stuck);
 
 // ---- 4. demo layout: the preset problem ("your problem") ---------------------
 // Outside setup the Lens scores only the problem's holds, so the opening view is these.

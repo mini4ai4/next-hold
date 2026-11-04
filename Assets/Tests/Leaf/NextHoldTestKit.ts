@@ -3,8 +3,8 @@
 // Input path: pinch() drives a simulated SIK right hand (LeafHandInteractor)
 // onto the target Interactable and pinches it, so the Interactable's own
 // onTriggerStart / onTriggerEnd fire through SIK's InteractionManager, the same
-// path a real pinch takes. The Lens's action API (pressHold etc.) is used ONLY
-// by restorePreset(), as test setup, never as the thing under test.
+// path a real pinch takes. The Lens's action API (forceMove etc.) is used ONLY
+// by restorePreset() and for setting a position up, never as the thing under test.
 
 import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
 import {LeafHandInteractor} from "Leaf.lspkg/Interactors/interactor/LeafTwoHandInteractor"
@@ -896,7 +896,8 @@ export function checkArrowPointsAt(cam: Camera, main: NextHoldMain, errs: string
  * Scenarios share one live Lens. Put it back to the open state (climb mode,
  * Ground view, '?' off, preset position, best move auto-selected) through the ACTION API.
  * This is setup, not the behaviour under test. The last call is always a
- * pressHold so the Lens re-runs its auto-select exactly as at open.
+ * move so the Lens re-runs its auto-select exactly as at open. Session 21: forceMove, as
+ * a pinch can't make a red move and the way back to the preset may need one.
  */
 export async function restorePreset(main: NextHoldMain): Promise<void> {
   // the brief's 175 cm climber (the height setting is Lens state; a scenario may have changed it)
@@ -919,23 +920,19 @@ export async function restorePreset(main: NextHoldMain): Promise<void> {
       if (cur[l] === want) continue
       const blocked = REF_LIMBS.some((o) => o !== l && cur[o] === want)
       if (blocked) continue
-      main.pressLimb(l as any)
-      main.pressHold(want)
+      main.forceMove(l as any, want)
       moved = true
       break
     }
     if (!moved) {
       // every wanted hold is taken (e.g. a swap): park one limb on a spare hold
       const l = REF_LIMBS.filter((x) => cur[x] !== target[x])[0]
-      main.pressLimb(l as any)
-      main.pressHold(spare(cur))
+      main.forceMove(l as any, spare(cur))
     }
   }
-  // round-trip one foot so the final action is a move (re-runs auto-select)
-  main.pressLimb("LF")
-  main.pressHold(spare(main.getPosition() as RefPosition))
-  main.pressLimb("LF")
-  main.pressHold(target.LF as string)
+  // round-trip one foot so the final action is a move (re-runs auto-select, clears any override)
+  main.forceMove("LF", spare(main.getPosition() as RefPosition))
+  main.forceMove("LF", target.LF as string)
   await frames(3)
   const now = main.getPosition() as RefPosition
   if (!samePosition(now, target)) throw new Error("restorePreset failed: " + fmtPos(now))

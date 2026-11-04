@@ -249,15 +249,35 @@ export function bestMove(a: MoveArgs): ScoreResult | null {
 }
 
 // Session 20: hands stay on the holds. A pinch on a hold moves the limb that makes the best move to
-// it: the highest rank for that hold over all four limbs, ties in LH, RH, LF, RF order. Rank, not
-// score, so it picks the same way bestMove does: bestMove's limb is always the best limb for its hold.
+// it: the highest rank for that hold, ties in LH, RH, LF, RF order. Rank, not score, so it picks the
+// same way bestMove does. Session 21: over the limbs with a green or yellow move, if any. A red move
+// can outrank a yellow one (the goal only ranks), and that hold would be refused while a limb could
+// make the move. No limb has one: the highest rank of all, which is red.
 export function bestLimbFor(a: MoveArgs & { holdId: string }): ScoreResult {
-  let best: ScoreResult | null = null;
+  let best: ScoreResult | null = null, bestSecure: ScoreResult | null = null;
   for (const limb of LIMBS) {
     const r = scoreHold({ limb, holdId: a.holdId, holds: a.holds, holdTypes: a.holdTypes, position: a.position, reach: a.reach, top: a.top });
     if (!best || r.rank > best.rank) best = r;
+    if (r.colour !== "red" && (!bestSecure || r.rank > bestSecure.rank)) bestSecure = r;
   }
-  return best as ScoreResult;
+  return (bestSecure || best) as ScoreResult;
+}
+
+export interface PinchMove {
+  /** false: the pinch is refused and nothing moves */
+  moves: boolean;
+  limb: Limb;
+  /** the move that was judged */
+  result: ScoreResult;
+}
+
+// Session 21: a pinch moves a limb only if that move is green or yellow. With an override, only the
+// override's move counts: if it is red the pinch is refused, even if another limb could make the move.
+export function pinchMove(a: MoveArgs & { holdId: string; override?: Limb | null }): PinchMove {
+  const result = a.override
+    ? scoreHold({ limb: a.override, holdId: a.holdId, holds: a.holds, holdTypes: a.holdTypes, position: a.position, reach: a.reach, top: a.top })
+    : bestLimbFor(a);
+  return { moves: result.colour !== "red", limb: result.limb, result };
 }
 
 // What each free hold's ring shows when no limb is chosen: the move a pinch on it would make.

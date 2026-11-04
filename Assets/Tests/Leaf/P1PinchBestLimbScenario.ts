@@ -3,7 +3,8 @@
 // chosen first, in the pinch's own frame. Each free hold's ring shows that move, so a ring never
 // looks red when a pinch on it would make a good move, and "?" explains that same move. The glow
 // stays the best move overall. The toggles are an override, and the panel says so: pick one and the
-// next pinch moves it, whatever is best there; the move uses it up. Picking one moves nothing.
+// next pinch moves it, if that move is green or yellow (session 21, p2), whatever is best there; the
+// move uses it up. Picking one moves nothing.
 // Input path: real SIK pinches on Hold_<id>, Toggle_<limb>, AskButton. No toggle is touched before
 // the first checks: the toggle row's lit limb stays the glow's, and is not the limb that moves.
 
@@ -107,13 +108,16 @@ export class P1PinchBestLimbScenario extends Scenario {
     if (!glow || glow.limb !== "LF" || glow.holdId !== lfBest.holdId) errs.push(`with the override the glow is ${glow ? glow.limb + "->" + glow.holdId : "none"}, LF's best is ${lfBest.holdId}`)
     if (main.getLitLimb() !== "LF") errs.push(`with the override the lit toggle is ${main.getLitLimb()}`)
 
-    // the next pinch moves LF, though the hold's best limb is another; that move uses it up
+    // the next pinch moves the override, though the hold's best limb is another; that move uses it up.
+    // Session 21: LH, not LF: only a green or yellow move is made (LF on "up" is red: p2 refuses it)
+    await pinch("Toggle_LH"); await frames(2)
     const bUp = ref.bestForHold("up", pos0)
-    if (bUp.limb === "LF") errs.push("precondition: up's best limb is LF")
-    await pinchMoves(main, ref, "up", "LF", errs, "override LF")
+    if (bUp.limb === "LH") errs.push("precondition: up's best limb is LH")
+    if (ref.score("LH", "up", pos0).colour === "red") errs.push("precondition: LH on up is red")
+    await pinchMoves(main, ref, "up", "LH", errs, "override LH")
     // and it is gone: the next pinch is back to the best limb
     const pos1 = main.getPosition() as RefPosition
-    const free = ref.perHold(pos1).filter((r) => r.limb !== "LF" && r.score > 0)[0]
+    const free = ref.perHold(pos1).filter((r) => r.limb !== "LH" && r.colour !== "red")[0]
     if (!free) errs.push("setup: no hold with another limb's move after the override")
     else await pinchMoves(main, ref, free.holdId, free.limb, errs, "after the override")
 

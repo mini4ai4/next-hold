@@ -127,7 +127,8 @@ export class C2PinchMoveScenario extends Scenario {
     if (main.getSelectedLimb() !== "RF") errs.push(`Toggle_RF pinch: selected ${main.getSelectedLimb()}`)
     const pos3 = main.getPosition() as RefPosition
     const ref3 = makeReference()
-    const t3 = ref3.evaluate("RF", pos3).results.map((r) => r.holdId).filter((id) => {
+    // (session 21: a move RF can make; a red one is refused, p2)
+    const t3 = ref3.evaluate("RF", pos3).results.filter((r) => r.colour !== "red").map((r) => r.holdId).filter((id) => {
       const b = ref3.bestMove({...pos3, RF: id})
       return b !== null && b.limb !== "RF"
     })[0]

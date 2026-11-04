@@ -21,6 +21,7 @@ import {D1DemoAutopilotScenario} from "./D1DemoAutopilotScenario"
 import {T1TopOutScenario} from "./T1TopOutScenario"
 import {L1LabelSizesScenario} from "./L1LabelSizesScenario"
 import {P1PinchBestLimbScenario} from "./P1PinchBestLimbScenario"
+import {P2PinchOutOfReachScenario} from "./P2PinchOutOfReachScenario"
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -46,6 +47,7 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "t1-top-out", typename: T1TopOutScenario.getTypeName()},
     {id: "l1-label-sizes", typename: L1LabelSizesScenario.getTypeName()},
     {id: "p1-pinch-best-limb", typename: P1PinchBestLimbScenario.getTypeName()},
+    {id: "p2-pinch-out-of-reach", typename: P2PinchOutOfReachScenario.getTypeName()},
     {id: "d1-demo-autopilot", typename: D1DemoAutopilotScenario.getTypeName()},
   ]
 }

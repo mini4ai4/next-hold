@@ -172,5 +172,30 @@ function evaluate({ holds, holdTypes, position, limb, reach, top = null }) {
   return { results, suggestion: best && best.score > 0 ? best : null };
 }
 
+// What a pinch on a free hold does (added 3 Nov, session 21). No limb is chosen first, so the
+// pinch picks one: the highest-ranked limb among those with a green or yellow move to the hold,
+// ties in LH, RH, LF, RF order. Rank alone won't do: a red move can outrank a yellow one, because
+// the goal only ranks, and that hold would be refused while a limb could make the move.
+// No limb has a green or yellow move: the highest-ranked of all, which is red.
+function bestLimbFor({ holdId, holds, holdTypes, position, reach, top = null }) {
+  let best = null, bestSecure = null;
+  for (const limb of [...HANDS, ...FEET]) {
+    const r = scoreHold({ limb, holdId, holds, holdTypes, position, reach, top });
+    if (!best || r.rank > best.rank) best = r;
+    if (r.colour !== "red" && (!bestSecure || r.rank > bestSecure.rank)) bestSecure = r;
+  }
+  return bestSecure || best;
+}
+
+// A pinch moves a limb only if that move is green or yellow. With an override, only the override's
+// move counts: if it is red the pinch is refused, even if another limb could make the move.
+// moves: false means nothing moves. result is the move that was judged.
+function pinchMove({ holdId, holds, holdTypes, position, reach, top = null, override = null }) {
+  const result = override
+    ? scoreHold({ limb: override, holdId, holds, holdTypes, position, reach, top })
+    : bestLimbFor({ holdId, holds, holdTypes, position, reach, top });
+  return { moves: result.colour !== "red", limb: result.limb, result };
+}
+
 module.exports = { GRIP, GOAL_WEIGHT, LEG_REACH, HIP_DROP, HIGH_STEP, reachFactor, balanceFactor, goalFactor,
-                   hipOf, highStepFactor, colourFor, scoreHold, evaluate };
+                   hipOf, highStepFactor, colourFor, scoreHold, evaluate, bestLimbFor, pinchMove };

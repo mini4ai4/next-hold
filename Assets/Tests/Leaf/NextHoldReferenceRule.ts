@@ -143,14 +143,20 @@ export class ReferenceRule {
     return best
   }
 
-  /** Session 20: the limb a pinch on this hold moves: the highest rank over the four limbs, first limb on a tie. */
+  /** Session 20: the limb a pinch on this hold moves: the highest rank over the four limbs, first limb
+   *  on a tie. Session 21: over the limbs whose move is green or yellow, if any. */
   bestForHold(holdId: string, p: RefPosition): RefResult {
+    const all = REF_LIMBS.map((l) => this.score(l, holdId, p))
+    const secure = all.filter((r) => r.colour !== "red")
     let best: RefResult | null = null
-    for (const l of REF_LIMBS) {
-      const r = this.score(l, holdId, p)
-      if (!best || r.rank > best.rank) best = r
-    }
+    for (const r of secure.length ? secure : all) if (!best || r.rank > best.rank) best = r
     return best as RefResult
+  }
+
+  /** Session 21: would a pinch on this hold move a limb? Only a green or yellow move: the override's if
+   *  there is one, even if another limb could make the move. */
+  pinchMoves(holdId: string, p: RefPosition, override: RefLimb | null = null): boolean {
+    return (override ? this.score(override, holdId, p) : this.bestForHold(holdId, p)).colour !== "red"
   }
 
   /** Every hold no limb is on, each for the limb a pinch on it moves: what the rings show with no limb chosen. */

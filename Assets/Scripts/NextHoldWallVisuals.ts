@@ -36,6 +36,10 @@ export type RingColour = "green" | "yellow" | "red"
  *  hold all follow it: green solid, yellow dashed, red broken by one clear gap. */
 export type RingStyle = "solid" | "dashed" | "broken"
 export const STYLE_OF: Record<RingColour, RingStyle> = {green: "solid", yellow: "dashed", red: "broken"}
+/** session 21, a refused pinch: the hold's ring swells to (1 + RING_PULSE_GROW) x and back, once, in this long */
+export const RING_PULSE_SECONDS = 0.45
+const RING_PULSE_GROW = 0.3
+
 /** dashed: this many dashes round a ring, half of the way round being gap (30 deg each): from 2.5 m the
  *  gap on the smallest ring is wider than the line */
 const RING_DASHES = 6
@@ -363,6 +367,9 @@ export class NextHoldWallVisuals {
   private thinMeshes: {[r: string]: RenderMesh} = {}
   /** the "TOPPED" tag's alpha (Main fades it out) */
   private toppedAlpha = 1
+  /** the hold whose ring is pulsing, and when it started */
+  private pulseHold: string | null = null
+  private pulseStart = -1
 
   constructor(
     private wallRoot: SceneObject,
@@ -467,7 +474,8 @@ export class NextHoldWallVisuals {
     const gs = Math.max(1, s.glowScale || 1)
     for (const h of HOLDS) {
       const ring = this.rings[h.id]
-      const c = s.rings[h.id]
+      // a pulsing ring shows even where the view draws none (On wall): it is red, or it wouldn't pulse
+      const c = s.rings[h.id] || (h.id === this.pulseHold ? "red" : null)
       ring.so.enabled = !!c
       if (c) {
         ring.mat.mainPass.baseColor = scaled(this.colours[c], h.id === s.glowHoldId ? 1 : RING_DIM)
@@ -780,7 +788,38 @@ export class NextHoldWallVisuals {
   }
 
   /** Called every frame: the glow on the suggested ring breathes. */
+  /** The ring of a hold a pinch was refused on swells and settles, once. */
+  pulseRing(id: string): void {
+    this.stopPulse()
+    if (!this.rings[id]) return
+    this.pulseHold = id
+    this.pulseStart = getTime()
+    if (this.state && !this.state.rings[id]) this.apply(this.state)
+  }
+
+  /** Ends a pulse now: the ring is back at its own size, and hidden again if the view draws none. */
+  stopPulse(): void {
+    const id = this.pulseHold
+    if (!id) return
+    this.pulseHold = null
+    this.rings[id].so.getTransform().setLocalScale(vec3.one())
+    if (this.state && !this.state.rings[id]) this.apply(this.state)
+  }
+
+  /** the ring pulsing now and its scale (1 = its own size), or null */
+  getPulse(): {hold: string; scale: number} | null {
+    return this.pulseHold ? {hold: this.pulseHold, scale: this.rings[this.pulseHold].so.getTransform().getLocalScale().x} : null
+  }
+
+  private tickPulse(time: number): void {
+    if (!this.pulseHold) return
+    const u = (time - this.pulseStart) / RING_PULSE_SECONDS
+    if (u >= 1) { this.stopPulse(); return }
+    this.rings[this.pulseHold].so.getTransform().setLocalScale(vec3.one().uniformScale(1 + RING_PULSE_GROW * Math.sin(Math.PI * Math.max(0, u))))
+  }
+
   tick(time: number): void {
+    this.tickPulse(time)
     if (!this.state || !this.glow.so.enabled || !this.state.glowHoldId) return
     const c = this.state.rings[this.state.glowHoldId]
     if (!c) return

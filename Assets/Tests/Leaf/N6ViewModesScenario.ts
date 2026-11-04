@@ -218,6 +218,7 @@ export class N6ViewModesScenario extends Scenario {
       for (const node of frontier) {
         for (const l of ["RF", "LF", "RH", "LH"]) {
           for (const r of ref.evaluate(l as any, node.pos).results) {
+            if (r.colour === "red") continue // session 21: a pinch can't make a red move
             const pos = {...node.pos, [l]: r.holdId} as RefPosition
             const k = fmtPos(pos)
             if (seen[k]) continue
