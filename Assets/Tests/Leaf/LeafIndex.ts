@@ -22,6 +22,7 @@ import {T1TopOutScenario} from "./T1TopOutScenario"
 import {L1LabelSizesScenario} from "./L1LabelSizesScenario"
 import {P1PinchBestLimbScenario} from "./P1PinchBestLimbScenario"
 import {P2PinchOutOfReachScenario} from "./P2PinchOutOfReachScenario"
+import {R8ArrowClearOfPanelScenario} from "./R8ArrowClearOfPanelScenario"
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -40,6 +41,7 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "r5-control-row-in-view", typename: N5ControlRowInViewScenario.getTypeName()},
     {id: "r6-foot-reach", typename: N10FootReachScenario.getTypeName()},
     {id: "r7-height", typename: N11HeightScenario.getTypeName()},
+    {id: "r8-arrow-clear-of-panel", typename: R8ArrowClearOfPanelScenario.getTypeName()},
     {id: "a1-view-modes", typename: N6ViewModesScenario.getTypeName()},
     {id: "a2-ground-scan-250", typename: N7GroundViewpointScenario.getTypeName()},
     {id: "a3-auto-view", typename: N9AutoViewScenario.getTypeName()},

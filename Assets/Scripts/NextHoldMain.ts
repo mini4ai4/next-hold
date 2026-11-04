@@ -295,6 +295,7 @@ export class NextHoldMain extends BaseScriptComponent {
       this.typePicker.onTopPressed.add(() => this.pressTop())
       this.typePicker.onRemovePressed.add(() => this.pressRemove())
       this.typePicker.onDonePressed.add(() => this.pressDone())
+      this.offViewArrow.setKeepClearOf(() => this.rowCorners())
 
       this.ready = true
       this.updateGroundDistance(true)
@@ -783,6 +784,15 @@ export class NextHoldMain extends BaseScriptComponent {
     this.visuals.setFigureMask(mask)
   }
 
+  /** the control row's plate, as four world corners */
+  private rowCorners(): vec3[] {
+    const size = this.controlRow.getSize()
+    const hw = size ? size.x / 2 : ROW_HALF_W
+    const hh = size ? size.y / 2 : ROW_HALF_H
+    const row = this.controlRow.getTransform().getWorldTransform()
+    return [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([x, y]) => row.multiplyPoint(new vec3(x, y, 0)))
+  }
+
   private rowOutlineOnWall(): WallPt[] | null {
     const cam = WorldCameraFinderProvider.getInstance()
     const camComp = cam ? cam.getComponent() : null
@@ -1147,6 +1157,7 @@ export class NextHoldMain extends BaseScriptComponent {
   getViewLabel(): string { return this.controlRow.getViewLabel() }
   getLitLimb(): string | null { return this.controlRow.getLitLimb() }
   isOffViewArrowVisible(): boolean { return this.offViewArrow.isArrowVisible() }
+  isOffViewArrowMoved(): boolean { return this.offViewArrow.isArrowMoved() }
   isTypePickerVisible(): boolean { return this.typePicker.isVisible() }
   getPickerHold(): string | null { return this.pickerHold }
   isInProblem(id: string): boolean { return !!this.problem[id] }
