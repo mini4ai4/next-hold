@@ -24,6 +24,9 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
   The raw output of the last full run (19 of 19 pass, session 19): `devpost/LEAF_RUN_2026-10-29_s19.txt`, copied out of
   the Lens Studio log with `node tests/extract_leaf_run.mjs <log> <first line>`.
 - Scoring port: `node tests/scoring.port.test.mjs` (57 checks, including the 1-2-3 search against a brute force).
+- How often height changes the plan: `node tests/measure_heights.mjs 300 7` runs the Lens's own planner on 300 random
+  problems (seeded). On the problems both a 155 cm and a 195 cm climber can finish, their 1-2-3 differs in 184 of 192
+  (95.8%; seed 11: 179 of 193, 92.7%), and the very first move differs in about half.
 - Reference rule, written before the build: `node devpost/scoring-reference/scoring.test.js` (27 checks). This is
   pre-written design code; CLAD ported it to TypeScript.
 
