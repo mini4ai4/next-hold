@@ -39,7 +39,7 @@ import {
   sequence, shoulderOf,
 } from "./NextHoldScoring"
 import {
-  DESIGN_VIEW_CM, FigureBody, NextHoldWallVisuals, OverlayState, RingColour, TOPPED_TEXT, WallPt, minReadSize, ringLineWidth,
+  DESIGN_VIEW_CM, FigureBody, NextHoldWallVisuals, OverlayState, RingColour, TOPPED_TEXT, WallPt, minReadSize, readBoost, ringLineWidth,
 } from "./NextHoldWallVisuals"
 import {NextHoldControlRowUI} from "./NextHoldControlRowUI"
 import {NextHoldTypePickerUI} from "./NextHoldTypePickerUI"
@@ -91,8 +91,13 @@ export const GROUND_CM = 120
  *  (with the 1.6 cm line: 3.2 cm below the ring's radius, as before) */
 const LABEL_GAP = 2.4
 /** half the suggestion label's box at its 110 cm size (cm): "R hand" at the label's size */
-const LABEL_HALF_W = 7
-const LABEL_HALF_H = 2
+const LABEL_HALF_W = 4.5
+const LABEL_HALF_H = 1.6
+/** session 20: from this much larger than its 110 cm size the label no longer fits inside the glow's
+ *  target ring: it moves out to just past the glow, gradually from 1 x */
+const LABEL_OUT_SCALE = 1.3
+/** gap (cm) between the glow's outer edge and the label outside it, and any other ring and the label */
+const LABEL_GLOW_GAP = 1
 
 /** session 19, topping out: once a hand is on the problem's top hold the climb is done. Its "TOP" tag
  *  reads "TOPPED" (green) for TOPPED_SECONDS, then fades out over TOPPED_FADE_SECONDS; meanwhile
@@ -567,15 +572,15 @@ export class NextHoldMain extends BaseScriptComponent {
     const s = this.overlay
     if (!s) return
     const ground = this.view === "ground"
-    this.callouts.setLabelMinSize(ground ? minReadSize(this.groundCm) : 0)
+    this.callouts.setLabelMinSize(ground ? minReadSize(this.groundCm) * readBoost(this.groundCm) : 0)
     // On wall the label is the only word: it stays there; in Ground it fades
     this.callouts.setLabelSticky(!ground)
-    const labelScale = this.callouts.getLabelScale()
+    const glowScale = this.glowScale()
     const labelBox = s.glowHoldId ? this.labelBox(s.glowHoldId) : null
     if (ground) {
       // no stick figure in Ground: its 1 cm line is a faint smudge from 2.5 m and competes with
       // the rings; the limb markers already show where the hands and feet are
-      this.visuals.apply({...s, body: null, viewCm: this.groundCm, labelScale, labelBox})
+      this.visuals.apply({...s, body: null, viewCm: this.groundCm, glowScale, labelBox})
     } else {
       const rings: {[id: string]: RingColour | null} = {}
       if (s.glowHoldId) rings[s.glowHoldId] = s.rings[s.glowHoldId] || null
@@ -583,7 +588,7 @@ export class NextHoldMain extends BaseScriptComponent {
       // but "TOPPED" is the word when there is no ring left
       const tags: {[id: string]: string} = this.mode === "climb" ? {} : s.tags
       if (this.mode === "climb") for (const id of Object.keys(s.tags)) if (s.tags[id] === TOPPED_TEXT) tags[id] = TOPPED_TEXT
-      this.visuals.apply({...s, rings, tags, ghosts: [], viewCm: DESIGN_VIEW_CM, labelScale, labelBox})
+      this.visuals.apply({...s, rings, tags, ghosts: [], viewCm: DESIGN_VIEW_CM, glowScale, labelBox})
     }
     // the label's size changed with the view: keep it just below the ring
     if (s.glowHoldId) this.callouts.moveSuggestion(this.labelPos(s.glowHoldId), this.wallRot())
@@ -625,10 +630,41 @@ export class NextHoldMain extends BaseScriptComponent {
     return this.wall.wallToWorld(c.x, c.y, 3)
   }
 
+  /**
+   * Up close the label sits inside the glow's target ring, just under the ring's line. Session 20:
+   * drawn larger from the mats it can't fit there, so it moves out past the glow, below it, or above
+   * or beside it when another ring is in the way. Never over a ring or the glow from 2.5 m (l1).
+   */
   private labelCentre(id: string): WallPt {
     const h = this.holds[id]
-    const dy = this.ringRadius(id) + this.getRingLineWidth() / 2 + LABEL_GAP * this.callouts.getLabelScale()
-    return {x: h.x, y: h.y - dy}
+    const k = this.callouts.getLabelScale()
+    const hw = LABEL_HALF_W * k, hh = LABEL_HALF_H * k
+    const inside = this.ringRadius(id) + this.getRingLineWidth() / 2 + LABEL_GAP * k
+    const glow = this.glowRadius(id) + LABEL_GLOW_GAP
+    const t = Math.min(1, Math.max(0, (k - 1) / (LABEL_OUT_SCALE - 1)))
+    const below = {x: h.x, y: h.y - (inside + (glow + hh - inside) * t)}
+    if (t < 1) return below
+    const line = this.getRingLineWidth() / 2
+    const clearance = (c: WallPt) => {
+      let m = Math.min(c.x - hw, 240 - c.x - hw)
+      for (const o of this.getProblemHolds()) {
+        if (o !== id) m = Math.min(m, boxCircleGap(c, hw, hh, this.holds[o].x, this.holds[o].y, this.ringRadius(o) + line) - LABEL_GLOW_GAP)
+      }
+      return m
+    }
+    let best = below, bestClear = clearance(below)
+    for (const c of [{x: h.x, y: h.y + glow + hh}, {x: h.x + glow + hw, y: h.y}, {x: h.x - glow - hw, y: h.y}]) {
+      if (bestClear >= 0) break
+      const m = clearance(c)
+      if (m > bestClear) { best = c; bestClear = m }
+    }
+    return best
+  }
+
+  /** how much larger the glow is drawn than its 110 cm span: in Ground it keeps "as large as at 110 cm",
+   *  it doesn't take the label's extra size, or it would swallow the holds beside it */
+  private glowScale(): number {
+    return this.view === "ground" ? Math.max(1, minReadSize(this.groundCm) / this.callouts.getLabelBaseSize()) : 1
   }
 
   /** the suggestion label's box on the wall (cm) at its current size: the badges and the path keep clear of it */
@@ -756,7 +792,7 @@ export class NextHoldMain extends BaseScriptComponent {
 
   /** the suggested ring's outer edge with its glow (wall cm): the "one ring" On wall */
   private glowRadius(id: string): number {
-    return this.ringRadius(id) + this.getRingLineWidth() / 2 + GLOW_PROFILE.span * this.callouts.getLabelScale()
+    return this.ringRadius(id) + this.getRingLineWidth() / 2 + GLOW_PROFILE.span * this.glowScale()
   }
 
   /** the eye in wall cm: x from the wall's left edge, y up from the floor, z out from the face; null without a camera */
@@ -985,7 +1021,7 @@ export class NextHoldMain extends BaseScriptComponent {
   getEyeToWallCm(): number | null { return this.eyeToWallCm() }
   /** width of the rings' crisp line in the current view (cm) */
   getRingLineWidth(): number { return ringLineWidth(this.view === "ground" ? this.groundCm : DESIGN_VIEW_CM) }
-  /** how much larger the suggestion label (and the glow with it) is drawn than at 110 cm */
+  /** how much larger the suggestion label is drawn than at 110 cm */
   getLabelScale(): number { return this.callouts.getLabelScale() }
   /** the control row outline (wall cm) the stick figure fades behind, or null */
   getFigureMask(): WallPt[] | null { return this.visuals ? this.visuals.getFigureMask() : null }

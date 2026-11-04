@@ -227,13 +227,16 @@ export function eyeToWallCm(cam: Camera): number {
 }
 
 /** The rule: from D (clamped to 110-365 cm) each element is its 110 cm size x D / 110; text never
- *  below its own size, and never reading smaller than Body at 110 cm. */
-export function groundSizesFor(distanceCm: number): {D: number; line: number; label: number; ghostNumber: number; ghostR: number; labelScale: number} {
+ *  below its own size, and never reading smaller than Body at 110 cm. Session 20: the words read from
+ *  the mats, the tags and the label, get a boost on top: none up to 125 cm, 2.2 x from 250 cm, in a
+ *  straight line between. The glow doesn't take it. */
+export function groundSizesFor(distanceCm: number): {D: number; line: number; label: number; ghostNumber: number; ghostR: number; glowScale: number} {
   const D = Math.min(GROUND_FAR_CM, Math.max(GROUND_NEAR_CM, distanceCm))
   const need = (AT_110.body * D) / 110
-  const label = Math.max(AT_110.label, need)
-  const ghostNumber = Math.max(AT_110.ghostNumber, need)
-  return {D, line: (AT_110.ringLine * D) / 110, label, ghostNumber, ghostR: (AT_110.ghostR * ghostNumber) / AT_110.ghostNumber, labelScale: label / AT_110.label}
+  const boost = 1 + 1.2 * Math.min(1, Math.max(0, (D - 125) / 125))
+  const label = Math.max(AT_110.label, need * boost)
+  const ghostNumber = Math.max(AT_110.ghostNumber, need * boost)
+  return {D, line: (AT_110.ringLine * D) / 110, label, ghostNumber, ghostR: (AT_110.ghostR * ghostNumber) / AT_110.ghostNumber, glowScale: Math.max(1, need / AT_110.label)}
 }
 
 /**
@@ -291,7 +294,7 @@ export function checkGroundSizes(main: NextHoldMain, distanceCm: number, errs: s
   let glow = NaN
   if (sug && mustFind("SuggestGlow").enabled) {
     glow = renderedOuterRadius("SuggestGlow")
-    const wantGlow = HOLD_SIZE[holdById(sug.holdId)!.type].ringR + want.line / 2 + GLOW_PROFILE.span * want.labelScale
+    const wantGlow = HOLD_SIZE[holdById(sug.holdId)!.type].ringR + want.line / 2 + GLOW_PROFILE.span * want.glowScale
     if (!near(glow, wantGlow, tol.glow)) errs.push(`${tag}: glow outer edge ${glow.toFixed(2)} cm, want ${wantGlow.toFixed(2)}`)
   } else errs.push(`${tag}: no suggestion glow to measure`)
   const ghosts: string[] = []

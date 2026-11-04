@@ -93,9 +93,8 @@ export interface OverlayState {
   /** the distance (cm) the overlay is drawn to be read from; absent = DESIGN_VIEW_CM.
    *  The ring line and the ghost badges grow with it (see readSize). */
   viewCm?: number
-  /** how much larger the suggestion label is drawn than its 110 cm size; absent = 1. The glow
-   *  grows with it, so its target ring stays outside the label as it does on the wall. */
-  labelScale?: number
+  /** how much larger the glow is drawn than its 110 cm span; absent = 1 */
+  glowScale?: number
   /** stick figure: the torso point in wall cm (the centre of mass the scoring uses); null = no figure */
   torso: {x: number; y: number} | null
   /** the stick figure's body in wall cm, from the scoring (Main): shoulders, hips, and how long an
@@ -214,6 +213,17 @@ export const BODY_TEXT_SIZE = 39
  *  Rounded up to 0.1: Text.size is stored as a 32-bit float and would otherwise land a hair under. */
 export function minReadSize(viewCm: number): number {
   return Math.ceil(((BODY_TEXT_SIZE * viewCm) / DESIGN_VIEW_CM) * 10) / 10
+}
+
+/** Session 20: the words read from the mats (step tags, TOP / TOPPED, the suggestion label) are drawn
+ *  larger than plain "as large as at 110 cm": from READ_BOOST_FROM cm the extra grows, up to READ_BOOST
+ *  x at READ_BOOST_AT cm and beyond. Up close (the preset's 125 cm) they stay as they were. */
+export const READ_BOOST = 2.2
+export const READ_BOOST_FROM = 125
+export const READ_BOOST_AT = 250
+export function readBoost(viewCm: number): number {
+  const t = (viewCm - READ_BOOST_FROM) / (READ_BOOST_AT - READ_BOOST_FROM)
+  return 1 + (READ_BOOST - 1) * Math.min(1, Math.max(0, t))
 }
 
 /** The ring's crisp line, as wide (cm) as it must be from viewCm to look as wide as its 110 cm width. */
@@ -454,7 +464,7 @@ export class NextHoldWallVisuals {
     this.state = s
     const viewCm = s.viewCm || DESIGN_VIEW_CM
     const ringW = ringLineWidth(viewCm)
-    const gs = Math.max(1, s.labelScale || 1)
+    const gs = Math.max(1, s.glowScale || 1)
     for (const h of HOLDS) {
       const ring = this.rings[h.id]
       const c = s.rings[h.id]
@@ -481,7 +491,8 @@ export class NextHoldWallVisuals {
           t.text.outlineSettings.fill.color = new vec4(o.x, o.y, o.z, o.w * this.toppedAlpha)
         }
         // tags grow with the distance like the ring line
-        const tk = Math.max(1, viewCm / DESIGN_VIEW_CM) * (topped ? TOPPED_TAG_SIZE : s.tagsAbove ? TOP_TAG_SIZE : TAG_SIZE) / TAG_SIZE
+        // (session 20: the climbing TOP and TOPPED, read from the mats, grow by readBoost too)
+        const tk = Math.max(1, viewCm / DESIGN_VIEW_CM) * (topped || s.tagsAbove ? readBoost(viewCm) : 1) * (topped ? TOPPED_TAG_SIZE : s.tagsAbove ? TOP_TAG_SIZE : TAG_SIZE) / TAG_SIZE
         t.text.size = TAG_SIZE * tk
         const r = HOLD_SIZE[h.type].ringR + ringW / 2
         const dy = s.tagsAbove ? r + TAG_GAP * tk : -(r + TAG_GAP * tk)
@@ -498,7 +509,7 @@ export class NextHoldWallVisuals {
     // every other hold's ring by BADGE_OTHER_GAP, so the nearest ring to a badge is always its own.
     // A hold with no ring of its own (a limb is on it now) gets a thin light ring to pin onto.
     // From further back the badge grows until its text reads at least as large as Body at 110 cm.
-    const gk = Math.max(GHOST_NUMBER_SIZE, minReadSize(viewCm)) / GHOST_NUMBER_SIZE
+    const gk = Math.max(GHOST_NUMBER_SIZE, minReadSize(viewCm) * readBoost(viewCm)) / GHOST_NUMBER_SIZE
     const badgeR = GHOST_R * gk
     const badgeL = Math.max(0, (BADGE_TEXT_HALF_W + BADGE_PAD) * gk - badgeR)
     const glowOn = !!glowHold && !!glowColour

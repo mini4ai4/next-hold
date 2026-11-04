@@ -301,7 +301,7 @@ export class D1DemoAutopilotScenario extends Scenario {
     const frameErrs: {[m: string]: number} = {}
     const frameErr = (m: string) => { frameErrs[m] = (frameErrs[m] || 0) + 1 }
     let wallFrames = 0, heightChanges = 0, heightInScene4 = 0
-    let lastHeight = main.getHeightLabel()
+    let lastHeight = main.getHeightCm()
     const rippleFrom = main.getRippleLog().length
     let rippleSeen = rippleFrom
     const rippleShots: string[] = []
@@ -322,14 +322,16 @@ export class D1DemoAutopilotScenario extends Scenario {
           checkRowClearOfRing(camera(), fe, `t=${pilot.getTimelineTime().toFixed(1)} on wall`)
           if (fe.length) frameErr(fe[0].replace(/^t=[\d.]+ /, "") + ` (first at t=${pilot.getTimelineTime().toFixed(1)})`)
         }
-        const h = main.getHeightLabel()
+        const h = main.getHeightCm()
         if (h !== lastHeight) {
-          heightChanges++
+          // at x8 two 5 cm pinches can land in one frame: counted by the centimetres, not the frames
+          const steps = Math.round(Math.abs(h - lastHeight) / 5)
+          heightChanges += steps
           lastHeight = h
           // scene 4 is the height beat; scene 5 sets 175 again while the eye walks back to 2.5 m
           const tl = pilot.getTimelineTime()
           const off = tl >= SCENES[4].start && tl < SCENES[5].start ? notOnScreen(["HeightDown", "HeightLabel", "HeightUp"], camera()) : []
-          if (tl >= SCENES[4].start && tl < SCENES[5].start) heightInScene4++
+          if (tl >= SCENES[4].start && tl < SCENES[5].start) heightInScene4 += steps
           if (off.length) frameErr(`height changed to "${h}" at t=${pilot.getTimelineTime().toFixed(1)} with not in view: ${off.join(", ")}`)
         }
         // session 19: where each pinch on a hold ripples on screen (its centre and its full start ring);

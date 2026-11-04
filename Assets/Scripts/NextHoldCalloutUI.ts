@@ -201,6 +201,9 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     return this.labelBaseSize > 0 ? Math.max(this.labelBaseSize, this.labelMinSize) / this.labelBaseSize : 1
   }
 
+  /** The label's own size at 110 cm (its text size). */
+  getLabelBaseSize(): number { return this.labelBaseSize }
+
   /** Move the label (its size changed) without showing it again or restarting its fade. */
   moveSuggestion(worldPos: vec3, worldRot: quat): void {
     const tr = this.labelRoot.getTransform()

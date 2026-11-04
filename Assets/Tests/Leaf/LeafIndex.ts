@@ -19,6 +19,7 @@ import {N10FootReachScenario} from "./N10FootReachScenario"
 import {N11HeightScenario} from "./N11HeightScenario"
 import {D1DemoAutopilotScenario} from "./D1DemoAutopilotScenario"
 import {T1TopOutScenario} from "./T1TopOutScenario"
+import {L1LabelSizesScenario} from "./L1LabelSizesScenario"
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -42,6 +43,7 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "a3-auto-view", typename: N9AutoViewScenario.getTypeName()},
     {id: "b1-stick-figure", typename: N8StickFigureScenario.getTypeName()},
     {id: "t1-top-out", typename: T1TopOutScenario.getTypeName()},
+    {id: "l1-label-sizes", typename: L1LabelSizesScenario.getTypeName()},
     {id: "d1-demo-autopilot", typename: D1DemoAutopilotScenario.getTypeName()},
   ]
 }
