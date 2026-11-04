@@ -3,6 +3,9 @@
 // a pinch moves a limb only if that move is green or yellow. Otherwise nothing moves, the hold's ring
 // gives a short pulse, and the why-line says "OUT OF REACH" for about 1.5 s. An override wins only if
 // its move is green or yellow; otherwise it is the same refusal, and the override stays.
+// Session 22: a hold under a step tag wears that step's colour, so "OUT OF REACH" on its green ring read
+// as a contradiction: a refused pinch on a hold with a drawn "2 · LH" or "3 · LF" says "STEP 1 FIRST".
+// The tags are only drawn in Ground and never on the glowing hold; everywhere else it stays OUT OF REACH.
 // Input path: real SIK pinches on Hold_<id> and the buttons. Every frame from before the pinch is
 // sampled (the simulated pinch only returns after its release, too late to see the frames in between).
 
@@ -11,10 +14,11 @@ import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {NextHoldMain, REFUSED_SECONDS} from "../../Scripts/NextHoldMain"
 import {PRESET_TOP} from "../../Scripts/Wall/WallLayout"
-import {fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, restorePreset, samePosition} from "./NextHoldTestKit"
+import {classifyColour, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, restorePreset, samePosition} from "./NextHoldTestKit"
 import {REF_LIMBS, RefPosition} from "./NextHoldReferenceRule"
 
 const REFUSED = "OUT OF REACH"
+const STEP_FIRST = "STEP 1 FIRST"
 
 interface Sample {t: number; pos: RefPosition; tag: string | null; topped: boolean; why: string; whyOn: boolean; whyHold: string | null; shown: string; pulse: string | null; scale: number; ring: boolean}
 
@@ -28,10 +32,10 @@ function sample(main: NextHoldMain, hold: string): Sample {
 
 /**
  * A real pinch on `hold` that must be refused, watched for `seconds` after it, every frame: no limb
- * moves, "TOPPED" never shows, the why-line says OUT OF REACH on this hold for about REFUSED_SECONDS and
+ * moves, "TOPPED" never shows, the why-line says `want` on this hold for about REFUSED_SECONDS and
  * then goes, the ring pulses and settles, no ripple (that marks a pinch taken). Returns every frame.
  */
-async function refused(main: NextHoldMain, hold: string, errs: string[], tag: string, during?: () => Promise<void>): Promise<Sample[]> {
+async function refused(main: NextHoldMain, hold: string, errs: string[], tag: string, want: string, during?: () => Promise<void>): Promise<Sample[]> {
   const pos0 = main.getPosition() as RefPosition
   const override0 = main.getLimbOverride(), label0 = main.getOverrideLabel()
   const ripples0 = main.getRippleLog().length
@@ -44,7 +48,7 @@ async function refused(main: NextHoldMain, hold: string, errs: string[], tag: st
   const f = got.value
   // in the pinch's own frame
   if (!samePosition(f.pos, pos0)) errs.push(`${tag}: in the pinch frame ${fmtPos(f.pos)}, was ${fmtPos(pos0)}`)
-  if (!f.whyOn || f.why !== REFUSED || f.shown !== REFUSED || f.whyHold !== hold) errs.push(`${tag}: pinch frame why "${f.why}" (shown "${f.shown}", on ${f.whyOn}) on ${f.whyHold}, want "${REFUSED}" on ${hold}`)
+  if (!f.whyOn || f.why !== want || f.shown !== want || f.whyHold !== hold) errs.push(`${tag}: pinch frame why "${f.why}" (shown "${f.shown}", on ${f.whyOn}) on ${f.whyHold}, want "${want}" on ${hold}`)
   if (f.pulse !== hold) errs.push(`${tag}: pinch frame: the ring pulsing is ${f.pulse}, want ${hold}`)
   if (during) await during()
   while (getTime() - got.time < REFUSED_SECONDS + 0.5) await frames(1)
@@ -57,11 +61,11 @@ async function refused(main: NextHoldMain, hold: string, errs: string[], tag: st
   }
   if (samples.some((s) => s.tag === "TOPPED" || s.topped)) errs.push(`${tag}: "TOPPED" showed`)
   // the why-line: up from the pinch for about REFUSED_SECONDS, then gone
-  const on = after.filter((s) => s.whyOn && s.why === REFUSED)
+  const on = after.filter((s) => s.whyOn && s.why === want)
   const lastOn = on.length ? on[on.length - 1].dt : -1
-  const wrong = after.filter((s) => s.whyOn && s.why !== REFUSED)
+  const wrong = after.filter((s) => s.whyOn && s.why !== want)
   const stillOn = after.filter((s) => s.dt > REFUSED_SECONDS + 0.25 && s.whyOn)
-  const steady = after.filter((s) => s.dt < REFUSED_SECONDS - 0.1).every((s) => s.whyOn && s.why === REFUSED)
+  const steady = after.filter((s) => s.dt < REFUSED_SECONDS - 0.1).every((s) => s.whyOn && s.why === want)
   // the ring: larger for a moment, back to its own size
   const maxScale = Math.max(...after.map((s) => s.scale))
   const pulseFrames = after.filter((s) => s.pulse === hold)
@@ -71,7 +75,7 @@ async function refused(main: NextHoldMain, hold: string, errs: string[], tag: st
   print(`[P2] ${tag}: pinch on ${hold}: ${fmtPos(pos0)} -> ${fmtPos(end.pos)}; why "${f.why}" for ${lastOn.toFixed(2)} s; ring pulse to x${maxScale.toFixed(2)}, over by ${lastPulse.toFixed(2)} s; TOPPED in ${toppedFrames} of ${samples.length} frames; override ${main.getLimbOverride()}`)
   if (wrong.length) errs.push(`${tag}: the why-line read "${wrong[0].why}" at ${wrong[0].dt.toFixed(2)} s`)
   if (!steady) errs.push(`${tag}: the why-line did not stay for the first ${(REFUSED_SECONDS - 0.1).toFixed(1)} s (last ${lastOn.toFixed(2)} s)`)
-  if (lastOn > REFUSED_SECONDS + 0.2 || lastOn < REFUSED_SECONDS - 0.2) errs.push(`${tag}: "${REFUSED}" lasted ${lastOn.toFixed(2)} s, want about ${REFUSED_SECONDS}`)
+  if (lastOn > REFUSED_SECONDS + 0.2 || lastOn < REFUSED_SECONDS - 0.2) errs.push(`${tag}: "${want}" lasted ${lastOn.toFixed(2)} s, want about ${REFUSED_SECONDS}`)
   if (stillOn.length) errs.push(`${tag}: the why-line is still up at ${stillOn[0].dt.toFixed(2)} s`)
   if (!(maxScale > 1.15)) errs.push(`${tag}: Ring_${hold} only reached x${maxScale.toFixed(2)}: no pulse to see`)
   if (!(lastPulse > 0 && lastPulse < 1)) errs.push(`${tag}: the pulse lasted ${lastPulse.toFixed(2)} s, want a short one`)
@@ -101,14 +105,14 @@ export class P2PinchOutOfReachScenario extends Scenario {
     if (ref.pinchMoves(PRESET_TOP, pos0)) errs.push("precondition: the rule moves a limb to the top from the start")
     if (main.getTagText(PRESET_TOP) !== "TOP") errs.push(`precondition: ${PRESET_TOP} tagged "${main.getTagText(PRESET_TOP)}"`)
     const sug0 = main.getSuggestion()
-    await refused(main, PRESET_TOP, errs, "from the start")
+    await refused(main, PRESET_TOP, errs, "from the start", REFUSED)
     const sug1 = main.getSuggestion()
     if (!sug0 || !sug1 || sug1.holdId !== sug0.holdId || sug1.limb !== sug0.limb) errs.push(`the refused pinch changed the glow: ${JSON.stringify(sug0)} -> ${JSON.stringify(sug1)}`)
     if (main.getTagText(PRESET_TOP) !== "TOP") errs.push(`after it ${PRESET_TOP} is tagged "${main.getTagText(PRESET_TOP)}", want TOP`)
 
     // ── a view change while it is up (the panels are placed again): it keeps saying OUT OF REACH ──
     // (by the action API: a simulated pinch on the button can take longer than the line stays up)
-    await refused(main, PRESET_TOP, errs, "view change while it is up", async () => {
+    await refused(main, PRESET_TOP, errs, "view change while it is up", REFUSED, async () => {
       if (!main.isWhyVisible()) errs.push("setup: the why-line is already down before the view change")
       main.pressView()
       if (main.getView() !== "wall") errs.push(`setup: view ${main.getView()} after pressView`)
@@ -120,7 +124,7 @@ export class P2PinchOutOfReachScenario extends Scenario {
     // ── On wall only the glowing ring is drawn: the pinched hold's ring shows for its pulse, then goes ──
     if (main.getView() !== "wall") errs.push(`setup: view ${main.getView()}, want wall`)
     if (mustFind("Ring_" + PRESET_TOP).enabled) errs.push(`setup: On wall Ring_${PRESET_TOP} is already drawn`)
-    const wall = await refused(main, PRESET_TOP, errs, "on wall")
+    const wall = await refused(main, PRESET_TOP, errs, "on wall", REFUSED)
     if (!wall.some((s) => s.pulse === PRESET_TOP && s.ring)) errs.push(`on wall: Ring_${PRESET_TOP} never showed for its pulse`)
     if (mustFind("Ring_" + PRESET_TOP).enabled) errs.push(`on wall: Ring_${PRESET_TOP} stays drawn after its pulse`)
     await pinch("ViewToggle")
@@ -136,12 +140,19 @@ export class P2PinchOutOfReachScenario extends Scenario {
     if (asked !== "JUG HOLD" || main.getWhyText() !== "JUG HOLD" || !main.isWhyVisible()) errs.push(`"?" while refused: "${asked}", then "${main.getWhyText()}" (shown ${main.isWhyVisible()})`)
 
     // ── an override whose move is red: the same refusal, though the best limb could make the move ──
+    // With LF picked the plan is LF h16, then RH up: "up" carries "2 · RH", so it says step 1 first.
     await restorePreset(main)
     await pinch("Toggle_LF"); await frames(2)
     if (ref.score("LF", "up", pos0).colour !== "red" || ref.bestForHold("up", pos0).colour === "red") errs.push("precondition: LF on up should be red, with a limb that can make the move")
     if (ref.pinchMoves("up", pos0, "LF")) errs.push("precondition: the rule moves LF to up")
-    await refused(main, "up", errs, "override LF, red")
+    if (main.getGhostHold(2) !== "up") errs.push(`precondition: override LF: badge 2 on ${main.getGhostHold(2)}, want up`)
+    await refused(main, "up", errs, "override LF, red, under its step tag", STEP_FIRST)
     if (main.getLimbOverride() !== "LF" || main.getOverrideLabel() !== "Limb override: LF") errs.push(`the refusal used up the override: ${main.getLimbOverride()}, "${main.getOverrideLabel()}"`)
+    // the same override on a hold with no tag, which another limb could also move to
+    if (ref.score("LF", "h09", pos0).colour !== "red" || ref.bestForHold("h09", pos0).colour === "red") errs.push("precondition: LF on h09 should be red, with a limb that can make the move")
+    if (main.getGhostHold(2) === "h09" || main.getGhostHold(3) === "h09") errs.push("precondition: override LF: h09 carries a step tag")
+    await refused(main, "h09", errs, "override LF, red, no tag", REFUSED)
+    if (main.getLimbOverride() !== "LF") errs.push(`the second refusal used up the override: ${main.getLimbOverride()}`)
 
     // ── an override whose move is green still wins over the best limb, and is used up ──
     await pinch("Toggle_LH"); await frames(2)
@@ -177,11 +188,65 @@ export class P2PinchOutOfReachScenario extends Scenario {
     const posT = main.getPosition() as RefPosition
     const tagged = main.getGhostHold(2)
     if (tagged !== PRESET_TOP || ref.pinchMoves(PRESET_TOP, posT)) errs.push(`precondition: from ${fmtPos(posT)} badge 2 on ${tagged}, the rule moves a limb to it: ${ref.pinchMoves(PRESET_TOP, posT)}`)
-    await refused(main, PRESET_TOP, errs, "under its step tag, for now")
+    await refused(main, PRESET_TOP, errs, "under its step tag, for now", STEP_FIRST)
+
+    // ── step 3: at 150 cm from the same holds the plan takes one move longer, and the top hold carries "3 · LH" ──
+    await restorePreset(main)
+    for (let i = 0; i < 5; i++) main.pressHeight(-1)
+    main.forceMove("RH", "up")
+    main.forceMove("LH", "h09")
+    await frames(2)
+    const pos3 = main.getPosition() as RefPosition
+    if (main.getGhostHold(3) !== PRESET_TOP || main.getGhostHold(2) === PRESET_TOP || makeReference(150).pinchMoves(PRESET_TOP, pos3)) errs.push(`precondition: at 150 cm badge 2 on ${main.getGhostHold(2)}, badge 3 on ${main.getGhostHold(3)}, the rule moves a limb to ${PRESET_TOP}: ${makeReference(150).pinchMoves(PRESET_TOP, pos3)}`)
+    await refused(main, PRESET_TOP, errs, "under its step 3 tag", STEP_FIRST)
+
+    // ── from the start at 195 cm: the green "2 · LH" on h10 refuses, and the top hold, with no step tag, still says OUT OF REACH ──
+    await restorePreset(main)
+    for (let i = 0; i < 4; i++) main.pressHeight(1)
+    await frames(2)
+    const ref195 = makeReference(195)
+    if (main.getGhostHold(2) !== "h10" || drawnRing("h10", main) !== "green" || ref195.pinchMoves("h10", pos0)) errs.push(`precondition: at 195 cm badge 2 on ${main.getGhostHold(2)}, h10's ring drawn ${drawnRing("h10", main)}, the rule moves a limb to h10: ${ref195.pinchMoves("h10", pos0)}`)
+    if (main.getGhostHold(2) === PRESET_TOP || main.getGhostHold(3) === PRESET_TOP || ref195.pinchMoves(PRESET_TOP, pos0)) errs.push(`precondition: at 195 cm from the start ${PRESET_TOP} should be refused with no step tag`)
+    await refused(main, "h10", errs, "195 cm, green 2 · LH", STEP_FIRST)
+    if (drawnRing("h10", main) !== "green") errs.push(`after the refusal h10's ring is drawn ${drawnRing("h10", main)}, want its tag's green`)
+    await refused(main, PRESET_TOP, errs, "195 cm, the top hold", REFUSED)
+
+    // ── the next refusal says its own line, whichever was up ──
+    main.pressHold("h10")
+    if (main.getWhyText() !== STEP_FIRST) errs.push(`tagged after untagged: the why-line reads "${main.getWhyText()}"`)
+    main.pressHold(PRESET_TOP)
+    if (main.getWhyText() !== REFUSED) errs.push(`untagged straight after tagged: the why-line reads "${main.getWhyText()}"`)
+    await sleep((REFUSED_SECONDS + 0.4) * 1000)
+
+    // ── a view change while the new line is up keeps saying it; On wall no tag is drawn, so a new pinch says OUT OF REACH ──
+    await refused(main, "h10", errs, "195 cm, view change while it is up", STEP_FIRST, async () => {
+      main.pressView()
+      if (main.getView() !== "wall") errs.push(`setup: view ${main.getView()} after pressView`)
+      if (main.getWhyText() !== STEP_FIRST) errs.push(`in the view change's own frame the why-line reads "${main.getWhyText()}"`)
+      await frames(2)
+      if (main.isWhyVisible() && main.getWhyText() !== STEP_FIRST) errs.push(`after the view change the why-line reads "${main.getWhyText()}"`)
+    })
+    if (main.getGhostHold(2) !== null) errs.push(`setup: On wall badge 2 is still drawn, on ${main.getGhostHold(2)}`)
+    await refused(main, "h10", errs, "195 cm, on wall, no tag drawn", REFUSED)
+    main.pressView()
+    await frames(2)
+
+    // ── and the line is true: step 1 made, the same pinch on h10 moves the left hand ──
+    if (main.getGhostHold(2) !== "h10") errs.push(`setup: back in Ground badge 2 is on ${main.getGhostHold(2)}`)
+    await pinch("Hold_up"); await frames(2)
+    await pinch("Hold_h10"); await frames(2)
+    const pStep = main.getPosition() as RefPosition
+    print(`[P2] 195 cm, step 1 made, then h10: ${fmtPos(pStep)}`)
+    if (pStep.RH !== "up" || pStep.LH !== "h10") errs.push(`after step 1 the pinch on h10 did not move LH: ${fmtPos(pStep)}`)
 
     await restorePreset(main)
     expect(errs.length, "a pinch out of reach:\n" + errs.join("\n")).toBe(0)
   }
+}
+
+/** the colour the hold's ring is drawn in, the one the climber sees (under a tag, not its score's) */
+function drawnRing(id: string, main: NextHoldMain): string {
+  return classifyColour((mustFind("Ring_" + id).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4, main)
 }
 
 /** a refused pinch by the action API, as setup for what follows it */

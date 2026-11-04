@@ -110,6 +110,10 @@ export const TOPPED_FADE_SECONDS = 0.6
 /** session 21, a pinch no limb can make: nothing moves, the hold's ring pulses (NextHoldWallVisuals)
  *  and the why-line says this for REFUSED_SECONDS. */
 export const REFUSED_TEXT = "OUT OF REACH"
+/** session 22: said instead on a hold with a drawn step tag, whose ring wears that step's colour:
+ *  "OUT OF REACH" on a green ring read as a contradiction. Step 1, for tag 3 too: the numbers are
+ *  worked out again after every move, and only the glow is sure to be a move a pinch can make. */
+export const REFUSED_STEP_TEXT = "STEP 1 FIRST"
 export const REFUSED_SECONDS = 1.5
 
 /** the in-Lens height setting: range and step (cm) */
@@ -229,6 +233,8 @@ export class NextHoldMain extends BaseScriptComponent {
   private toppedShown = false
   /** getTime() when the why-line stops saying "OUT OF REACH" (-1: it isn't saying it) */
   private refusedUntil = -1
+  /** what the refusal's why-line says, kept so a view change keeps saying it */
+  private refusedText = REFUSED_TEXT
   /** every refused pinch (newest last), for the read API */
   private refusalLog: {hold: string; time: number}[] = []
   /** the control row outline last pushed to the stick figure */
@@ -394,7 +400,8 @@ export class NextHoldMain extends BaseScriptComponent {
     if (this.refusalLog.length > 200) this.refusalLog.shift()
     this.visuals.pulseRing(id)
     this.refusedUntil = getTime() + REFUSED_SECONDS
-    this.showWhyFor(id, REFUSED_TEXT)
+    this.refusedText = this.shownStep(id) ? REFUSED_STEP_TEXT : REFUSED_TEXT
+    this.showWhyFor(id, this.refusedText)
   }
 
   /** The move itself. The move uses up the override. */
@@ -553,7 +560,7 @@ export class NextHoldMain extends BaseScriptComponent {
     this.recompute()
   }
 
-  /** "OUT OF REACH" comes down by itself; any other why-line stays until something closes it. */
+  /** A refusal's line comes down by itself; any other why-line stays until something closes it. */
   private tickRefused(time: number): void {
     if (this.refusedUntil < 0 || time < this.refusedUntil) return
     this.refusedUntil = -1
@@ -669,7 +676,7 @@ export class NextHoldMain extends BaseScriptComponent {
     // the why-line follows the view too, and keeps saying what it was saying
     const whyId = this.callouts.getWhyHoldId()
     const whyScore = whyId ? this.shownScore(whyId) : null
-    const whyText = this.refusedUntil >= 0 ? REFUSED_TEXT : whyScore ? whyScore.why : null
+    const whyText = this.refusedUntil >= 0 ? this.refusedText : whyScore ? whyScore.why : null
     if (this.callouts.isWhyVisible() && whyId && whyText) this.showWhyFor(whyId, whyText)
   }
 
@@ -682,13 +689,19 @@ export class NextHoldMain extends BaseScriptComponent {
   private shownScore(id: string): ScoreResult | null {
     const own = this.byHold[id]
     if (!own) return null
+    return this.shownStep(id) || own
+  }
+
+  /** The step whose drawn tag this hold's ring wears: the earliest of steps 2 and 3 on it, in Ground
+   *  and not on the glowing hold. Null otherwise. */
+  private shownStep(id: string): ScoreResult | null {
     if (this.view === "ground" && this.overlay && this.overlay.glowHoldId !== id) {
       for (let n = 2; n <= 3; n++) {
         const step = this.preview[n - 1]
         if (step && step.holdId === id && this.visuals.ghostHold(n) === id) return step
       }
     }
-    return own
+    return null
   }
 
   /** How much larger the panels (control row, why-line) are drawn than at 110 cm: in Ground they
