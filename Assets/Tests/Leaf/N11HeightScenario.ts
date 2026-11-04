@@ -6,8 +6,11 @@
 // Input path: real SIK pinches on HeightDown / HeightUp. State is captured inside
 // the pinch's own onTriggerEnd (the same frame) and every ring is compared with
 // the test's own rule at that height.
-//   175 -> 150: from the preset, h09 (a pinch up and left) is green for the right
-//   hand at 175 and is not green at 150; the green set changes.
+// Session 20: each ring shows the limb a pinch on it moves, so that is the rule compared. With no
+// override, a height change picks the best limb again in its own frame (checked where it changes:
+// LF on h16, RH on h09, the best move goes from LH at 170 cm to RH at 165 cm); an override stays.
+//   175 -> 150: from the preset, h09 (a pinch up and left) has a green ring at 175
+//   and not at 150; the green set changes.
 //   -> 200: back up past 175, the colours follow again; the range stops at 150 and 200.
 // Session 15, two heights, two betas: from the same start the 1-2-3 at 155 cm is
 // RH up, LH h09, LF lh and at 195 cm RH up, LH h10, LF lh (the taller left hand
@@ -19,16 +22,17 @@ import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
-import {BRIEF_HEIGHT, camera, checkBadgeAttribution, checkStepColours, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, presetPosition, renderedRingColour, restorePreset, samePosition} from "./NextHoldTestKit"
+import {BRIEF_HEIGHT, camera, checkBadgeAttribution, checkStepColours, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, presetPosition, renderedRingColour, restorePreset, ringRule, samePosition} from "./NextHoldTestKit"
 import {RefLimb, RefPosition} from "./NextHoldReferenceRule"
 
-/** green holds for the selected limb as rendered, and every ring checked against the rule at `heightCm` */
+/** green holds as rendered, and every ring checked against the rule at `heightCm` */
 function readRings(main: NextHoldMain, heightCm: number, errs: string[], tag: string): string[] {
   const ref = makeReference(heightCm)
-  const limb = main.getSelectedLimb() as RefLimb
   const pos = main.getPosition() as RefPosition
   const greens: string[] = []
-  for (const r of ref.evaluate(limb, pos).results) {
+  const rule = ringRule(ref, main, pos)
+  for (const id of Object.keys(rule)) {
+    const r = rule[id]
     const rc = renderedRingColour(r.holdId, main)
     if (rc !== r.colour) errs.push(`${tag}: Ring_${r.holdId} renders ${rc}, rule at ${heightCm} cm says ${r.colour} (${r.score.toFixed(3)})`)
     if (rc === "green") greens.push(r.holdId)
@@ -100,8 +104,8 @@ export class N11HeightScenario extends Scenario {
     if (selected !== "RH") errs.push(`precondition: the preset selects ${selected}, want RH`)
     const g175 = readRings(main, 175, errs, "175")
     const seq175 = main.getPreview().map((m) => m.limb + "->" + m.holdId).join(" ")
-    print(`[r7] 175 cm: ${selected} green ${g175.join(",")}; look-ahead ${seq175}`)
-    if (g175.indexOf("h09") < 0) errs.push(`precondition: h09 is not green for RH at 175 cm (${g175.join(",")})`)
+    print(`[r7] 175 cm: glow ${selected}, green rings ${g175.join(",")}; look-ahead ${seq175}`)
+    if (g175.indexOf("h09") < 0) errs.push(`precondition: h09's ring is not green at 175 cm (${g175.join(",")})`)
 
     // ── down to 150, five real pinches; the last one is read in its own frame ──
     for (let i = 0; i < 4; i++) { await pinch("HeightDown"); await frames(2) }
@@ -113,18 +117,19 @@ export class N11HeightScenario extends Scenario {
     if (!got.fired || !got.value) errs.push("HeightDown pinch did not fire")
     else {
       const v = got.value
-      const want = makeReference(150).score("RH", "h09", pos0)
+      const want = makeReference(150).bestForHold("h09", pos0)
       print(`[r7] in the pinch frame: height ${v.h}, reach ${v.reach.toFixed(1)}, panel "${v.label}", h09 ${v.h09} (${v.score !== null ? v.score.toFixed(3) : "-"}; rule ${want.colour} ${want.score.toFixed(3)})`)
       if (v.h !== 150 || Math.abs(v.reach - 66) > 1e-9 || v.label !== "Height 150 cm") errs.push(`pinch frame: height ${v.h}, reach ${v.reach}, panel "${v.label}"; want 150, 66, "Height 150 cm"`)
       if (v.h09 !== want.colour || v.score === null || Math.abs(v.score - want.score) > 1e-9) errs.push(`pinch frame: h09 ${v.h09} ${v.score}, rule at 150 says ${want.colour} ${want.score}`)
     }
     await frames(3)
     if (!samePosition(main.getPosition() as RefPosition, pos0)) errs.push(`the height changed the position: ${fmtPos(main.getPosition() as RefPosition)}`)
-    if (main.getSelectedLimb() !== selected) errs.push(`the height changed the selected limb to ${main.getSelectedLimb()}`)
+    const best150 = makeReference(150).bestMove(pos0)!
+    if (main.getSelectedLimb() !== best150.limb) errs.push(`at 150 cm the limb is ${main.getSelectedLimb()}, the best move is ${best150.limb}'s`)
     const g150 = readRings(main, 150, errs, "150")
     const seq150 = main.getPreview().map((m) => m.limb + "->" + m.holdId).join(" ")
-    print(`[r7] 150 cm: ${selected} green ${g150.join(",") || "none"}; look-ahead ${seq150}`)
-    if (g150.indexOf("h09") >= 0) errs.push("h09 is still green for RH at 150 cm")
+    print(`[r7] 150 cm: glow ${best150.limb}, green rings ${g150.join(",") || "none"}; look-ahead ${seq150}`)
+    if (g150.indexOf("h09") >= 0) errs.push("h09's ring is still green at 150 cm")
     if (g150.join() === g175.join()) errs.push(`the same holds are green at 150 and 175 cm (${g150.join(",")})`)
 
     // the range stops at 150
@@ -166,6 +171,35 @@ export class N11HeightScenario extends Scenario {
     const g200 = readRings(main, 200, errs, "200")
     print(`[r7] 200 cm: ${main.getSelectedLimb()} green ${g200.join(",")}; look-ahead ${main.getPreview().map((m) => m.limb + "->" + m.holdId).join(" ")}`)
     if (!(g200.length >= g175.length)) errs.push(`fewer greens at 200 cm (${g200.join(",")}) than at 175 (${g175.join(",")})`)
+
+    // ── session 20: no override, the height picks the best limb again, in the pinch's own frame ──
+    await restorePreset(main)
+    await pinch("Toggle_LF"); await frames(2)
+    await pinch("Hold_h16"); await frames(2)
+    await pinch("Toggle_RH"); await frames(2)
+    await pinch("Hold_h09"); await frames(2)
+    const posR = main.getPosition() as RefPosition
+    await pinch("HeightDown"); await frames(2)
+    const was = main.getSelectedLimb()
+    const repick = await pinchCapture("HeightDown", () => ({h: main.getHeightCm(), sel: main.getSelectedLimb(), lit: main.getLitLimb(), sug: main.getSuggestion()}))
+    const best165 = makeReference(165).bestMove(posR)!
+    const best170 = makeReference(170).bestMove(posR)!
+    print(`[r7] ${fmtPos(posR)}: best at 170 cm ${best170.limb}->${best170.holdId} (Lens ${was}); in the 165 pinch frame ${repick.value ? repick.value.sel : "-"}, rule ${best165.limb}->${best165.holdId}`)
+    if (best165.limb === best170.limb) errs.push(`precondition: the best limb is ${best165.limb} at both 165 and 170 cm`)
+    if (was !== best170.limb) errs.push(`at 170 cm the limb is ${was}, the best move is ${best170.limb}'s`)
+    if (!repick.fired || !repick.value) errs.push("HeightDown pinch (170 -> 165) did not fire")
+    else {
+      const v = repick.value
+      if (v.h !== 165 || v.sel !== best165.limb || v.lit !== best165.limb) errs.push(`165 pinch frame: height ${v.h}, limb ${v.sel}, lit ${v.lit}; want 165, ${best165.limb}`)
+      if (!v.sug || v.sug.limb !== best165.limb || v.sug.holdId !== best165.holdId) errs.push(`165 pinch frame: glow ${v.sug ? v.sug.limb + "->" + v.sug.holdId : "none"}, rule ${best165.limb}->${best165.holdId}`)
+    }
+    readRings(main, 165, errs, "165, no override")
+
+    // ── an override stays through a height change, and the rings stay that limb's ──
+    await pinch("Toggle_LF"); await frames(2)
+    const kept = await pinchCapture("HeightUp", () => ({sel: main.getSelectedLimb(), over: main.getLimbOverride(), label: main.getOverrideLabel()}))
+    if (!kept.value || kept.value.sel !== "LF" || kept.value.over !== "LF" || kept.value.label !== "Limb override: LF") errs.push(`override through a height change: ${JSON.stringify(kept.value)}`)
+    readRings(main, 170, errs, "170, override LF")
 
     await restorePreset(main)
     if (main.getHeightCm() !== BRIEF_HEIGHT || Math.abs(main.getReach() - 77) > 1e-9) errs.push(`restore: height ${main.getHeightCm()}`)

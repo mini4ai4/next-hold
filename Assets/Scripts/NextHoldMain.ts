@@ -35,8 +35,8 @@ import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interactio
 import {ClimbingWall} from "./Wall/ClimbingWall"
 import {HOLDS, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP, HOLD_SIZE, holdById} from "./Wall/WallLayout"
 import {
-  Evaluation, HoldTypes, Holds, LEG_REACH, LIMBS, Limb, Position, ScoreResult, bestMove, centreOfMass, evaluate, hipOf,
-  sequence, shoulderOf,
+  Evaluation, HoldTypes, Holds, LEG_REACH, LIMBS, Limb, Position, ScoreResult, bestLimbFor, bestMove, bestPerHold, centreOfMass,
+  evaluate, hipOf, sequence, shoulderOf,
 } from "./NextHoldScoring"
 import {
   DESIGN_VIEW_CM, FigureBody, NextHoldWallVisuals, OverlayState, RingColour, TOPPED_TEXT, WallPt, minReadSize, readBoost, ringLineWidth,
@@ -59,9 +59,9 @@ const WHY_RING_GAP = 1.5
  *  title, five type buttons, the Start / Top and Remove / Done rows, gaps and padding tall */
 const PICKER_HALF_W = 10.5
 const PICKER_HALF_H = 27.5
-/** half the control row block (four rows of 5 cm buttons + the note + padding), until its layout reports a size */
+/** half the control row block (the override line, four rows of 5 cm buttons, the note, padding), until its layout reports a size */
 const ROW_HALF_W = 15.4
-const ROW_HALF_H = 14.5
+const ROW_HALF_H = 16.4
 /** Ground: gap (cm) between the problem's outermost ring and the control row beside it */
 const ROW_SIDE_GAP = 4
 
@@ -204,7 +204,11 @@ export class NextHoldMain extends BaseScriptComponent {
   private sizingCamera: Camera | null = null
   /** the full overlay for the current state; the view decides how much of it is pushed */
   private overlay: OverlayState | null = null
+  /** the limb whose rings and glow show: the override if there is one, else the best move's */
   private selected: Limb = "RH"
+  /** session 20: the limb picked on a toggle, which the next move uses instead of the best limb for
+   *  its hold; null = none. Lasts until that move. */
+  private override: Limb | null = null
   private askArmed = false
   private evaluation: Evaluation = {results: [], suggestion: null}
   private byHold: {[id: string]: ScoreResult} = {}
@@ -283,8 +287,8 @@ export class NextHoldMain extends BaseScriptComponent {
 
       this.ready = true
       this.updateGroundDistance(true)
-      // The Lens opens in climb mode with the preset position: auto-select the best move.
-      this.recompute(true)
+      // The Lens opens in climb mode with the preset position: the best move shows.
+      this.recompute()
       this.followDistance()
     })
 
@@ -343,7 +347,7 @@ export class NextHoldMain extends BaseScriptComponent {
       // the picker is ~54 cm tall: keep all five types, Start / Top and Remove / Done inside the view
       this.typePicker.showFor(this.keepInView(this.wall.wallToWorld(px, py, 12), PICKER_HALF_W, PICKER_HALF_H),
         this.wallRot(), this.holdTypes[id] || null, !!this.startFlags[id], this.topFlag === id)
-      this.recompute(false)
+      this.recompute()
       return
     }
     if (!this.problem[id]) return // outside setup only the problem's holds are targets
@@ -360,7 +364,12 @@ export class NextHoldMain extends BaseScriptComponent {
     if (this.isOccupied(id)) return // the reference doesn't score occupied holds
     this.rippleHold(id)
     const wasTopped = this.isTopped()
-    this.position[this.selected] = id
+    // session 20: hands stay on the holds, no limb has to be chosen first: the best limb for this
+    // hold moves, unless a toggle picked one. The move uses up the override.
+    const limb = this.override || bestLimbFor({holds: this.scoredHolds(), holdTypes: this.holdTypes, position: this.position,
+      reach: this.reach(), top: this.getTopHold(), holdId: id}).limb
+    this.position[limb] = id
+    this.override = null
     // a hand just reached the top hold: the problem is done, "TOPPED" from this frame
     if (!wasTopped && this.isTopped()) {
       this.toppedAt = getTime()
@@ -368,15 +377,24 @@ export class NextHoldMain extends BaseScriptComponent {
       this.visuals.setToppedAlpha(1)
     }
     this.callouts.hideWhy()
-    this.recompute(true)
+    this.recompute()
   }
 
+  /** A toggle is an override: the next pinch on a hold moves this limb, and until then the rings and
+   *  the glow are this limb's. It lasts until that move. */
   pressLimb(limb: Limb): void {
     if (!this.ready || LIMBS.indexOf(limb) < 0) return
     this.rippleButton("Toggle_" + limb)
-    this.selected = limb
+    this.override = limb
     this.callouts.hideWhy()
-    this.recompute(false)
+    this.recompute()
+  }
+
+  /** Shows the suggestion's label again and restarts its fade; moves nothing. The demo autopilot uses
+   *  it as the overlays come in, since the label from the Lens's start has faded by then. */
+  showLabelAgain(): void {
+    const s = this.getSuggestion()
+    if (s) this.callouts.showSuggestion(this.labelPos(s.holdId), this.wallRot(), s.label)
   }
 
   pressAsk(): void {
@@ -395,7 +413,7 @@ export class NextHoldMain extends BaseScriptComponent {
     this.callouts.hideWhy()
     this.typePicker.hide()
     this.pickerHold = null
-    this.recompute(false) // switching back to climb recomputes everything
+    this.recompute() // switching back to climb recomputes everything
   }
 
   /** Ground <-> On wall by hand. It holds until the eye next crosses a threshold (followDistance). */
@@ -406,8 +424,8 @@ export class NextHoldMain extends BaseScriptComponent {
   }
 
   /** Height − / +: one 5 cm step, kept in 150-200 cm. The wall recolours for the new body and the
-   *  1-2-3 is searched again for it, in the same frame; the selected limb stays (the climber chose
-   *  it), the position doesn't change. */
+   *  1-2-3 is searched again for it, in the same frame; an override stays (the climber chose it),
+   *  otherwise the best limb is picked again for the new body. The position doesn't change. */
   pressHeight(step: number): void {
     if (!this.ready || step === 0) return
     this.rippleButton(step > 0 ? "HeightUp" : "HeightDown")
@@ -417,7 +435,7 @@ export class NextHoldMain extends BaseScriptComponent {
     this.heightCm = next
     this.controlRow.setHeight(this.heightCm)
     this.callouts.hideWhy()
-    this.recompute(false)
+    this.recompute()
   }
 
   /** Only what is shown changes: no rescoring, same state, same frame. */
@@ -451,7 +469,7 @@ export class NextHoldMain extends BaseScriptComponent {
     delete this.problem[this.pickerHold]
     this.pickerHold = null
     this.typePicker.hide()
-    this.recompute(false)
+    this.recompute()
   }
 
   /** Setup: toggle the hold just pinched as one of the problem's start holds. */
@@ -462,7 +480,7 @@ export class NextHoldMain extends BaseScriptComponent {
     if (this.startFlags[id]) delete this.startFlags[id]
     else this.startFlags[id] = true
     this.typePicker.setFlags(!!this.startFlags[id], this.topFlag === id)
-    this.recompute(false)
+    this.recompute()
   }
 
   /** Setup: make the hold just pinched the problem's top hold (pinch again to clear it). */
@@ -472,7 +490,7 @@ export class NextHoldMain extends BaseScriptComponent {
     this.rippleButton("TopButton")
     this.topFlag = this.topFlag === id ? null : id
     this.typePicker.setFlags(!!this.startFlags[id], this.topFlag === id)
-    this.recompute(false)
+    this.recompute()
   }
 
   /** A hand is on the problem's top hold, climbing: the problem is done (read API too). */
@@ -490,22 +508,27 @@ export class NextHoldMain extends BaseScriptComponent {
       return
     }
     this.toppedShown = false
-    this.recompute(false)
+    this.recompute()
   }
 
   // ── recompute: same frame as the change ──────────────────────────────────
-  private recompute(autoSelect: boolean): void {
+  private recompute(): void {
     const reach = this.reach()
     const holds = this.scoredHolds()
     // the problem's top hold pulls the suggestion upward (ranking only, never the colour)
     const goalTop = this.getTopHold()
-    if (autoSelect) {
-      const best = bestMove({holds, holdTypes: this.holdTypes, position: this.position, reach, top: goalTop})
+    const moveArgs = {holds, holdTypes: this.holdTypes, position: this.position, reach, top: goalTop}
+    if (this.override) this.selected = this.override
+    else {
+      const best = bestMove(moveArgs)
       if (best) this.selected = best.limb
     }
-    this.evaluation = evaluate({holds, holdTypes: this.holdTypes, position: this.position, limb: this.selected, reach, top: goalTop})
+    this.evaluation = evaluate({...moveArgs, limb: this.selected})
+    // session 20: each ring shows what a pinch on it would do: the override's move if there is one,
+    // else the best limb's for that hold, so a ring never looks red when a pinch on it makes a good move
     this.byHold = {}
-    for (const r of this.evaluation.results) this.byHold[r.holdId] = r
+    for (const r of this.override ? this.evaluation.results : bestPerHold(moveArgs)) this.byHold[r.holdId] = r
+    this.controlRow.setOverride(this.override)
 
     const climb = this.mode === "climb"
     const topped = this.isTopped()
@@ -600,8 +623,8 @@ export class NextHoldMain extends BaseScriptComponent {
   }
 
   /**
-   * The score a hold's ring shows, which is the one "?" explains: the selected limb's, except under a
-   * step tag in Ground (not on the glowing hold), where the ring wears the earliest such step's colour
+   * The score a hold's ring shows, which is the one "?" explains: the limb a pinch on it moves (the
+   * override, or the best limb for that hold), except under a step tag in Ground (not on the glowing hold), where the ring wears the earliest such step's colour
    * (session 16), so the why-line explains that step's move. Asked about otherwise, "POCKET HOLD ·
    * HIGH STEP" could sit on a green ring. Null when the hold has no ring.
    */
@@ -1031,6 +1054,9 @@ export class NextHoldMain extends BaseScriptComponent {
   getFigureBody(): FigureBody | null { return this.overlay && this.overlay.body ? this.overlay.body : null }
   getPosition(): Position { return {...this.position} }
   getSelectedLimb(): Limb { return this.selected }
+  /** the limb picked on a toggle for the next move, or null */
+  getLimbOverride(): Limb | null { return this.override }
+  getOverrideLabel(): string { return this.controlRow.getOverrideLabel() }
   getReach(): number { return this.reach() }
   /** the climber's height (cm) the rule is using, and as the panel shows it */
   getHeightCm(): number { return this.heightCm }
@@ -1042,7 +1068,7 @@ export class NextHoldMain extends BaseScriptComponent {
     const h = this.holds[id]
     return h ? this.wall.wallToWorld(h.x, h.y, 0) : null
   }
-  /** Ring colour for the selected limb, or null when the hold shows no ring. */
+  /** Ring colour for the limb a pinch on this hold moves, or null when the hold shows no ring. */
   getHoldColour(id: string): RingColour | null {
     return this.mode === "climb" && this.byHold[id] ? this.byHold[id].colour : null
   }

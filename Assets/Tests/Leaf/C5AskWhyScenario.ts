@@ -48,20 +48,22 @@ export class C5AskWhyScenario extends Scenario {
 
     // pick a ringed hold whose reference why says "LONG REACH" (the brief's example, in the
     // review's wording: was "a long reach"), else any ringed hold
-    const ev = ref.evaluate(sel0 as any, pos0)
-    const target = ev.results.filter((r) => r.why.indexOf("LONG REACH") >= 0)[0] || ev.results[0]
+    const rings = ref.perHold(pos0)
+    // (it must be in view from where the test stands: off view the line slides in beside another ring)
+    const inView = rings.filter((r) => camera().isSphereVisible(mustFind("Hold_" + r.holdId).getTransform().getWorldPosition(), 12))
+    const target = inView.filter((r) => r.why.indexOf("LONG REACH") >= 0)[0] || inView.filter((r) => !main.isRingGlowing(r.holdId) && main.getGhostHold(2) !== r.holdId && main.getGhostHold(3) !== r.holdId)[0] || inView[0]
     if (!mustFind("Ring_" + target.holdId).enabled) errs.push(`setup: ${target.holdId} has no ring`)
     const markers0: {[l: string]: string | null} = {}
     for (const l of REF_LIMBS) markers0[l] = main.getMarkerHold(l as any)
 
     // ── pinch the ringed hold ──
-    // session 18: "?" explains the score the ring shows: the selected limb's, or the step's under a step tag
+    // session 18: "?" explains the score the ring shows: the limb a pinch moves, or the step's under a step tag
     const want = expectedWhy(main, target.holdId)
     const wantWhy = want ? want.why : target.why
     await pinch("Hold_" + target.holdId)
     await frames(3)
     const pos1 = main.getPosition() as RefPosition
-    print(`[C5] asked ${target.holdId} for ${sel0}: Lens why "${whyText()}", reference "${wantWhy}" (${want ? want.from : "selected"}); position ${fmtPos(pos1)}`)
+    print(`[C5] asked ${target.holdId} (a pinch moves ${target.limb}): Lens why "${whyText()}", reference "${wantWhy}" (${want ? want.from : "selected"}); position ${fmtPos(pos1)}`)
     if (!main.isWhyVisible() || !mustFind("WhyLine").enabled) errs.push("why line not shown")
     if (whyText() !== wantWhy) errs.push(`why text "${whyText()}" != reference "${wantWhy}"`)
     if (main.getWhyText() !== wantWhy) errs.push(`getWhyText "${main.getWhyText()}"`)
@@ -78,7 +80,7 @@ export class C5AskWhyScenario extends Scenario {
     await pinch("Hold_" + target.holdId)
     await frames(3)
     const pos2 = main.getPosition() as RefPosition
-    if (pos2[sel0] !== target.holdId) errs.push(`next pinch after the why did not move ${sel0} to ${target.holdId} (${fmtPos(pos2)})`)
+    if (pos2[target.limb] !== target.holdId) errs.push(`next pinch after the why did not move ${target.limb} to ${target.holdId} (${fmtPos(pos2)})`)
     if (main.isWhyVisible()) errs.push("why line still shown after a move")
 
     // session 18: a hold under a step tag. At the preset "2 · LH" sits on h09 while RH is selected:

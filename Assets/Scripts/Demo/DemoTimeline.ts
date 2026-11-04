@@ -20,7 +20,7 @@ export const START_DELAY = 3
 export interface DemoScene { n: number; start: number; title: string }
 export interface CameraKey { t: number; x: number; y: number; z: number; pitch: number; yaw: number; cut?: boolean }
 export type DemoActionName = "pressLimb" | "pressHold" | "pressHeight" | "pressAsk" | "pressMode" | "pressView" |
-  "pickType" | "pressStart" | "pressTop" | "pressDone" | "pressRemove"
+  "pickType" | "pressStart" | "pressTop" | "pressDone" | "pressRemove" | "showLabel"
 export interface DemoAction { t: number; do: DemoActionName; arg?: string | number }
 export interface DemoCheck { t: number; key: string }
 
@@ -120,17 +120,18 @@ export const CAMERA: CameraKey[] = [
 ]
 
 export const ACTIONS: DemoAction[] = [
-  // 0: RH again as the overlays come in: the Lens shows "R hand" again (in Ground it fades after
-  // ~2 s, and it showed while the Lens started, before the take)
-  {t: 1.5, do: "pressLimb", arg: "RH"},
-  // 3: pinch the glowing hold "up" (RH is already the selected limb: its label says "R hand").
-  // Session 19: no RH button pinch first: On wall the panel is tucked under the ring, so its
-  // ripple landed off-frame and the move's input read as a cut
+  // 0: the Lens shows "R hand" again as the overlays come in (in Ground it fades after ~2 s, and it
+  // showed while the Lens started, before the take). Not a pinch: session 20, a toggle pinch here
+  // would set the override and show it on the panel for the next 50 s
+  {t: 1.5, do: "showLabel"},
+  // Session 20: hands stay on the holds. Every hold pinch below moves the best limb for that hold, with
+  // no toggle first, and the outcome is the one the toggles gave. The one toggle left is LF in scene 5.
+  // 3: pinch the glowing hold "up": the best limb for it is RH, as its label says
   {t: 50.5, do: "pressHold", arg: "up"},
-  // 4: back to the start first (RH down to rh): "2 · LH" names the pinch h09 or the jug h10 only
-  // from there, as in r7 and beta-155/195cm.png; from RH on "up" the glow itself sits on them.
-  // Then Height − to 155 cm, and + to 195 cm (badge 2 jumps from h09 to h10 at 185)
-  {t: 65.5, do: "pressLimb", arg: "RH"},
+  // 4: back to the start first (RH down to rh, the best limb for it): "2 · LH" names the pinch h09 or
+  // the jug h10 only from there, as in r7 and beta-155/195cm.png; from RH on "up" the glow itself sits
+  // on them. Then Height − to 155 cm, and + to 195 cm (badge 2 jumps from h09 to h10 at 185); RH to up
+  // stays the best move at every height, so the glow stays
   {t: 66.3, do: "pressHold", arg: "rh"},
   {t: 68.5, do: "pressHeight", arg: -1},
   {t: 69.1, do: "pressHeight", arg: -1},
@@ -144,19 +145,19 @@ export const ACTIONS: DemoAction[] = [
   {t: 77.5, do: "pressHeight", arg: 1},
   {t: 78.1, do: "pressHeight", arg: 1},
   {t: 78.7, do: "pressHeight", arg: 1},
-  // 5: back to 175; RH to up again, then the plan's next move, LH to h09; pinch LF, then "?" and h11
+  // 5: back to 175; RH to up again, then the plan's next move, LH to h09 (each the best limb for its
+  // hold); then the override: pinch LF, so "?" on h11 explains the left foot's high step, where
+  // without it the ring would be the right hand's (and the panel reads "Limb override: LF")
   {t: 90.5, do: "pressHeight", arg: -1},
   {t: 91.1, do: "pressHeight", arg: -1},
   {t: 91.7, do: "pressHeight", arg: -1},
   {t: 92.3, do: "pressHeight", arg: -1},
-  {t: 93.3, do: "pressLimb", arg: "RH"},
   {t: 94, do: "pressHold", arg: "up"},
-  {t: 95.5, do: "pressLimb", arg: "LH"},
   {t: 96.2, do: "pressHold", arg: "h09"},
   {t: 97.4, do: "pressLimb", arg: "LF"},
   {t: 99.6, do: "pressAsk"},
   {t: 100.6, do: "pressHold", arg: "h11"},
-  // 6: LF again closes the why-line, as a real pinch on it does
+  // 6: LF again closes the why-line, as a real pinch on it does; the override lasts until the next move
   {t: 105.3, do: "pressLimb", arg: "LF"},
   // 7: Setup; pinch h12, Crimp, Start, Done; pinch it again, Remove; back to Climb
   {t: 118, do: "pressMode"},
@@ -168,7 +169,8 @@ export const ACTIONS: DemoAction[] = [
   {t: 127.6, do: "pressRemove"},
   {t: 129.3, do: "pressMode"},
   // 8 (session 19): follow the plan to the end, each pinch on the hold glowing at its turn: LF to
-  // lh, then RF to rh, then LH to the top hold h20 (the "2 · LH" the plan showed): "TOPPED"
+  // lh (scene 5's override, used up here), then RF to rh, then LH to the top hold h20 (the "2 · LH"
+  // the plan showed): "TOPPED"
   {t: 133, do: "pressHold", arg: "lh"},
   {t: 135.3, do: "pressHold", arg: "rh"},
   {t: 137.6, do: "pressHold", arg: "h20"},

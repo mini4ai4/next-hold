@@ -143,6 +143,23 @@ export class ReferenceRule {
     return best
   }
 
+  /** Session 20: the limb a pinch on this hold moves: the highest rank over the four limbs, first limb on a tie. */
+  bestForHold(holdId: string, p: RefPosition): RefResult {
+    let best: RefResult | null = null
+    for (const l of REF_LIMBS) {
+      const r = this.score(l, holdId, p)
+      if (!best || r.rank > best.rank) best = r
+    }
+    return best as RefResult
+  }
+
+  /** Every hold no limb is on, each for the limb a pinch on it moves: what the rings show with no limb chosen. */
+  perHold(p: RefPosition): RefResult[] {
+    const occ: {[id: string]: boolean} = {}
+    for (const l of REF_LIMBS) if (p[l] != null) occ[p[l] as string] = true
+    return Object.keys(this.holds).filter((id) => !occ[id]).map((id) => this.bestForHold(id, p))
+  }
+
   /**
    * Sequence preview (session 15): step 1 is `limb`'s suggestion when given (the glowing ring),
    * else bestMove. After it, the cheapest route to a hand on the top over every limb and hold:

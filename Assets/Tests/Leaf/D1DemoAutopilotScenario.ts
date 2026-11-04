@@ -137,6 +137,8 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
         `glow on up ${main.isRingGlowing("up")}, label "${main.getLabelText()}" shown ${main.isLabelVisible()}`)
       badge2("h09", "2 · LH")
       want(main.getTagText("h20") === "TOP", `h20 tag "${main.getTagText("h20")}", want TOP`)
+      // session 20: no toggle has been pinched: the take opens with no override
+      want(main.getLimbOverride() === null && main.getOverrideLabel() === "Limb override: none", `override ${main.getLimbOverride()}, panel "${main.getOverrideLabel()}"`)
       {
         const off = notOnScreen(["SuggestLabel", "GhostNumber_2", "GhostNumber_3", "Tag_h20"], camera())
         want(!off.length, `not fully in view: ${off.join(", ")}`)
@@ -193,6 +195,8 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
       want(main.getHeightCm() === 175, `height ${main.getHeightCm()}, want 175`)
       want(pos.RH === "up" && pos.LH === "h09", `RH ${pos.RH}, LH ${pos.LH}; want up, h09`)
       want(main.getSelectedLimb() === "LF" && main.getLitLimb() === "LF", `selected ${main.getSelectedLimb()}, lit ${main.getLitLimb()}`)
+      // session 20: the one toggle left in the take, and the panel says what it is
+      want(main.getLimbOverride() === "LF" && main.getOverrideLabel() === "Limb override: LF", `override ${main.getLimbOverride()}, panel "${main.getOverrideLabel()}"`)
       want(main.getHoldColour("lh") === "green" && main.isRingVisible("lh"), `lh for LF is ${main.getHoldColour("lh")}`)
       glowInShot("lh")
       break
@@ -377,7 +381,7 @@ export class D1DemoAutopilotScenario extends Scenario {
 
     // session 18: every pinch of the take shows the ripple where it lands, in order
     const ripples = main.getRippleLog().slice(rippleFrom).map((r) => r.target)
-    const wantRipples = ACTIONS.map(rippleTarget)
+    const wantRipples = ACTIONS.filter((a) => a.do !== "showLabel").map(rippleTarget)
     print(`[d1] ripples: ${ripples.length} of ${wantRipples.length} pinches; on holds, on screen at: ${rippleShots.join("; ")}`)
     if (ripples.join() !== wantRipples.join()) errs.push(`ripples ${ripples.join(",")}; want ${wantRipples.join(",")}`)
 

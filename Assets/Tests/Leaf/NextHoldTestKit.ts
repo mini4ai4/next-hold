@@ -13,7 +13,7 @@ import {findSceneObjectByName, findSceneObjectsByName, nextFrame} from "Leaf.lsp
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {HOLDS, HOLD_SIZE, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP, holdById} from "../../Scripts/Wall/WallLayout"
 import {GLOW_PROFILE, HOVER_PROFILE, RING_PROFILE} from "../../Scripts/Wall/ProceduralTextures"
-import {RefColour, RefLimb, RefPosition, RefPt, ReferenceRule, REF_LIMBS} from "./NextHoldReferenceRule"
+import {RefColour, RefLimb, RefPosition, RefPt, RefResult, ReferenceRule, REF_LIMBS} from "./NextHoldReferenceRule"
 
 /** Brief: a 175 cm climber has 77 cm of reach (height x 0.44). Fixed here, not read from the Lens. */
 export const BRIEF_HEIGHT = 175
@@ -102,6 +102,16 @@ export function isPresetProblem(id: string): boolean {
   return PRESET_PROBLEM.indexOf(id) >= 0
 }
 
+/** Session 20: what each ring must show, by the test's own rule: the override's move if a toggle is
+ *  on, else the best limb's for that hold. Keyed by hold id. */
+export function ringRule(ref: ReferenceRule, main: NextHoldMain, pos: RefPosition): {[id: string]: RefResult} {
+  const over = main.getLimbOverride()
+  const list = over ? ref.evaluate(over as RefLimb, pos).results : ref.perHold(pos)
+  const out: {[id: string]: RefResult} = {}
+  for (const r of list) out[r.holdId] = r
+  return out
+}
+
 /** Scene hold coordinates, limited to the preset problem's holds (the preset position is on them). */
 export function problemHoldCoords(): {[id: string]: RefPt} {
   const all = sceneHoldCoords()
@@ -151,8 +161,8 @@ export function taggedHolds(main: NextHoldMain): {[id: string]: RefColour} {
 
 /**
  * Colour of the rendered Ring_<id> material, classified against the Lens's three ring colours; null
- * if the ring object is off. Rings are the selected limb's score, except under a step tag
- * (taggedHolds), where the ring renders in the step's colour: there this returns the Lens's score
+ * if the ring object is off. Rings are the score of the limb a pinch moves (ringRule), except under a
+ * step tag (taggedHolds), where the ring renders in the step's colour: there this returns the Lens's score
  * colour for the hold when the ring shows the step's colour (callers check it against the rule; C1
  * also checks the state directly), else the colour it renders. That a tagged ring really shows its
  * step's colour is checked by checkTagRingsAgree (in checkBadgeAttribution: r3, r7, a2).
@@ -780,9 +790,9 @@ export function notOnScreen(names: string[], cam: Camera): string[] {
   return out
 }
 
-/** the score the Lens's "?" must explain on hold id, by the test's own rule: the selected limb's from
- *  here, unless a shown step tag (2 or 3, not on the glow) sits on it: then that step's, as its ring
- *  wears that step's colour (session 16) */
+/** the score the Lens's "?" must explain on hold id, by the test's own rule: what its ring shows from
+ *  here (ringRule), unless a shown step tag (2 or 3, not on the glow) sits on it: then that step's, as
+ *  its ring wears that step's colour (session 16) */
 export function expectedWhy(main: NextHoldMain, id: string): {why: string; colour: RefColour; from: string} | null {
   const ref = makeReference(main.getHeightCm())
   const pos = main.getPosition() as RefPosition
@@ -794,8 +804,8 @@ export function expectedWhy(main: NextHoldMain, id: string): {why: string; colou
       if (st && st.holdId === id && main.getGhostHold(n) === id) return {why: st.why, colour: st.colour as RefColour, from: `step ${n} ${st.limb}`}
     }
   }
-  const r = ref.score(sel, id, pos)
-  return r ? {why: r.why, colour: r.colour as RefColour, from: `selected ${sel}`} : null
+  const r = ringRule(ref, main, pos)[id]
+  return r ? {why: r.why, colour: r.colour as RefColour, from: `${main.getLimbOverride() ? "override" : "best limb"} ${r.limb}`} : null
 }
 
 /**

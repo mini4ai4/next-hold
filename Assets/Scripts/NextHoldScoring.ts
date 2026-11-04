@@ -248,6 +248,24 @@ export function bestMove(a: MoveArgs): ScoreResult | null {
   return best;
 }
 
+// Session 20: hands stay on the holds. A pinch on a hold moves the limb that makes the best move to
+// it: the highest rank for that hold over all four limbs, ties in LH, RH, LF, RF order. Rank, not
+// score, so it picks the same way bestMove does: bestMove's limb is always the best limb for its hold.
+export function bestLimbFor(a: MoveArgs & { holdId: string }): ScoreResult {
+  let best: ScoreResult | null = null;
+  for (const limb of LIMBS) {
+    const r = scoreHold({ limb, holdId: a.holdId, holds: a.holds, holdTypes: a.holdTypes, position: a.position, reach: a.reach, top: a.top });
+    if (!best || r.rank > best.rank) best = r;
+  }
+  return best as ScoreResult;
+}
+
+// What each free hold's ring shows when no limb is chosen: the move a pinch on it would make.
+export function bestPerHold(a: MoveArgs): ScoreResult[] {
+  const occupied = new Set<string | null>([a.position.LH, a.position.RH, a.position.LF, a.position.RF]);
+  return Object.keys(a.holds).filter((id) => !occupied.has(id)).map((holdId) => bestLimbFor({ ...a, holdId }));
+}
+
 // ── Sequence preview (session 15): a search over limbs and holds, not one greedy step at a time ──
 //
 // Step 1 is the move suggested now: the selected limb's best hold when `limb` is given (the

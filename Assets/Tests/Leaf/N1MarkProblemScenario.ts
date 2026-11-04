@@ -29,11 +29,11 @@ function checkClimbView(main: NextHoldMain, problem: string[], errs: string[], t
   const all = sceneHoldCoords()
   const coords: {[id: string]: RefPt} = {}
   for (const id of problem) coords[id] = all[id]
-  const ref = new ReferenceRule(coords, presetTypes(), BRIEF_REACH)
+  // session 20: which limb a pinch moves goes by rank, so the rule needs the problem's top hold too
+  const ref = new ReferenceRule(coords, presetTypes(), BRIEF_REACH, main.getTopHold())
   const pos = main.getPosition() as RefPosition
-  const ev = ref.evaluate(main.getSelectedLimb() as any, pos)
   const want: {[id: string]: string} = {}
-  for (const r of ev.results) want[r.holdId] = r.colour
+  for (const r of ref.perHold(pos)) want[r.holdId] = r.colour
   for (const h of HOLDS) {
     const inP = problem.indexOf(h.id) >= 0
     const rc = renderedRingColour(h.id, main)

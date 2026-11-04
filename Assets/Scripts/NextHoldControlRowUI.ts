@@ -8,7 +8,7 @@
 // UI -> Main: onLimbPressed, onAskPressed, onModePressed, onViewPressed, onHeightStep (-1 / +1).
 // Must not: hold climbing state or decide anything; Main owns all state.
 //
-// Stable scene names for tests: Toggle_LH, Toggle_RH, Toggle_LF, Toggle_RF,
+// Stable scene names for tests: Toggle_LH, Toggle_RH, Toggle_LF, Toggle_RF, OverrideLabel,
 // AskButton, ModeSwitch, ViewToggle, HeightDown, HeightUp, HeightLabel, SafetyNote.
 
 import {BackPlate} from "SpectaclesUIKit.lspkg/Scripts/BackPlate"
@@ -109,6 +109,7 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
   private viewButton: Button
   private viewLabel: Text
   private heightLabel: Text
+  private overrideLabel: Text
   private backPlate: BackPlate
 
   private selectedLimb: string | null = null
@@ -144,6 +145,12 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
     // The view switch gets a third row of its own.
     const n = 3
     const rowW = n * this.buttonWidth + (n - 1) * this.buttonGap
+    // session 20: a pinch on a hold moves the best limb for it, so the toggles are an override, and say so
+    this.flexChild(content, {w: rowW, h: 3}, (so) => {
+      so.name = "OverrideLabel"
+      this.overrideLabel = this.addButtonLabel(so, "Limb override: none", rowW, "Headline2")
+      this.overrideLabel.getSceneObject().getTransform().setLocalPosition(new vec3(0, 0, LAYOUT_Z_LIFT))
+    })
     const addLimb = (row: SceneObject, limb: string) => {
       const b = this.addButton(row, "Toggle_" + limb, limb, this.buttonWidth, this.buttonHeight, "Headline1")
       this.limbButtons[limb] = b.btn
@@ -253,6 +260,14 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
   setHeight(cm: number): void {
     if (this.heightLabel) this.heightLabel.text = "Height " + Math.round(cm) + " cm"
   }
+
+  /** The limb the next pinch on a hold will move instead of the best one, or null. */
+  setOverride(limb: string | null): void {
+    if (this.overrideLabel) this.overrideLabel.text = "Limb override: " + (limb || "none")
+  }
+
+  /** Read-back for tests: the override line as shown. */
+  getOverrideLabel(): string { return this.overrideLabel ? this.overrideLabel.text : "" }
 
   /** Read-back for tests: the height as shown. */
   getHeightLabel(): string { return this.heightLabel ? this.heightLabel.text : "" }

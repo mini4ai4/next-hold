@@ -66,7 +66,7 @@ function pillRuns(style: RingStyle): [number, number][] {
 }
 
 export interface OverlayState {
-  /** ring colour per hold id (the selected limb's score); null/absent = no ring (occupied, or setup
+  /** ring colour per hold id (the score of the limb a pinch on it moves); null/absent = no ring (occupied, or setup
    *  mode). A hold under a step 2 / 3 tag is drawn in that step's colour instead (see apply) */
   rings: {[id: string]: RingColour | null}
   /** hold whose ring glows (the suggestion), or null */

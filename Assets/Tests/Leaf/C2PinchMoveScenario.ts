@@ -1,5 +1,6 @@
-// Done criterion 2: pinching a free hold moves the selected limb there; its
-// dim marker jumps to that hold; all rings recompute in the SAME frame; and the
+// Done criterion 2: pinching a free hold moves a limb there (session 20: the best
+// limb for that hold, or the override if a toggle picked one; p1 tests the choice);
+// its dim marker jumps to that hold; all rings recompute in the SAME frame; and the
 // limb with the best next move (reference bestMove) is auto-selected.
 // Input path: real SIK pinches on Hold_<id> (simulated right hand). The
 // post-move state is captured inside the Interactable's onTriggerEnd, in the
@@ -50,7 +51,7 @@ function snap(main: NextHoldMain): Snap {
 async function moveAndCheck(main: NextHoldMain, target: string, errs: string[], tag: string): Promise<void> {
   const ref = makeReference()
   const before = snap(main)
-  const mover = before.selected
+  const mover = main.getLimbOverride() || ref.bestForHold(target, before.pos).limb
   const fromHold = before.pos[mover] as string
   const got = await pinchCapture("Hold_" + target, () => snap(main))
   if (!got.fired || !got.value) { errs.push(`${tag}: Hold_${target} onTriggerEnd never fired`); return }
@@ -72,10 +73,9 @@ async function moveAndCheck(main: NextHoldMain, target: string, errs: string[], 
   if (!best) errs.push(`${tag}: reference has no best move`)
   else {
     if (a.selected !== best.limb) errs.push(`${tag}: selected ${a.selected} in the pinch frame, reference bestMove limb ${best.limb}`)
-    // every ring recomputed in the same frame, for the auto-selected limb
-    const ev = ref.evaluate(best.limb, expectPos)
+    // every ring recomputed in the same frame, each for the limb a pinch on it moves now
     const want: {[id: string]: string} = {}
-    for (const r of ev.results) want[r.holdId] = r.colour
+    for (const r of ref.perHold(expectPos)) want[r.holdId] = r.colour
     let changed = 0
     for (const h of HOLDS) {
       const w = want[h.id] || null
@@ -112,10 +112,9 @@ export class C2PinchMoveScenario extends Scenario {
     // move 2: pinch a free hold that is NOT the suggestion (a non-red one if any)
     const ref = makeReference()
     const pos = main.getPosition() as RefPosition
-    const ev = ref.evaluate(main.getSelectedLimb() as any, pos)
-    const sug = ev.suggestion ? ev.suggestion.holdId : ""
-    const pick = ev.results.filter((r) => r.holdId !== sug && r.colour !== "red")[0] ||
-      ev.results.filter((r) => r.holdId !== sug)[0]
+    const sug = main.getSuggestion() ? main.getSuggestion()!.holdId : ""
+    const rings = ref.perHold(pos)
+    const pick = rings.filter((r) => r.holdId !== sug && r.colour !== "red")[0] || rings.filter((r) => r.holdId !== sug)[0]
     await moveAndCheck(main, pick.holdId, errs, "move 2")
 
     // move 3: a move after which a DIFFERENT limb is best, so the auto-select visibly switches

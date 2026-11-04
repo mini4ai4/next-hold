@@ -1,6 +1,8 @@
 // Done criterion 1: at open (climb mode, preset position) every hold of the
 // preset problem that no limb is on shows exactly one ring whose colour matches
-// the reference rule (over the problem's holds) for the auto-selected limb; the
+// the reference rule (over the problem's holds) for the limb a pinch on that hold
+// moves (session 20: the best limb for that hold, so a ring never looks red when a
+// pinch on it would make a good move; the glow stays the best move overall); the
 // four occupied holds show a dim marker and no ring; holds outside the problem
 // show no ring and are dim (review item 1: "Mark your problem").
 // Expected colours are computed by the test's own port of scoring.js
@@ -32,9 +34,8 @@ function checkOpenState(main: NextHoldMain, tag: string): string[] {
   if (sel !== best.limb) errs.push(`${tag}: selected limb ${sel} != reference bestMove limb ${best.limb}`)
   if (main.getLitLimb() !== best.limb) errs.push(`${tag}: lit toggle ${main.getLitLimb()} != ${best.limb}`)
 
-  const ev = ref.evaluate(best.limb, pos)
   const byId: {[id: string]: any} = {}
-  for (const r of ev.results) byId[r.holdId] = r
+  for (const r of ref.perHold(pos)) byId[r.holdId] = r
   const occupied: {[id: string]: string} = {}
   for (const l of REF_LIMBS) occupied[pos[l] as string] = l
 
@@ -85,6 +86,7 @@ function checkOpenState(main: NextHoldMain, tag: string): string[] {
   // session 20: a second cue, every ring's drawn style is its colour's, and all three show at the open
   const styles = checkRingStyles(main, errs, tag)
   if (!tally.green || !tally.yellow || !tally.red) errs.push(`${tag}: not all three colours show at the open (${JSON.stringify(tally)})`)
+  if (main.getLimbOverride() !== null || main.getOverrideLabel() !== "Limb override: none") errs.push(`${tag}: override ${main.getLimbOverride()}, panel "${main.getOverrideLabel()}"`)
   print(`[C1] ${tag}: limb ${best.limb}, reference colours green ${tally.green} / yellow ${tally.yellow} / red ${tally.red}, ${errs.length} mismatches; ${styles}`)
   return errs
 }

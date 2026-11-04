@@ -27,7 +27,7 @@ import {camera, checkRowClearOfRing, eyeToWallCm, frames, getMain, mustFind, pin
 
 /** the wall root's preset place (BUILD_LOG session 5); this item must not move it */
 const WALL_ROOT = new vec3(-10.5, -166, -125)
-const CONTROLS = ["Toggle_LF", "Toggle_RF", "ModeSwitch", "ViewToggle", "SafetyNote", "Toggle_LH", "Toggle_RH", "AskButton"]
+const CONTROLS = ["OverrideLabel", "Toggle_LF", "Toggle_RF", "ModeSwitch", "ViewToggle", "SafetyNote", "Toggle_LH", "Toggle_RH", "AskButton"]
 
 function visualsUnder(so: SceneObject, out: BaseMeshVisual[]): BaseMeshVisual[] {
   if (!so.isEnabledInHierarchy) return out

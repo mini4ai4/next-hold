@@ -16,15 +16,15 @@ import {RefPosition, ReferenceRule} from "./NextHoldReferenceRule"
 
 function checkColours(main: NextHoldMain, ref: ReferenceRule, pos: RefPosition, errs: string[], tag: string): void {
   const plain = ref.withoutGoal()
-  const limb = main.getSelectedLimb() as any
-  const withGoal = ref.evaluate(limb, pos).results
-  const without: {[id: string]: string} = {}
-  for (const r of plain.evaluate(limb, pos).results) without[r.holdId] = r.colour
+  // session 20: each ring is for the limb a pinch on it moves. The goal helps pick that limb, by rank;
+  // for that limb the colour is still the plain rule's, with no goal in it
+  const withGoal = ref.perHold(pos)
   let beyond = 0
   for (const r of withGoal) {
     const rc = renderedRingColour(r.holdId, main)
-    if (r.colour !== without[r.holdId]) errs.push(`${tag}: reference colour of ${r.holdId} changes with the goal`)
-    if (rc !== without[r.holdId]) errs.push(`${tag}: Ring_${r.holdId} renders ${rc}, colour rule (no goal) says ${without[r.holdId]}`)
+    const noGoal = plain.score(r.limb, r.holdId, pos).colour
+    if (r.colour !== noGoal) errs.push(`${tag}: reference colour of ${r.holdId} for ${r.limb} changes with the goal`)
+    if (rc !== noGoal) errs.push(`${tag}: Ring_${r.holdId} renders ${rc}, colour rule (no goal) for ${r.limb} says ${noGoal}`)
     if (r.reachFactor === 0) {
       beyond++
       if (rc !== "red") errs.push(`${tag}: ${r.holdId} is out of reach but renders ${rc}`)
@@ -87,7 +87,8 @@ export class N2UpwardGoalScenario extends Scenario {
     for (const h of HOLDS) {
       const sc = main.getHoldScore(h.id)
       if (sc === null) continue
-      const want = ref.withoutGoal().score(main.getSelectedLimb() as any, h.id, main.getPosition() as RefPosition).score
+      const posNow = main.getPosition() as RefPosition
+      const want = ref.withoutGoal().score(ref.bestForHold(h.id, posNow).limb, h.id, posNow).score
       if (Math.abs(sc - want) > 1e-9) errs.push(`getHoldScore(${h.id}) = ${sc}, colour score ${want}`)
     }
 

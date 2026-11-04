@@ -200,6 +200,7 @@ export class DemoAutopilot extends BaseScriptComponent {
       case "pressTop": m.pressTop(); break
       case "pressDone": m.pressDone(); break
       case "pressRemove": m.pressRemove(); break
+      case "showLabel": m.showLabelAgain(); break
     }
   }
 

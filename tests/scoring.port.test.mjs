@@ -147,6 +147,36 @@ check("bestMove returns null when nothing is reachable",
   P.bestMove({ holds: { a: { x: 0, y: 0 }, b: { x: 500, y: 500 } }, holdTypes: { a: "jug", b: "jug" },
                position: { LH: "a", RH: null, LF: null, RF: null }, reach: 77 }) === null);
 
+// ---- 3b. the limb a pinch moves: the best for that hold (session 20) ----------
+let perHoldOk = true, firstPerHold = null;
+for (const pos of positions) {
+  for (const top of tops) {
+    const got = P.bestPerHold({ holds: wHolds, holdTypes: wTypes, position: pos, reach: CLIMBER_REACH, top });
+    for (const g of got) {
+      // the reference's own scores, every limb: the highest rank, the earlier limb on a tie
+      let want = null;
+      for (const limb of ["LH", "RH", "LF", "RF"]) {
+        const r = R.scoreHold({ limb, holdId: g.holdId, holds: wHolds, holdTypes: wTypes, position: pos, reach: CLIMBER_REACH, top });
+        if (!want || r.rank > want.rank) want = r;
+      }
+      if (JSON.stringify(g) !== JSON.stringify(want)) { perHoldOk = false; firstPerHold = firstPerHold || { g, want }; }
+    }
+  }
+}
+check("bestPerHold = the highest-ranked limb for each hold by the reference's own scores (4 positions x 4 tops)", perHoldOk, firstPerHold);
+let holdsAgree = true;
+for (const pos of positions) {
+  for (const top of tops) {
+    const args = { holds: wHolds, holdTypes: wTypes, position: pos, reach: CLIMBER_REACH, top };
+    const b = P.bestMove(args);
+    if (b && P.bestLimbFor({ ...args, holdId: b.holdId }).limb !== b.limb) holdsAgree = false;
+  }
+}
+check("the best move's limb is the best limb for its hold: a pinch on the glow moves the limb its label names", holdsAgree);
+check("bestPerHold skips the holds a limb is on", P.bestPerHold({ holds: wHolds, holdTypes: wTypes, position: wPos, reach: CLIMBER_REACH }).every((r) => !Object.values(wPos).includes(r.holdId)));
+const nobody = P.bestLimbFor({ holds: wHolds, holdTypes: wTypes, position: wPos, reach: CLIMBER_REACH, holdId: "h24" });
+check("no limb reaches it: the first limb, score 0, red", nobody.limb === "LH" && nobody.score === 0 && nobody.colour === "red", nobody);
+
 // ---- 4. demo layout: the preset problem ("your problem") ---------------------
 // Outside setup the Lens scores only the problem's holds, so the opening view is these.
 const pHolds = {};
