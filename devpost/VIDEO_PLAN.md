@@ -56,4 +56,4 @@ Before recording: Lens Studio open on NextHold, preview refreshed (no LEAF banne
 the demo preset, then step back 125 cm with S for scene 1. Check that the control panel sits beside the problem, not
 over it, before starting the take.
 Assets on hand: `devpost/visual/beta-155cm.png`, `devpost/visual/beta-195cm.png` (scene 4, optional now); the LEAF run
-log `devpost/LEAF_RUN_2026-11-04_s21.txt` (scene 9: 23 of 23, the 22 checks plus the demo check d1).
+log `devpost/LEAF_RUN_2026-11-04_s22.txt` (scene 9: 23 of 23, the 22 checks plus the demo check d1).
