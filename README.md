@@ -9,7 +9,7 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
 1. Open `NextHold.esproj` in Lens Studio 5.23.2 (sign in, so SIK, UI Kit and LEAF load).
 2. Press Preview. Pinch a hold: the best limb for it moves there, and every ring recolours. Green is a solid ring, yellow
    dashed, red has one gap. If no limb has a green or yellow move to that hold, nothing moves: its ring pulses and the
-   why-line says "OUT OF REACH". To move another limb, pick it first (LH, RH, LF, RF: the panel shows "Limb override: LF"
+   why-line says "OUT OF REACH", or "STEP 1 FIRST" on a hold with a "2 · LH" or "3 · LF" tag. To move another limb, pick it first (LH, RH, LF, RF: the panel shows "Limb override: LF"
    until the next move; it too moves only on green or yellow). Pinch "?" and then a ring for
    the reason. "Setup" marks your problem: pinch a hold to add it, set its type, Start and Top in any order, then
    Done (pinch it again to change or Remove it). "Height − / +" sets your height (150–200 cm); reach follows it, so
