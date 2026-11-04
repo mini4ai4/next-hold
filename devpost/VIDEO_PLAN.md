@@ -5,6 +5,7 @@ top and the Lens shows "TOPPED"; the pinch ripple is bolder (a white band over a
 scene 3 is a pinch on the glowing hold itself, its ripple mid-frame; scene 4 is filmed from 4.0 m and scene 5 from
 3.0 m, so no glow is cut at the frame's edge. The times below are the v4 cut's real times (2:36) with the new beat
 added after setup: about **2:47** in all, 13 s under 3:00. The chime is laid in during the edit (the take has no audio).
+Session 21 changed the counts in scene 9 (23 of 23, 69 passed, twenty-two checks, and the voice line with them). The take itself is the same: every demo move is green, so none is refused.
 v3 (session 18): scene 0 opens on the lit read; On wall the panel tucks under the ring; every pinch shows a ripple;
 the height beat keeps the −/+ row in shot; the why-line sits on its own ring; the arrow points past bare wall.
 
@@ -32,7 +33,7 @@ now · Green / yellow / red · Tag "2 · LH" = your next moves, in their own col
 | 6 | 1:37–1:45 | Look up and to the right, over the top of the problem: lh goes out of view down to the left, and the arrow in the lower left points back at it past bare wall (a dark disc behind it so it reads on the ply). Look back: the arrow goes. Chime laid in at the arrow, music ducked under it. | "If the next hold is out of view, an arrow and a soft chime point you to it." |
 | 7 | 1:45–1:57 | Setup: pinch a hold, pick "Crimp", then Start, then Done; pinch it again, Remove; back to Climb. | "On real glasses, hold recognition is the next step. Here you mark the holds yourself, in any order, which is the stand-in the rules suggest." |
 | 8 | 1:57–2:08 | Back to 2.5 m and the upper look. Follow the plan to the end, a ripple on each hold as it glows: LF to lh, RF to rh, then LH to the top hold. "TOP" turns into a green "TOPPED" for 2 s and fades; nothing glows next. (Take t = 130–141.) | "Follow the plan, one ring at a time, and it takes you to the top." |
-| 9 | 2:08–2:28 | Brief card ("nineteen sessions logged in BUILD_LOG.md", the same count as DEVPOST), then the LEAF panel with 19 of 19 green (18 checks plus the demo check d1) and the a2 print "two head positions from 250 cm cover 10/10", then `node tests/scoring.port.test.mjs` ending "57 passed". | "We planned it with the plan-lens skill and built it with CLAD. Every done criterion has a LEAF test, and all eighteen pass." |
+| 9 | 2:08–2:28 | Brief card ("twenty-one sessions logged in BUILD_LOG.md", the same count as DEVPOST), then the LEAF panel with 23 of 23 green (22 checks plus the demo check d1) and the a2 print "two head positions from 250 cm cover 10/10", then `node tests/scoring.port.test.mjs` ending "69 passed". | "We planned it with the plan-lens skill and built it with CLAD. Every done criterion has a LEAF test, and all twenty-two pass." |
 | 10 | 2:28–2:37 | Card over the live preview: "Logic proven in the preview: colours, the plan, the switch, the sizes. Feel unproven until real SPECS and a real wall." | "The logic is proven in the preview. How it feels on a real wall, only real glasses can tell." |
 | 11 | 2:37–2:47 | End card: wordmark, "A bouldering coach on SPECS", "Indoor bouldering and top-rope. Not a spotter.", the Devpost link. Music to the last frame. | "Next Hold never says safe. It shows you your next hold." |
 
@@ -55,4 +56,4 @@ Before recording: Lens Studio open on NextHold, preview refreshed (no LEAF banne
 the demo preset, then step back 125 cm with S for scene 1. Check that the control panel sits beside the problem, not
 over it, before starting the take.
 Assets on hand: `devpost/visual/beta-155cm.png`, `devpost/visual/beta-195cm.png` (scene 4, optional now); the LEAF run
-log `devpost/LEAF_RUN_2026-10-29_s19.txt` (scene 9: 19 of 19, the 18 checks plus the demo check d1).
+log `devpost/LEAF_RUN_2026-11-04_s21.txt` (scene 9: 23 of 23, the 22 checks plus the demo check d1).
