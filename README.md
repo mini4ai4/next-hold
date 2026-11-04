@@ -7,7 +7,9 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
 
 ## Open it
 1. Open `NextHold.esproj` in Lens Studio 5.23.2 (sign in, so SIK, UI Kit and LEAF load).
-2. Press Preview. Pick a limb (LH, RH, LF, RF), pinch a hold, and every ring recolours. Pinch "?" and then a ring for
+2. Press Preview. Pinch a hold: the best limb for it moves there, and every ring recolours. Green is a solid ring, yellow
+   dashed, red has one gap. To move another limb, pick it first (LH, RH, LF, RF: the panel shows "Limb override: LF"
+   until the next move). Pinch "?" and then a ring for
    the reason. "Setup" marks your problem: pinch a hold to add it, set its type, Start and Top in any order, then
    Done (pinch it again to change or Remove it). "Height − / +" sets your height (150–200 cm); reach follows it, so
    the colours and the 1-2-3 change for a taller or shorter climber (at 155 cm step 2 is the pinch h09, from 185 cm
@@ -20,10 +22,10 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    when done. The timeline is `Assets/Scripts/Demo/DemoTimeline.ts`.
 
 ## Tests
-- LEAF: open the LEAF panel and run all nineteen scenarios (one per done criterion in `devpost/design-brief.md`, one per review fix, and d1 for the demo autopilot).
-  The raw output of the last full run (19 of 19 pass, session 19): `devpost/LEAF_RUN_2026-10-29_s19.txt`, copied out of
+- LEAF: open the LEAF panel and run all twenty-one scenarios (one per done criterion in `devpost/design-brief.md`, one per review fix, and d1 for the demo autopilot).
+  The raw output of the last full run (21 of 21 pass, session 20): `devpost/LEAF_RUN_2026-11-03_s20.txt`, copied out of
   the Lens Studio log with `node tests/extract_leaf_run.mjs <log> <first line>`.
-- Scoring port: `node tests/scoring.port.test.mjs` (57 checks, including the 1-2-3 search against a brute force).
+- Scoring port: `node tests/scoring.port.test.mjs` (61 checks, including the 1-2-3 search against a brute force).
 - How often height changes the plan: `node tests/measure_heights.mjs 300 7` runs the Lens's own planner on 300 random
   problems (seeded). On the problems both a 155 cm and a 195 cm climber can finish, their 1-2-3 differs in 184 of 192
   (95.8%; seed 11: 179 of 193, 92.7%), and the very first move differs in about half.
