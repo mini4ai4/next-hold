@@ -16,12 +16,12 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    "2 · LH", "3 · LF" (each tag, and the ring under it, in its own move's colour), and "TOP". Walk in under 80 cm
    and it shows **On wall**: one ring, its label, and a stick figure for your body (hidden in Ground). The Ground / On wall button overrides until you next cross one of those distances.
 4. To record the demo, select the `DemoAutopilot` object, tick **Play On Start** and refresh the preview: 3 s later
-   the Lens plays VIDEO_PLAN scenes 0–7 by itself (about 2:15) and prints "SCENE n start t=…" to the Logger. Untick it
+   the Lens plays VIDEO_PLAN scenes 0–8 by itself (about 2:20) and prints "SCENE n start t=…" to the Logger. Untick it
    when done. The timeline is `Assets/Scripts/Demo/DemoTimeline.ts`.
 
 ## Tests
-- LEAF: open the LEAF panel and run all eighteen scenarios (one per done criterion in `devpost/design-brief.md`, one per review fix, and d1 for the demo autopilot).
-  The raw output of the last full run (18 of 18 pass, session 17): `devpost/LEAF_RUN_2026-10-29_s17.txt`, copied out of
+- LEAF: open the LEAF panel and run all nineteen scenarios (one per done criterion in `devpost/design-brief.md`, one per review fix, and d1 for the demo autopilot).
+  The raw output of the last full run (19 of 19 pass, session 19): `devpost/LEAF_RUN_2026-10-29_s19.txt`, copied out of
   the Lens Studio log with `node tests/extract_leaf_run.mjs <log> <first line>`.
 - Scoring port: `node tests/scoring.port.test.mjs` (57 checks, including the 1-2-3 search against a brute force).
 - Reference rule, written before the build: `node devpost/scoring-reference/scoring.test.js` (27 checks). This is
