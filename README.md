@@ -29,7 +29,8 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
 - Scoring port: `node tests/scoring.port.test.mjs` (69 checks, including the 1-2-3 search against a brute force).
 - How often height changes the plan: `node tests/measure_heights.mjs 300 7` runs the Lens's own planner on 300 random
   problems (seeded). On the problems both a 155 cm and a 195 cm climber can finish, their 1-2-3 differs in 184 of 192
-  (95.8%; seed 11: 179 of 193, 92.7%), and the very first move differs in about half.
+  (95.8%). Over ten seeds (1, 2, 3, 5, 7, 11, 13, 23, 42, 99) it ranges from 92.7% (seed 11) to 96.7% (seed 42),
+  and the very first move differs in 38–55%.
 - Reference rule, written before the build: `node devpost/scoring-reference/scoring.test.js` (35 checks). This is
   pre-written design code; CLAD ported it to TypeScript.
 
@@ -42,8 +43,8 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
   195 cm, On wall, the height row).
 
 ## What's stood in
-The preview can't see a real wall or track a body, so hold recognition is a setup mode and body position is four
-limb toggles. The logic is proven in tests and the preview; how it feels on a real wall needs real SPECS.
+The preview can't see a real wall or track a body, so hold recognition is a setup mode and body position is stood in by
+pinches: pinch a hold and the limb with the best move to it goes there (LH/RH/LF/RF are an override). The logic is proven in tests and the preview; how it feels on a real wall needs real SPECS.
 
 Green never means "safe". It means "a secure grip for you, from where you are now".
 
