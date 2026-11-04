@@ -22,8 +22,8 @@ import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {
-  BADGE_STEPS, camera, checkBadgeAttribution, checkGhostNumbersClear, checkStepColours, classifyColour, fmtPos, frames, ghostBadge, ghostPathDots, getMain,
-  makeReference, mustFind, pinch, pinchCapture, renderedRingColour, restorePreset,
+  BADGE_STEPS, STYLE_FOR, camera, checkBadgeAttribution, checkGhostNumbersClear, checkRingStyles, checkStepColours, classifyColour, fmtPos, frames, ghostBadge, ghostPathDots, getMain,
+  makeReference, mustFind, pinch, pinchCapture, renderedRingColour, renderedStyle, restorePreset,
 } from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 
@@ -167,6 +167,24 @@ export class N3SequencePreviewScenario extends Scenario {
       tag = `step 2 on the glow ${sug.holdId}`
       if (mustFind("GhostPath_1").enabled) errs.push(`${tag}: GhostPath_1 shows, but step 2 is on the glowing hold itself`)
       print(`[N3] ${tag}: ${checkBadgeAttribution(camera(), main, want, errs, tag)}; ${checkGhostNumbersClear(camera(), errs, tag, main)}`)
+
+      // session 20, forced: each colour on the glow, on a step tag, on a ring under a tag and on the
+      // ring of an occupied hold: the style follows the colour on every one of them
+      const occ = main.getPosition().RF as string
+      const free = problem.filter((id) => id !== sug.holdId && mustFind("Ring_" + id).enabled)
+      for (const c of ["green", "yellow", "red"]) {
+        vis.apply({...vis.state, rings: {...vis.state.rings, [sug.holdId]: c},
+          ghosts: [{hold: sug.holdId, limb: sug.limb, colour: c}, {hold: occ, limb: "RF", colour: c}, {hold: free[0], limb: "LH", colour: c}]})
+        tag = `forced ${c}`
+        const glowC = classifyColour((mustFind("SuggestGlow").getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4, main)
+        if (glowC !== c) errs.push(`${tag}: the glow renders ${glowC}`)
+        if (!mustFind("GhostHoldRing_2").enabled) errs.push(`${tag}: no ring on the occupied hold ${occ}`)
+        const want3 = STYLE_FOR[c]
+        for (const n of ["SuggestGlow", "Ghost_2", "Ghost_3", "GhostHoldRing_2", "Ring_" + free[0]]) {
+          if (renderedStyle(n) !== want3) errs.push(`${tag}: ${n} draws ${renderedStyle(n)}, want ${want3}`)
+        }
+        print(`[N3] ${tag}: glow, both tags, the occupied hold's ring and the ring under a tag draw ${want3}; ${checkRingStyles(main, errs, tag)}`)
+      }
     }
 
     await restorePreset(main)

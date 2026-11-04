@@ -24,12 +24,46 @@
 // profile row (crisp core + soft halo), alpha-blended over the wall. Ring hue
 // lives in mainPass.baseColor (tests classify it); the halo is in the texture.
 
-import {UVGeo, UV_LAYOUT, addProfileAnnulus} from "./Wall/MeshKit"
+import {UVGeo, UV_LAYOUT, addProfileAnnulus, addProfileArc} from "./Wall/MeshKit"
 import {HOLDS, HOLD_SIZE, HoldDef} from "./Wall/WallLayout"
 import {GLOW_PROFILE, HOVER_PROFILE, ProfileRow, RING_PROFILE, overlayMaterial, profileV} from "./Wall/ProceduralTextures"
 import {ORDER_RIPPLE} from "./NextHoldPinchRipple"
 
 export type RingColour = "green" | "yellow" | "red"
+
+/** Session 20: every colour has a second cue, so colour alone never carries the meaning (colour-blind
+ *  climbers, a washed-out additive display). Rings, the glow, step tags and the ring on an occupied
+ *  hold all follow it: green solid, yellow dashed, red broken by one clear gap. */
+export type RingStyle = "solid" | "dashed" | "broken"
+export const STYLE_OF: Record<RingColour, RingStyle> = {green: "solid", yellow: "dashed", red: "broken"}
+/** dashed: this many dashes round a ring, half of the way round being gap (30 deg each): from 2.5 m the
+ *  gap on the smallest ring is wider than the line */
+const RING_DASHES = 6
+/** broken: one gap this wide (deg), at the upper right, like an eye chart's C */
+const RING_GAP_DEG = 60
+const RING_GAP_AT_DEG = 45
+
+/** the arcs a ring of this style is drawn in: [from, to] in radians */
+function styleArcs(style: RingStyle): [number, number][] {
+  const d = Math.PI / 180
+  if (style === "broken") return [[(RING_GAP_AT_DEG + RING_GAP_DEG / 2) * d, (RING_GAP_AT_DEG - RING_GAP_DEG / 2 + 360) * d]]
+  if (style === "solid") return [[0, 2 * Math.PI]]
+  const out: [number, number][] = []
+  const period = (2 * Math.PI) / RING_DASHES
+  for (let k = 0; k < RING_DASHES; k++) out.push([k * period - period / 4, k * period + period / 4])
+  return out
+}
+
+/** The same for a tag's pill outline, as shares of its perimeter, from the middle of its right end
+ *  going counter-clockwise: a dash on each end and on the middle of each long side */
+const PILL_DASHES = 8
+function pillRuns(style: RingStyle): [number, number][] {
+  if (style === "broken") return [[0.2, 1.06]]
+  if (style === "solid") return [[0, 1]]
+  const out: [number, number][] = []
+  for (let k = 0; k < PILL_DASHES; k++) out.push([(k - 0.25) / PILL_DASHES, (k + 0.25) / PILL_DASHES])
+  return out
+}
 
 export interface OverlayState {
   /** ring colour per hold id (the selected limb's score); null/absent = no ring (occupied, or setup
@@ -427,7 +461,7 @@ export class NextHoldWallVisuals {
       ring.so.enabled = !!c
       if (c) {
         ring.mat.mainPass.baseColor = scaled(this.colours[c], h.id === s.glowHoldId ? 1 : RING_DIM)
-        ;(ring.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.ringMesh(HOLD_SIZE[h.type].ringR, ringW)
+        ;(ring.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.ringMesh(HOLD_SIZE[h.type].ringR, ringW, STYLE_OF[c])
       }
       this.marks[h.id].so.enabled = !!s.marks[h.id]
       const tag = s.tags[h.id]
@@ -523,7 +557,7 @@ export class NextHoldWallVisuals {
         if (c > bestClear) { best = p; bestClear = c }
       }
       at.push({x: best.x, y: best.y, hold: h, a: best.a, d: best.d, L: badgeL, R: badgeR})
-      ;(g.ring.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.pillMesh(badgeL, badgeR)
+      ;(g.ring.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.pillMesh(badgeL, badgeR, STYLE_OF[step.colour], ringW / RING_W)
       // the tag's outline says how secure its move is at its turn; the text stays light to read
       g.ring.mat.mainPass.baseColor = this.colours[step.colour]
       g.label.text.size = GHOST_NUMBER_SIZE * gk
@@ -535,12 +569,13 @@ export class NextHoldWallVisuals {
         // what the selected limb could do from here (a red ring under a green "2 · LH" read as a
         // contradiction). The score itself is unchanged; only the ring under the tag shows the step.
         this.rings[h.id].mat.mainPass.baseColor = scaled(this.colours[step.colour], RING_DIM)
+        ;(this.rings[h.id].so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.ringMesh(HOLD_SIZE[h.type].ringR, ringW, STYLE_OF[step.colour])
       }
       stepRinged[h.id] = true
       if (!ownRing && !onGlow) {
         // a limb is on this hold now, so it has no ring of its own: it gets an ordinary ring in
         // the colour of the step that moves onto it (never white)
-        ;(g.holdRing.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.ringMesh(HOLD_SIZE[h.type].ringR, ringW)
+        ;(g.holdRing.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.ringMesh(HOLD_SIZE[h.type].ringR, ringW, STYLE_OF[step.colour])
         g.holdRing.mat.mainPass.baseColor = scaled(this.colours[step.colour], RING_DIM)
         g.holdRing.so.getTransform().setLocalPosition(this.wallToLocal(h.x, h.y, RING_Z))
         g.holdRing.so.enabled = true
@@ -554,7 +589,7 @@ export class NextHoldWallVisuals {
 
     if (glowHold && glowColour) {
       const r = HOLD_SIZE[glowHold.type].ringR
-      this.glow.rmv.mesh = this.glowMesh(this.glow.meshes, r, ringW, gs)
+      this.glow.rmv.mesh = this.glowMesh(this.glow.meshes, r, ringW, gs, STYLE_OF[glowColour])
       this.glow.so.getTransform().setLocalPosition(this.wallToLocal(glowHold.x, glowHold.y, RING_Z + 0.05))
       this.glow.so.enabled = true
       this.setGlowColour(glowColour, GLOW_MAX)
@@ -829,17 +864,20 @@ export class NextHoldWallVisuals {
    * Ring with its crisp core w cm wide, centred on radius r, halo inside and out. Built from three
    * annuli (inner halo, core, outer halo) so a wider core keeps the halos at their own width.
    */
-  private ringMesh(r: number, w: number): RenderMesh {
-    const key = r + "/" + w
+  private ringMesh(r: number, w: number, style: RingStyle = "solid"): RenderMesh {
+    const key = r + "/" + w + "/" + style
     if (!this.ringMeshes[key]) {
       const {inner, core, outer} = RING_PROFILE
       const total = inner + core + outer
       const c0 = r - w / 2, c1 = r + w / 2
       const v = profileV(ProfileRow.Ring)
       const g = new UVGeo()
-      addProfileAnnulus(g, Math.max(0, c0 - inner), c0, SEG, v, [0, 0, 0], 1, 1, 0, 0, inner / total)
-      addProfileAnnulus(g, c0, c1, SEG, v, [0, 0, 0], 1, 1, 0, inner / total, (inner + core) / total)
-      addProfileAnnulus(g, c1, c1 + outer, SEG, v, [0, 0, 0], 1, 1, 0, (inner + core) / total, 1)
+      for (const [t0, t1] of styleArcs(style)) {
+        const n = Math.max(2, Math.round((SEG * (t1 - t0)) / (2 * Math.PI)))
+        addProfileArc(g, Math.max(0, c0 - inner), c0, n, v, t0, t1, 0, inner / total)
+        addProfileArc(g, c0, c1, n, v, t0, t1, inner / total, (inner + core) / total)
+        addProfileArc(g, c1, c1 + outer, n, v, t0, t1, (inner + core) / total, 1)
+      }
       // Ground's line width follows the eye's distance: don't let walking about grow the cache without end
       if (Object.keys(this.ringMeshes).length > 64) this.ringMeshes = {}
       this.ringMeshes[key] = toMesh(g)
@@ -848,9 +886,9 @@ export class NextHoldWallVisuals {
   }
 
   /** suggestion glow: bloom and target ring outside the ring of radius r and line width w, k times its 110 cm span */
-  private glowMesh(cache: {[k: string]: RenderMesh}, r: number, w: number = RING_W, k = 1): RenderMesh {
+  private glowMesh(cache: {[k: string]: RenderMesh}, r: number, w: number = RING_W, k = 1, style: RingStyle = "solid"): RenderMesh {
     const rIn = r + w / 2
-    return this.cachedAnnulus(cache, rIn, rIn + GLOW_PROFILE.span * k, ProfileRow.Glow)
+    return this.cachedAnnulus(cache, rIn, rIn + GLOW_PROFILE.span * k, ProfileRow.Glow, style)
   }
 
   /** aim highlight: thin ring 2.4 cm outside the ring of radius r */
@@ -902,36 +940,43 @@ export class NextHoldWallVisuals {
 
   /**
    * Thin crisp pill outline (hover profile across the line, as the thin ring): a horizontal stadium
-   * whose line's core runs L cm either side of the centre and round the two ends at radius R.
+   * whose line's core runs L cm either side of the centre and round the two ends at radius R, its
+   * line drawn m times its 110 cm width and in the style's runs (session 20).
    */
-  private pillMesh(L: number, R: number): RenderMesh {
-    const key = L.toFixed(2) + "/" + R.toFixed(2)
+  private pillMesh(L: number, R: number, style: RingStyle = "solid", m = 1): RenderMesh {
+    const key = L.toFixed(2) + "/" + R.toFixed(2) + "/" + style + "/" + m.toFixed(2)
     if (this.pillMeshes[key]) return this.pillMeshes[key]
     const {span, coreAt, coreW} = HOVER_PROFILE
-    const inIn = coreAt + coreW / 2, out = span - inIn
+    const inIn = (coreAt + coreW / 2) * m, out = (span - coreAt - coreW / 2) * m
     const v = profileV(ProfileRow.Hover)
-    // the core line's path: right half-circle, top edge, left half-circle, bottom edge (closed)
-    const path: {x: number; y: number; nx: number; ny: number}[] = []
-    const ARC = 16
-    for (let j = 0; j <= ARC; j++) {
-      const t = -Math.PI / 2 + (Math.PI * j) / ARC
-      path.push({x: L + R * Math.cos(t), y: R * Math.sin(t), nx: Math.cos(t), ny: Math.sin(t)})
+    // the core line at s along it, from the middle of the right end, counter-clockwise (closed)
+    const arc = Math.PI * R, per = 4 * L + 2 * arc
+    const at = (s0: number): {x: number; y: number; nx: number; ny: number} => {
+      let s = ((s0 % per) + per) % per
+      const round = (cx: number, t: number) => ({x: cx + R * Math.cos(t), y: R * Math.sin(t), nx: Math.cos(t), ny: Math.sin(t)})
+      if (s < arc / 2) return round(L, s / R)
+      s -= arc / 2
+      if (s < 2 * L) return {x: L - s, y: R, nx: 0, ny: 1}
+      s -= 2 * L
+      if (s < arc) return round(-L, Math.PI / 2 + s / R)
+      s -= arc
+      if (s < 2 * L) return {x: -L + s, y: -R, nx: 0, ny: -1}
+      return round(L, -Math.PI / 2 + (s - 2 * L) / R)
     }
-    for (let j = 0; j <= ARC; j++) {
-      const t = Math.PI / 2 + (Math.PI * j) / ARC
-      path.push({x: -L + R * Math.cos(t), y: R * Math.sin(t), nx: Math.cos(t), ny: Math.sin(t)})
-    }
-    path.push(path[0])
     const g = new UVGeo()
-    let prev: number[] | null = null
-    for (const q of path) {
-      const cur = [
-        g.vert([q.x - q.nx * inIn, q.y - q.ny * inIn, 0], 0, v),
-        g.vert([q.x + q.nx * out, q.y + q.ny * out, 0], 1, v),
-      ]
-      // wound as addProfileAnnulus (inner, outer, next outer): facing +Z
-      if (prev) { g.tri(prev[0], prev[1], cur[1]); g.tri(prev[0], cur[1], cur[0]) }
-      prev = cur
+    for (const [a, b] of pillRuns(style)) {
+      const n = Math.max(2, Math.round((b - a) * 192))
+      let prev: number[] | null = null
+      for (let j = 0; j <= n; j++) {
+        const q = at(per * (a + ((b - a) * j) / n))
+        const cur = [
+          g.vert([q.x - q.nx * inIn, q.y - q.ny * inIn, 0], 0, v),
+          g.vert([q.x + q.nx * out, q.y + q.ny * out, 0], 1, v),
+        ]
+        // wound as addProfileAnnulus (inner, outer, next outer): facing +Z
+        if (prev) { g.tri(prev[0], prev[1], cur[1]); g.tri(prev[0], cur[1], cur[0]) }
+        prev = cur
+      }
     }
     if (Object.keys(this.pillMeshes).length > 64) this.pillMeshes = {}
     this.pillMeshes[key] = toMesh(g)
@@ -962,14 +1007,16 @@ export class NextHoldWallVisuals {
     return {so, text: t}
   }
 
-  private cachedAnnulus(cache: {[k: string]: RenderMesh}, rIn: number, rOut: number, row: ProfileRow): RenderMesh {
-    const key = rIn + "/" + rOut
+  private cachedAnnulus(cache: {[k: string]: RenderMesh}, rIn: number, rOut: number, row: ProfileRow, style: RingStyle = "solid"): RenderMesh {
+    const key = rIn + "/" + rOut + "/" + style
     if (!cache[key]) {
       // the glow and the ghost badges resize with Ground's distance: keep the cache bounded
       const keys = Object.keys(cache)
       if (keys.length > 64) for (const k of keys) delete cache[k]
       const g = new UVGeo()
-      addProfileAnnulus(g, Math.max(0, rIn), rOut, SEG, profileV(row))
+      for (const [t0, t1] of styleArcs(style)) {
+        addProfileArc(g, Math.max(0, rIn), rOut, Math.max(2, Math.round((SEG * (t1 - t0)) / (2 * Math.PI))), profileV(row), t0, t1)
+      }
       cache[key] = toMesh(g)
     }
     return cache[key]

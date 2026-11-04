@@ -323,6 +323,23 @@ export function addProfileAnnulus(
   }
 }
 
+/** A piece of addProfileAnnulus: from angle t0 to t1 (radians, counter-clockwise), centred on the origin. */
+export function addProfileArc(
+  g: UVGeo, rIn: number, rOut: number, segments: number, v: number, t0: number, t1: number, u0 = 0, u1 = 1,
+) {
+  const start = g.count;
+  for (let k = 0; k <= segments; k++) {
+    const t = t0 + ((t1 - t0) * k) / segments;
+    g.vert([rIn * Math.cos(t), rIn * Math.sin(t), 0], u0, v);
+    g.vert([rOut * Math.cos(t), rOut * Math.sin(t), 0], u1, v);
+  }
+  for (let k = 0; k < segments; k++) {
+    const in0 = start + k * 2, out0 = in0 + 1, in1 = in0 + 2, out1 = in0 + 3;
+    g.tri(in0, out0, out1);
+    g.tri(in0, out1, in1);
+  }
+}
+
 /** Flat textured quad facing +Z: corners (x0,y0)-(x1,y1), UV rect (u0,v0)-(u1,v1). */
 export function addUVQuad(
   g: UVGeo, x0: number, y0: number, x1: number, y1: number, z: number,

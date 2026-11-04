@@ -24,7 +24,7 @@ import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
-import {camera, checkBadgeAttribution, checkGhostNumbersClear, checkGroundSizes, eyeToWallCm, frames, getMain, groundSizesFor, mustFind, renderedLineWidth, restorePreset} from "./NextHoldTestKit"
+import {camera, checkBadgeAttribution, checkGapsReadable, checkGhostNumbersClear, checkGroundSizes, eyeToWallCm, frames, getMain, groundSizesFor, mustFind, renderedLineWidth, restorePreset} from "./NextHoldTestKit"
 
 /** where the climber stands to read the problem: on the mats, about 2.5 m back */
 const SCAN_CM = 250
@@ -105,6 +105,8 @@ export class N7GroundViewpointScenario extends Scenario {
       print(`[N7] sized from the second camera (${camCm.toFixed(1)} cm, Lens ${sized.toFixed(1)} cm): ${checkGroundSizes(main, camCm, errs, "second camera")}`)
       const sug = main.getSuggestion()
       if (sug) drawnLine = renderedLineWidth(sug.holdId)
+      // session 20: from here the dashes and the one gap read as gaps: each wider than the line
+      print(`[N7] from ${SCAN_CM} cm: ${checkGapsReadable(main, errs, "from " + SCAN_CM + " cm")}`)
 
       const vFov = (2 * aV * 180) / Math.PI, hFov = (2 * aH * 180) / Math.PI
       const floorY = mustFind("ClimbingWall (stand-in)").getTransform().getWorldPosition().y

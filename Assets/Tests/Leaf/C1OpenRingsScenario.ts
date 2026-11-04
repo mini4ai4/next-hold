@@ -13,7 +13,7 @@ import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLDS} from "../../Scripts/Wall/WallLayout"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {
-  BRIEF_REACH, countByName, fmtPos, getMain, isPresetProblem, makeReference, mustFind, planeDistanceToHold,
+  BRIEF_REACH, checkRingStyles, countByName, fmtPos, getMain, isPresetProblem, makeReference, mustFind, planeDistanceToHold,
   presetPosition, presetProblem, renderedRingColour, restorePreset, samePosition, sceneHoldCoords,
 } from "./NextHoldTestKit"
 import {REF_LIMBS, RefPosition} from "./NextHoldReferenceRule"
@@ -82,7 +82,10 @@ function checkOpenState(main: NextHoldMain, tag: string): string[] {
   if (ringed !== wantRinged) errs.push(`${tag}: ${ringed} ringed holds, want ${wantRinged} (the problem's free holds)`)
   if (markerOnly !== 4) errs.push(`${tag}: ${markerOnly} marker-only holds, want 4`)
   if (outside !== HOLDS.length - presetProblem().length) errs.push(`${tag}: ${outside} holds outside the problem`)
-  print(`[C1] ${tag}: limb ${best.limb}, reference colours green ${tally.green} / yellow ${tally.yellow} / red ${tally.red}, ${errs.length} mismatches`)
+  // session 20: a second cue, every ring's drawn style is its colour's, and all three show at the open
+  const styles = checkRingStyles(main, errs, tag)
+  if (!tally.green || !tally.yellow || !tally.red) errs.push(`${tag}: not all three colours show at the open (${JSON.stringify(tally)})`)
+  print(`[C1] ${tag}: limb ${best.limb}, reference colours green ${tally.green} / yellow ${tally.yellow} / red ${tally.red}, ${errs.length} mismatches; ${styles}`)
   return errs
 }
 

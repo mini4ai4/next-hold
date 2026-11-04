@@ -329,12 +329,93 @@ export function renderedInnerRadius(name: string): number {
  */
 export function ghostBadge(n: number): {c: vec3; L: number; R: number} {
   const so = mustFind("Ghost_" + n)
-  const pos = (so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh.getVertexDataForAttribute("position")
-  let mx = 0, my = 0
-  for (let i = 0; i * 3 < pos.length; i++) { mx = Math.max(mx, Math.abs(pos[i * 3])); my = Math.max(my, Math.abs(pos[i * 3 + 1])) }
-  const out = HOVER_PROFILE.span - (HOVER_PROFILE.coreAt + HOVER_PROFILE.coreW / 2)
-  const R = my - out
-  return {c: so.getTransform().getWorldPosition(), L: Math.max(0, mx - out - R), R}
+  const mesh = (so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh
+  const pos = mesh.getVertexDataForAttribute("position"), uv = mesh.getVertexDataForAttribute("texture0")
+  // session 20: the line's width follows the distance, so the core is read between the mesh's inner
+  // (U 0) and outer (U 1) edges, at the profile's own share of the way across
+  let ox = 0, oy = 0, iy = 0
+  for (let i = 0; i * 3 < pos.length; i++) {
+    const x = Math.abs(pos[i * 3]), y = Math.abs(pos[i * 3 + 1])
+    if (uv[i * 2] > 0.5) { ox = Math.max(ox, x); oy = Math.max(oy, y) } else iy = Math.max(iy, y)
+  }
+  const inner = HOVER_PROFILE.coreAt + HOVER_PROFILE.coreW / 2, share = inner / HOVER_PROFILE.span
+  const R = iy + (oy - iy) * share
+  return {c: so.getTransform().getWorldPosition(), L: Math.max(0, ox - oy), R}
+}
+
+// ── session 20: a second cue for every colour ───────────────────────────────
+
+/** The style each colour must be drawn in. Fixed here, not read from the Lens. */
+export const STYLE_FOR: {[c: string]: string} = {green: "solid", yellow: "dashed", red: "broken"}
+
+/**
+ * The gaps (deg, as seen from its centre) in what the named object's mesh actually draws: its outer
+ * edge's vertices (U 1), in order round the centre. A step over 3 x the usual step along that edge
+ * is a gap, so a solid ring or pill has none, whatever its shape.
+ */
+export function renderedGaps(name: string): number[] {
+  const mesh = (mustFind(name).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh
+  const pos = mesh.getVertexDataForAttribute("position"), uv = mesh.getVertexDataForAttribute("texture0")
+  const v: {a: number; x: number; y: number}[] = []
+  for (let i = 0; i * 3 < pos.length; i++) {
+    if (uv[i * 2] < 0.99) continue
+    v.push({a: ((Math.atan2(pos[i * 3 + 1], pos[i * 3]) * 180) / Math.PI + 360) % 360, x: pos[i * 3], y: pos[i * 3 + 1]})
+  }
+  v.sort((p, q) => p.a - q.a)
+  const steps = v.map((p, i) => {
+    const q = v[(i + 1) % v.length]
+    return {cm: Math.hypot(q.x - p.x, q.y - p.y), deg: ((q.a - p.a) + 360) % 360}
+  })
+  const usual = steps.map((s) => s.cm).filter((c) => c > 1e-4).sort((p, q) => p - q)[Math.floor(steps.length / 2)]
+  return steps.filter((s) => s.cm > 3 * usual).map((s) => s.deg)
+}
+
+/** The style a mesh is really drawn in, from its gaps: none solid, one gap broken, many dashed. */
+export function renderedStyle(name: string): string {
+  const g = renderedGaps(name)
+  if (g.length === 0) return "solid"
+  if (g.length === 1) return "broken"
+  if (g.length >= 5) return "dashed"
+  return "unclear (" + g.map((d) => d.toFixed(0)).join(", ") + " deg gaps)"
+}
+
+function visualColour(name: string, main: NextHoldMain): RefColour {
+  return classifyColour((mustFind(name).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4, main)
+}
+
+/**
+ * Every shown ring, the glow, each shown step tag's outline and the ring on an occupied hold: the
+ * style it draws must be its colour's (green solid, yellow dashed, red broken). Returns what it saw.
+ */
+export function checkRingStyles(main: NextHoldMain, errs: string[], tag: string): string {
+  const seen: {[k: string]: number} = {}
+  const one = (name: string) => {
+    const so = mustFind(name)
+    if (!so.enabled) return
+    const c = visualColour(name, main), got = renderedStyle(name)
+    seen[c + " " + got] = (seen[c + " " + got] || 0) + 1
+    if (got !== STYLE_FOR[c]) errs.push(`${tag}: ${name} is ${c} but draws ${got}, want ${STYLE_FOR[c]}`)
+  }
+  for (const h of HOLDS) one("Ring_" + h.id)
+  one("SuggestGlow")
+  for (const n of BADGE_STEPS) { one("Ghost_" + n); one("GhostHoldRing_" + n) }
+  return "styles: " + Object.keys(seen).map((k) => `${k} x${seen[k]}`).join(", ")
+}
+
+/** Clearly dashed from here: on every shown dashed or broken ring each gap, along the ring, is wider than the line. */
+export function checkGapsReadable(main: NextHoldMain, errs: string[], tag: string): string {
+  const line = main.getRingLineWidth()
+  let least = 1e9
+  for (const h of HOLDS) {
+    const name = "Ring_" + h.id
+    if (!mustFind(name).enabled) continue
+    for (const d of renderedGaps(name)) {
+      const cm = (d * Math.PI / 180) * HOLD_SIZE[h.type].ringR
+      least = Math.min(least, cm)
+      if (cm < line) errs.push(`${tag}: a gap in ${name} is ${cm.toFixed(2)} cm along the ring, under the ${line.toFixed(2)} cm line`)
+    }
+  }
+  return `narrowest gap ${least.toFixed(2)} cm, line ${line.toFixed(2)} cm`
 }
 
 /** distance (cm, wall plane) from a point to badge b's pill line; < 0 inside the pill */
@@ -452,7 +533,7 @@ export function checkTagRingsAgree(main: NextHoldMain, errs: string[], tag: stri
     else if (ring !== badge) errs.push(`${tag}: badge ${n} on ${id} is ${badge} but its ${what} is ${ring}`)
     out.push(`${n} on ${id}: tag ${badge}, ${what} ${ring}`)
   }
-  return `tag vs ring: ${out.join(", ") || "no tags"}`
+  return `tag vs ring: ${out.join(", ") || "no tags"}; ${checkRingStyles(main, errs, tag)}`
 }
 
 /** A ring colour, not white: the weakest channel well below the strongest (white is ~0.9 of it,
