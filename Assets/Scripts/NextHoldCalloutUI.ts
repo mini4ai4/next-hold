@@ -6,11 +6,15 @@
 //                 capitals: "PINCH HOLD · LONG REACH".
 //   CameOffCard:  session 23, on the mats after a fall: "Came off at move 3. Hint for
 //                 that move?"; one pinch on it opens the hint.
+//   ResultCard:   session 24, on the mats after a top: three lines (ONSIGHT / FLASH / SEND (attempt N),
+//                 moves and par for your body, hints and best). Not a button.
+//   AgainButton:  session 24, under either card: back to the start holds for the next go.
 //
 // Owns: the text widgets, the label's fade timer. Passive view.
 // Main -> UI: showSuggestion(), moveSuggestion(), hideSuggestion(), showWhy(), hideWhy(),
 //             setLabelMinSize(), showCameOff(), hideCameOff().
-// UI -> Main: onCameOffPressed.
+// UI -> Main: onCameOffPressed, onAgainPressed.
+// Main -> UI (session 24): showResult(), hideResult(), showAgain(), hideAgain().
 // Must not: score anything or pick the suggestion; Main does that.
 
 import {BackPlate} from "SpectaclesUIKit.lspkg/Scripts/BackPlate"
@@ -50,6 +54,12 @@ export const WHY_HALF_H = 2.5
 /** session 23, half the came-off card at its 110 cm size (cm): two lines of the panel's headline text */
 export const CARD_HALF_W = 16
 export const CARD_HALF_H = 5
+/** session 24: half the result card, and the Again button under a card (cm, at the 110 cm size; G: >= 10 cm, 3 cm gap) */
+export const RESULT_HALF_W = 16
+export const RESULT_HALF_H = 7.5
+export const AGAIN_W = 14
+export const AGAIN_H = 10
+export const AGAIN_GAP = 3
 
 /** the why-line text's width (cm, at its 110 cm size): as wide as its words, at most WHY_W (longer lines shrink) */
 function whyTextWidth(text: string): number {
@@ -112,6 +122,15 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
   private cardReady = false
   private _onCameOffPressed = new Event<void>()
   get onCameOffPressed(): PublicApi<void> { return this._onCameOffPressed.publicApi() }
+  private _onAgainPressed = new Event<void>()
+  get onAgainPressed(): PublicApi<void> { return this._onAgainPressed.publicApi() }
+  private resultRoot: SceneObject
+  private resultLines: Text[] = []
+  private resultWanted = false
+  private resultReady = false
+  private againRoot: SceneObject
+  private againWanted = false
+  private againReady = false
 
   onAwake() {
     this.sceneObject.createComponent("Component.Canvas")
@@ -201,6 +220,46 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
       this.cardRoot.enabled = this.cardWanted
     })
 
+    // ── ResultCard (session 24): a plate with three lines, read from the mats; not a button ──
+    this.resultRoot = this.obj(this.sceneObject, "ResultCard")
+    const plate = this.resultRoot.createComponent(BackPlate.getTypeName()) as BackPlate
+    plate.size = new vec2(2 * RESULT_HALF_W, 2 * RESULT_HALF_H)
+    const roles: TextRole[] = ["HeadlineXL", "Body", "Body"]
+    const ys = [3.9, -0.4, -4.2]
+    for (let i = 0; i < 3; i++) {
+      const t = this.obj(this.resultRoot, "ResultLine_" + (i + 1), new vec3(0, ys[i], 0.8)).createComponent("Component.Text") as Text
+      t.depthTest = true
+      applyTextRole(t, roles[i])
+      t.horizontalAlignment = HorizontalAlignment.Center
+      t.verticalAlignment = VerticalAlignment.Center
+      t.horizontalOverflow = HorizontalOverflow.Shrink
+      t.verticalOverflow = VerticalOverflow.Overflow
+      t.layoutRect = Rect.create(-RESULT_HALF_W + 1, RESULT_HALF_W - 1, -1.8, 1.8)
+      this.resultLines.push(t)
+    }
+    plate.onInitialized.add(() => {
+      this.resultReady = true
+      this.resultRoot.enabled = this.resultWanted
+    })
+
+    // ── AgainButton (session 24): one big target under the card that is up ──
+    this.againRoot = this.obj(this.sceneObject, "AgainButton")
+    const again = this.againRoot.createComponent(Button.getTypeName()) as Button
+    again.setVariant({theme: "SnapOS3", shape: "Rectangle", style: "Prism"})
+    again.size = new vec3(AGAIN_W, AGAIN_H, 1)
+    again.setIsToggleable(false)
+    again.onTriggerUp.add(() => this._onAgainPressed.invoke())
+    const againText = this.obj(this.againRoot, "AgainText", new vec3(0, 0, 1.6)).createComponent("Component.Text") as Text
+    againText.text = "Again"
+    againText.depthTest = true
+    applyTextRole(againText, "Headline1")
+    againText.horizontalAlignment = HorizontalAlignment.Center
+    againText.verticalAlignment = VerticalAlignment.Center
+    again.onInitialized.add(() => {
+      this.againReady = true
+      this.againRoot.enabled = this.againWanted
+    })
+
     this.createEvent("UpdateEvent").bind(() => this.tickLabel())
   }
 
@@ -221,6 +280,42 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
   }
 
   isCameOffVisible(): boolean { return this.cardWanted }
+
+  /** Session 24: the result card's three lines at worldPos; scale 1 = its 110 cm size. */
+  showResult(worldPos: vec3, worldRot: quat, lines: string[], scale = 1): void {
+    this.place(this.resultRoot, worldPos, worldRot, scale)
+    for (let i = 0; i < 3; i++) this.resultLines[i].text = lines[i] || ""
+    this.resultWanted = true
+    if (this.resultReady) this.resultRoot.enabled = true
+  }
+
+  hideResult(): void {
+    this.resultWanted = false
+    if (this.resultReady) this.resultRoot.enabled = false
+  }
+
+  isResultVisible(): boolean { return this.resultWanted }
+  getResultLines(): string[] { return this.resultWanted ? this.resultLines.map((t) => t.text) : [] }
+
+  showAgain(worldPos: vec3, worldRot: quat, scale = 1): void {
+    this.place(this.againRoot, worldPos, worldRot, scale)
+    this.againWanted = true
+    if (this.againReady) this.againRoot.enabled = true
+  }
+
+  hideAgain(): void {
+    this.againWanted = false
+    if (this.againReady) this.againRoot.enabled = false
+  }
+
+  isAgainVisible(): boolean { return this.againWanted }
+
+  private place(so: SceneObject, p: vec3, r: quat, k: number): void {
+    const tr = so.getTransform()
+    tr.setWorldPosition(p)
+    tr.setWorldRotation(r)
+    tr.setWorldScale(vec3.one().uniformScale(k))
+  }
   getCameOffText(): string { return this.cardWanted && this.cardText ? this.cardText.text : "" }
 
   // ── Main -> UI ────────────────────────────────────────────────────────────

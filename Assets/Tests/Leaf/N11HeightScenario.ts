@@ -22,7 +22,7 @@ import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
-import {BRIEF_HEIGHT, camera, checkBadgeAttribution, checkStepColours, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, presetPosition, renderedRingColour, restorePreset, ringRule, samePosition} from "./NextHoldTestKit"
+import {BRIEF_HEIGHT, camera, checkBadgeAttribution, checkStepColours, fmtPos, frames, getMain, makeReference, mustFind, openPageFor, pinch, pinchCapture, presetPosition, renderedRingColour, restorePreset, ringRule, samePosition} from "./NextHoldTestKit"
 import {RefLimb, RefPosition} from "./NextHoldReferenceRule"
 
 /** green holds as rendered, and every ring checked against the rule at `heightCm` */
@@ -85,19 +85,22 @@ export class N11HeightScenario extends Scenario {
     const errs: string[] = []
     const pos0 = presetPosition()
 
-    if (!mustFind("HeightDown").enabled || !mustFind("HeightUp").enabled || !mustFind("HeightLabel").enabled) errs.push("the height control is not shown")
-    if (main.getHeightCm() !== BRIEF_HEIGHT || main.getHeightLabel() !== "Height 175 cm") errs.push(`at open: height ${main.getHeightCm()}, panel "${main.getHeightLabel()}"`)
-    // session 15: "−", the label and "+" on one line, buttons and glyphs alike (in the row's own plane)
+    // session 24 (G, C): the height lives behind Setup: not shown while climbing; "Planned for 175 cm" under the row
+    if (mustFind("HeightDown").isEnabledInHierarchy || mustFind("HeightUp").isEnabledInHierarchy) errs.push("the height control shows while climbing")
+    if (main.getPlannedLine() !== "Planned for 175 cm" || !mustFind("PlannedLine").isEnabledInHierarchy) errs.push(`the planned line reads "${main.getPlannedLine()}"`)
+    await openPageFor("HeightDown")
+    if (!mustFind("HeightDown").isEnabledInHierarchy || !mustFind("HeightUp").isEnabledInHierarchy || !mustFind("HeightLabel").isEnabledInHierarchy) errs.push("the height control is not shown in Setup")
+    if (main.getHeightCm() !== BRIEF_HEIGHT || main.getHeightLabel() !== "175 cm") errs.push(`at open: height ${main.getHeightCm()}, panel "${main.getHeightLabel()}"`)
+    // session 15: "−" and "+" on one line, buttons and glyphs alike (in the row's own plane); session 24: the
+    // label above them, centred between them
     {
       const row = mustFind("HeightRow").getTransform().getInvertedWorldTransform()
-      const ys = ["HeightDown", "HeightLabel", "HeightUp"].map((n) => row.multiplyPoint(mustFind(n).getTransform().getWorldPosition()).y)
-      const glyphs = ["HeightDown", "HeightLabel", "HeightUp"].map((n) => {
-        const label = mustFind(n).getChild(0)
-        return row.multiplyPoint(label.getTransform().getWorldPosition()).y
-      })
-      print(`[r7] height row centres y ${ys.map((y) => y.toFixed(3)).join(" / ")}, glyphs ${glyphs.map((y) => y.toFixed(3)).join(" / ")}`)
-      if (Math.max(...ys) - Math.min(...ys) > 0.05) errs.push(`the height row's − / label / + are not on one line: y ${ys.join(", ")}`)
-      if (Math.max(...glyphs) - Math.min(...glyphs) > 0.05) errs.push(`the height row's glyphs are not on one line: y ${glyphs.join(", ")}`)
+      const at = (n: string) => row.multiplyPoint(mustFind(n).getTransform().getWorldPosition())
+      const glyph = (n: string) => row.multiplyPoint(mustFind(n).getChild(0).getTransform().getWorldPosition())
+      const d = at("HeightDown"), u = at("HeightUp"), l = at("HeightLabel")
+      print(`[r7] height: − at ${d.x.toFixed(2)},${d.y.toFixed(2)}, + at ${u.x.toFixed(2)},${u.y.toFixed(2)}, label at ${l.x.toFixed(2)},${l.y.toFixed(2)}`)
+      if (Math.abs(d.y - u.y) > 0.05 || Math.abs(glyph("HeightDown").y - glyph("HeightUp").y) > 0.05) errs.push(`− and + are not on one line: y ${d.y}, ${u.y}`)
+      if (!(l.y > d.y + 2.5) || Math.abs(l.x - (d.x + u.x) / 2) > 0.05) errs.push(`the label isn't centred above − and +: ${l.x}, ${l.y}`)
     }
     if (Math.abs(main.getReach() - 77) > 1e-9) errs.push(`reach ${main.getReach()} at 175 cm, want 77`)
     const selected = main.getSelectedLimb()
@@ -119,7 +122,7 @@ export class N11HeightScenario extends Scenario {
       const v = got.value
       const want = makeReference(150).bestForHold("h09", pos0)
       print(`[r7] in the pinch frame: height ${v.h}, reach ${v.reach.toFixed(1)}, panel "${v.label}", h09 ${v.h09} (${v.score !== null ? v.score.toFixed(3) : "-"}; rule ${want.colour} ${want.score.toFixed(3)})`)
-      if (v.h !== 150 || Math.abs(v.reach - 66) > 1e-9 || v.label !== "Height 150 cm") errs.push(`pinch frame: height ${v.h}, reach ${v.reach}, panel "${v.label}"; want 150, 66, "Height 150 cm"`)
+      if (v.h !== 150 || Math.abs(v.reach - 66) > 1e-9 || v.label !== "150 cm" || main.getPlannedLine() !== "Planned for 150 cm") errs.push(`pinch frame: height ${v.h}, reach ${v.reach}, panel "${v.label}", "${main.getPlannedLine()}"; want 150, 66, "150 cm"`)
       if (v.h09 !== want.colour || v.score === null || Math.abs(v.score - want.score) > 1e-9) errs.push(`pinch frame: h09 ${v.h09} ${v.score}, rule at 150 says ${want.colour} ${want.score}`)
     }
     await frames(3)
@@ -167,7 +170,7 @@ export class N11HeightScenario extends Scenario {
 
     // ── on to 200, and it stops there ──
     for (let i = 0; i < 2; i++) { await pinch("HeightUp"); await frames(2) }
-    if (main.getHeightCm() !== 200 || main.getHeightLabel() !== "Height 200 cm") errs.push(`after eleven steps up: ${main.getHeightCm()} cm, panel "${main.getHeightLabel()}"`)
+    if (main.getHeightCm() !== 200 || main.getHeightLabel() !== "200 cm") errs.push(`after eleven steps up: ${main.getHeightCm()} cm, panel "${main.getHeightLabel()}"`)
     const g200 = readRings(main, 200, errs, "200")
     print(`[r7] 200 cm: ${main.getSelectedLimb()} green ${g200.join(",")}; look-ahead ${main.getPreview().map((m) => m.limb + "->" + m.holdId).join(" ")}`)
     if (!(g200.length >= g175.length)) errs.push(`fewer greens at 200 cm (${g200.join(",")}) than at 175 (${g175.join(",")})`)

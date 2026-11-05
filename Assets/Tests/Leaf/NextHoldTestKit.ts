@@ -46,9 +46,35 @@ export function interactable(name: string): Interactable {
   return it
 }
 
-/** Real SIK pinch with the simulated right hand on the named Interactable. */
-export async function pinch(name: string): Promise<void> {
+/** Session 24 (G): the row's buttons by the page they show on */
+export const BODY_PAGE = ["Toggle_LH", "Toggle_RH", "Toggle_LF", "Toggle_RF"]
+export const SETTINGS_PAGE = ["ModeSwitch", "ViewToggle", "HeightDown", "HeightUp"]
+export const CLIMB_PAGE = ["ShowBetaButton", "AskButton", "BodyButton"]
+
+/**
+ * Session 24 (G): a row button that isn't on the page showing is first brought up the way a climber would,
+ * with real pinches: Body for a limb toggle, Setup for the settings, Setup again to close them. The body page
+ * has no close button (a limb pick or a hold pinch closes it), so leaving it unused is the one action-API step.
+ */
+export async function openPageFor(name: string): Promise<void> {
+  const main = getMain()
+  const want = BODY_PAGE.indexOf(name) >= 0 ? "body" : SETTINGS_PAGE.indexOf(name) >= 0 ? "settings" : CLIMB_PAGE.indexOf(name) >= 0 ? "climb" : null
+  if (!want || main.getPage() === want) return
+  if (main.getPage() === "body") { main.pressBody(); await frames(2) }
+  if (main.getPage() === "settings" && want !== "settings") { await rawPinch("SetupButton"); await frames(2) }
+  if (want === "body" && main.getPage() !== "body") { await rawPinch("BodyButton"); await frames(2) }
+  if (want === "settings" && main.getPage() !== "settings") { await rawPinch("SetupButton"); await frames(2) }
+  if (main.getPage() !== want) throw new Error(`could not bring up the ${want} page for ${name} (page ${main.getPage()})`)
+}
+
+async function rawPinch(name: string): Promise<void> {
   await LeafHandInteractor.get("right").trigger(interactable(name))
+}
+
+/** Real SIK pinch with the simulated right hand on the named Interactable (its page brought up first). */
+export async function pinch(name: string): Promise<void> {
+  await openPageFor(name)
+  await rawPinch(name)
 }
 
 /**
@@ -58,6 +84,7 @@ export async function pinch(name: string): Promise<void> {
  * the pinch, with no frame wait in between.
  */
 export async function pinchCapture<T>(name: string, capture: () => T): Promise<{fired: boolean; value: T | null; time: number}> {
+  await openPageFor(name)
   const it = interactable(name)
   const out: {fired: boolean; value: T | null; time: number} = {fired: false, value: null, time: -1}
   const unsub = it.onTriggerEnd.add(() => {
@@ -164,9 +191,26 @@ export function taggedHolds(main: NextHoldMain): {[id: string]: RefColour} {
  *  tag too (session 23). */
 export function renderedRingColour(id: string, main: NextHoldMain): RefColour | null {
   const so = mustFind("Ring_" + id)
+  // Session 24 (the judges' fix 1): a hold under a drawn step tag shows no grip colour, only the neutral outline
+  // its tag pins onto. Checked here, for every scenario that reads rings: such a hold reads as its own score only
+  // if its Ring_<id> is off and the tag's neutral outline is on it; a coloured ring under a tag reads as "tagged-ring"
+  const n = tagOn(id, main)
+  if (n !== null) {
+    const outline = mustFind("GhostHoldRing_" + n)
+    const ok = !so.enabled && outline.enabled && isColour("GhostHoldRing_" + n, NEUTRAL_COLOR)
+    return ok ? main.getHoldColour(id) as RefColour : ("tagged-ring" as RefColour)
+  }
   if (!so.enabled) return null
   const rmv = so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual
   return classifyColour(rmv.mainMaterial.mainPass.baseColor as vec4, main)
+}
+
+/** the step (2 or 3) whose badge shows on this hold, not the glowing hold; null otherwise */
+export function tagOn(id: string, main: NextHoldMain): number | null {
+  const sug = main.getSuggestion()
+  if (sug && sug.holdId === id && main.isRingGlowing(id)) return null
+  for (const n of BADGE_STEPS) if (mustFind("Ghost_" + n).enabled && main.getGhostHold(n) === id) return n
+  return null
 }
 
 export function classifyColour(c: vec4, main: NextHoldMain): RefColour {
@@ -551,9 +595,10 @@ export function checkTagRingsAgree(main: NextHoldMain, errs: string[], tag: stri
     let what = ""
     if (main.isRingGlowing(id)) what = "glow"
     else if (mustFind("Ring_" + id).enabled) {
-      const ring = overlayColour("Ring_" + id, main), own = main.getHoldColour(id)
+      // session 24 (the judges' fix 1): no grip colour under a tag, whatever the hold's score from here
+      const ring = overlayColour("Ring_" + id, main)
       what = "ring " + ring
-      if (ring !== own) errs.push(`${tag}: under badge ${n} Ring_${id} is ${ring}, the hold's own score is ${own}`)
+      errs.push(`${tag}: under badge ${n} Ring_${id} shows ${ring}: a hold under a step tag wears the neutral outline`)
     } else if (mustFind("GhostHoldRing_" + n).enabled) {
       what = "neutral outline"
       if (!isColour("GhostHoldRing_" + n, NEUTRAL_COLOR)) errs.push(`${tag}: GhostHoldRing_${n} on ${id} is not neutral`)
@@ -807,6 +852,13 @@ export function expectedWhy(main: NextHoldMain, id: string): {why: string; colou
   const ref = makeReference(main.getHeightCm())
   const pos = main.getPosition() as RefPosition
   const r = ringRule(ref, main, pos)[id]
+  // session 24: under a drawn step tag "?" names the step, never "OUT OF REACH"; the colour it stands for is the
+  // hold's own score (renderedRingColour checks the neutral outline there)
+  const n = tagOn(id, main)
+  if (r && n !== null && main.getView() === "ground") {
+    const type = (presetTypes()[id] || "").toUpperCase()
+    return {why: `${type} HOLD · STEP ${n}`, colour: r.colour as RefColour, from: `step tag ${n}`}
+  }
   return r ? {why: r.why, colour: r.colour as RefColour, from: `${main.getLimbOverride() ? "override" : "best limb"} ${r.limb}`} : null
 }
 
@@ -826,7 +878,9 @@ export function checkWhyAgrees(cam: Camera, main: NextHoldMain, errs: string[], 
   if (text !== want.why) errs.push(`${tag}: why-line on ${id} reads "${text}", the ring shows ${want.from}: "${want.why}"`)
   const glowing = main.isRingGlowing(id)
   const ringSo = mustFind(glowing ? "SuggestGlow" : "Ring_" + id)
-  const ringCol = ringSo.enabled ? classifyColour((ringSo.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4, main) : null
+  // a tagged hold has the neutral outline, no colour (renderedRingColour checks it and stands in its score)
+  const ringCol = !glowing && tagOn(id, main) !== null ? renderedRingColour(id, main)
+    : ringSo.enabled ? classifyColour((ringSo.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4, main) : null
   if (ringCol !== want.colour) errs.push(`${tag}: ${id}'s ring renders ${ringCol}, the why-line explains a ${want.colour} score (${want.from})`)
   // placement, on screen: the plate itself (its mesh), distances in screen heights (x scaled by the
   // aspect, so a gap counts the same across as up and down)
@@ -837,7 +891,7 @@ export function checkWhyAgrees(cam: Camera, main: NextHoldMain, errs: string[], 
   for (const h of HOLDS) {
     const c = mustFind("Hold_" + h.id).getTransform().getWorldPosition()
     if (main.isRingGlowing(h.id)) rings.push({id: h.id, pts: screenCircle(cam, mustFind("SuggestGlow").getTransform().getWorldPosition(), renderedOuterRadius("SuggestGlow"))})
-    else if (mustFind("Ring_" + h.id).enabled) rings.push({id: h.id, pts: screenCircle(cam, c, HOLD_SIZE[h.type].ringR + line / 2)})
+    else if (mustFind("Ring_" + h.id).enabled || tagOn(h.id, main) !== null) rings.push({id: h.id, pts: screenCircle(cam, c, HOLD_SIZE[h.type].ringR + line / 2)})
   }
   const inside = (p: vec2) => p.x > plate.x0 && p.x < plate.x1 && p.y > plate.y0 && p.y < plate.y1
   const gap = (pts: vec2[]) => Math.min(...pts.map((p) => Math.hypot(cam.aspect * Math.max(0, plate.x0 - p.x, p.x - plate.x1), Math.max(0, plate.y0 - p.y, p.y - plate.y1))))
@@ -902,6 +956,9 @@ export function checkArrowPointsAt(cam: Camera, main: NextHoldMain, errs: string
  * a pinch can't make a red move and the way back to the preset may need one.
  */
 export async function restorePreset(main: NextHoldMain, betaShown = true): Promise<void> {
+  // session 24: a fresh in-memory store before anything is written (the height steps below write it), so no
+  // scenario reads another's goes, best or height, and the preview's own store is never touched by a test
+  main.useStore(GeneralDataStore.create())
   // session 23: the full read, so '?' arms as these scenarios expect and they keep their meaning
   main.resetBetaForTests(true)
   // the brief's 175 cm climber (the height setting is Lens state; a scenario may have changed it)
@@ -991,6 +1048,36 @@ export function restoreProblem(main: NextHoldMain): void {
   if (!probOk || !startOk || main.getTopHold() !== PRESET_TOP) {
     throw new Error(`restoreProblem failed: problem ${main.getProblemHolds().join(",")} start ${main.getStartHolds().join(",")} top ${main.getTopHold()}`)
   }
+}
+
+/**
+ * Session 24: climb to the top with real pinches, each on the hold of the test's own best move from there
+ * (whatever is shown: with beta hidden there is no glow to follow). Each pinch must move that limb there.
+ * Returns the moves made and what the top-out pinch's own frame read (null if the top wasn't reached).
+ */
+export async function climbByRule(main: NextHoldMain, errs: string[], tag: string, max = 8):
+    Promise<{moves: string[]; top: {topped: boolean; result: boolean; card: boolean; again: boolean} | null; time: number}> {
+  const ref = makeReference(main.getHeightCm())
+  const moves: string[] = []
+  for (let i = 0; i < max; i++) {
+    const pos = main.getPosition() as RefPosition
+    const m = ref.bestMove(pos)
+    if (!m) { errs.push(`${tag}: the rule has no move from ${fmtPos(pos)}`); break }
+    const got = await pinchCapture("Hold_" + m.holdId, () => ({pos: main.getPosition() as RefPosition, topped: main.isTopped(),
+      result: !!main.getLastResult(), card: main.isResultVisible(), again: main.isAgainVisible()}))
+    moves.push(`${m.limb}->${m.holdId}`)
+    if (!got.fired || !got.value || got.value.pos[m.limb] !== m.holdId) { errs.push(`${tag}: the pinch on ${m.holdId} didn't move ${m.limb} there`); break }
+    if (got.value.topped) return {moves, top: got.value, time: got.time}
+    await frames(2)
+  }
+  errs.push(`${tag}: no top in ${max} moves (${moves.join(", ")})`)
+  return {moves, top: null, time: -1}
+}
+
+/** the par the test expects: its own route search from `start` at `heightCm` (glow + route) */
+export function parFor(start: RefPosition, heightCm: number): number | null {
+  const r = makeReference(heightCm).route(start)
+  return r ? r.length : null
 }
 
 export function fail(list: string[], msg: string): void {

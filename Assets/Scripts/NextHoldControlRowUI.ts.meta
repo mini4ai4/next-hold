@@ -28,14 +28,11 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
-    buttonGap: false
-    buttonHeight: false
-    buttonWidth: false
-    climbLabel: false
     groundLabel: false
+    markLabel: false
+    markingLabel: false
+    noteLine: false
     onWallLabel: false
-    safetyNote: false
-    setupLabel: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -45,27 +42,21 @@
   Attachments:
     []
   DefaultScriptInputs:
-    - buttonWidth: !<float> 8.000000
-      buttonHeight: !<float> 5.000000
-      buttonGap: !<float> 2.000000
-      safetyNote: Bouldering / top-rope aid only. Not a spotter or instructor.
-      climbLabel: Climb
-      setupLabel: Setup
+    - noteLine: Bouldering/top-rope aid. Not a spotter.
+      markLabel: Marknholds
+      markingLabel: Climb
       groundLabel: Ground
       onWallLabel: On wall
   ScriptTypes:
     -
       {}
   InputLines:
-    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">NextHoldControlRowUI – limb toggles, ? and mode switch</span>"}'
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">NextHoldControlRowUI – the row: climb, body and setup pages</span>"}'
     - '// @ui {"widget":"separator"}'
     - '// @ui {"widget":"group_start", "label":"Settings"}'
-    - '// @input float buttonWidth = 8 {"hint":"Width of each control button in cm (brief: about 8 cm)", "widget":"slider", "min":6, "max":12, "step":0.5}'
-    - '// @input float buttonHeight = 5 {"hint":"Height of each control button in cm", "widget":"slider", "min":3, "max":8, "step":0.5}'
-    - '// @input float buttonGap = 2 {"hint":"Gap between buttons in cm (brief: 2 cm or more)", "widget":"slider", "min":2, "max":5, "step":0.25}'
-    - "// @input string safetyNote = \"Bouldering / top-rope aid only. Not a spotter or instructor.\" {\"hint\":\"Not-a-spotter note shown under the row. Never use the word 'safe'.\"}"
-    - '// @input string climbLabel = "Climb" {"hint":"Mode switch label while in climb mode"}'
-    - '// @input string setupLabel = "Setup" {"hint":"Mode switch label while in setup mode"}'
+    - "// @input string noteLine = \"Bouldering/top-rope aid. Not a spotter.\" {\"hint\":\"Not-a-spotter note shown under the row, one short line (session 24). Never use the word 'safe'.\"}"
+    - '// @input string markLabel = "Mark holds" {"hint":"Mode switch label while climbing: pinch to mark the problem (session 24)"}'
+    - '// @input string markingLabel = "Climb" {"hint":"Mode switch label while marking: pinch to climb again (session 24)"}'
     - '// @input string groundLabel = "Ground" {"hint":"View switch label while every ring and the ghosts show (standing back at the base)"}'
     - '// @input string onWallLabel = "On wall" {"hint":"View switch label while only the suggested hold shows (on the wall)"}'
     - '// @ui {"widget":"group_end"}'

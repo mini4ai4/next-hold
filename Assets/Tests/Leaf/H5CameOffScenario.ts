@@ -2,7 +2,8 @@
 // wall (On wall) and goes past 120 cm (Ground). With beta hidden, below the top and a move made, that ends
 // the attempt with the card "Came off at move N. Hint for that move?"; one real pinch on the card opens
 // the hint ladder at that position, which hasn't changed. Not a fall: stepping back with no move made, a
-// hand on the top hold, beta shown, the view button, or stepping back again with no new move.
+// hand on the top hold, the view button, or stepping back again with no new move. Session 24: with beta
+// shown a fall is a go too, with no card; "Again" sits under the card, in view.
 // Distances: a second camera handed to the Lens (a3). The card's place on screen: the real eye, held as
 // r8 holds it, so what is checked is what the wearer sees from 2.5 m.
 
@@ -136,14 +137,18 @@ export class H5CameOffScenario extends Scenario {
       await at(250)
       notFallen("a hand on the top hold")
 
-      // ── not a fall: beta shown; the plan moves on with you ──
+      // ── session 24 (the judges' fix 2): beta shown, a fall is a go too; only the card is skipped, the read stays ──
       await restorePreset(main, false)
+      await pinch("ShowBetaButton"); await frames(2) // on the mats: it shows there only
       await at(60)
-      await pinch("ShowBetaButton"); await frames(2)
       await pinch("Hold_up"); await frames(2)
+      const goShown = main.getAttempt()
       await at(250)
       notFallen("beta shown")
+      print(`[H5] beta shown, stepped back after a move: attempt ${goShown} -> ${main.getAttempt()}, card ${main.isCameOffVisible()}, Again ${main.isAgainVisible()}`)
+      if (main.getAttempt() !== goShown + 1) errs.push(`beta shown: the fall wasn't counted as a go (${goShown} -> ${main.getAttempt()})`)
       if (!main.isBetaShown() || !main.isRingGlowing(main.getSuggestion()!.holdId)) errs.push("beta shown: stepping back took the read away")
+      if (!main.isBetaSeenThisGo()) errs.push("beta shown: the next go isn't marked with beta")
 
       // ── not a fall: the view button, with the eye still on the wall ──
       await restorePreset(main, false)
@@ -174,21 +179,24 @@ export class H5CameOffScenario extends Scenario {
       await frames(2)
       for (const z of [-55, 0, 60, 125]) { tr.setWorldPosition(new vec3(0, 0, z)); await frames(3) }
       if (!main.isCameOffVisible()) errs.push("the real eye: no card after stepping back")
-      const box = screenBoxOf("CameOffCard", camL, true)
-      print(`[H5] from 2.5 m, level: the card ${fmtBox(box)}`)
-      if (!box || box.x0 < 0 || box.x1 > 1 || box.y0 < 0 || box.y1 > 1) errs.push(`from 2.5 m the card isn't fully in view: ${fmtBox(box)}`)
-      // it covers no ring-to-be of the problem, nor START or TOP
+      // session 24: and "Again" under it; both in view, neither over a ring-to-be, START or TOP
+      if (!main.isAgainVisible()) errs.push("the real eye: no Again under the card")
+      for (const name of ["CameOffCard", "AgainButton"]) {
+      const box = screenBoxOf(name, camL, true)
+      print(`[H5] from 2.5 m, level: ${name} ${fmtBox(box)}`)
+      if (!box || box.x0 < 0 || box.x1 > 1 || box.y0 < 0 || box.y1 > 1) errs.push(`from 2.5 m ${name} isn't fully in view: ${fmtBox(box)}`)
       if (box) {
         for (const id of main.getProblemHolds()) {
           const c = main.getHoldWorldPosition(id)!, r = HOLD_SIZE[holdById(id)!.type].ringR
           const s = camL.worldSpaceToScreenSpace(c), e = camL.worldSpaceToScreenSpace(c.add(new vec3(r, 0, 0)))
           const rx = Math.abs(e.x - s.x), ry = rx * camL.aspect
-          if (s.x + rx > box.x0 && s.x - rx < box.x1 && s.y + ry > box.y0 && s.y - ry < box.y1) errs.push(`from 2.5 m the card is over ${id}`)
+          if (s.x + rx > box.x0 && s.x - rx < box.x1 && s.y + ry > box.y0 && s.y - ry < box.y1) errs.push(`from 2.5 m ${name} is over ${id}`)
         }
         for (const t of ["Tag_lh", "Tag_rh", "Tag_h20"]) {
           const b = screenBoxOf(t, camL)
-          if (b && b.x0 < box.x1 && box.x0 < b.x1 && b.y0 < box.y1 && box.y0 < b.y1) errs.push(`from 2.5 m the card is over ${t} (${fmtBox(b)})`)
+          if (b && b.x0 < box.x1 && box.x0 < b.x1 && b.y0 < box.y1 && box.y0 < b.y1) errs.push(`from 2.5 m ${name} is over ${t} (${fmtBox(b)})`)
         }
+      }
       }
     } finally {
       tr.setWorldPosition(p0)

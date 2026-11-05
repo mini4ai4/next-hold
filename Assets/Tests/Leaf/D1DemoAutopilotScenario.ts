@@ -42,6 +42,7 @@ function rippleTarget(a: DemoAction): string {
     case "pressAsk": return "AskButton"
     case "pressMode": return "ModeSwitch"
     case "pressView": return "ViewToggle"
+    case "pressSetup": return "SetupButton"
     case "pickType": return "TypeButton_" + a.arg
     case "pressStart": return "StartButton"
     case "pressTop": return "TopButton"
@@ -131,7 +132,8 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
       // 1-2-3 and TOP, all faded in and on screen
       ground(240, 270)
       want(pilot.getOverlayAlpha() === 1, `overlay alpha ${pilot.getOverlayAlpha()}, want 1 by 2 s`)
-      for (const n of ["Ring_h09", "SuggestGlow", "SuggestLabel", "GhostNumber_2", "Tag_h20"]) {
+      // session 24: h09 carries "2 · LH", so it wears the neutral outline (GhostHoldRing_2), not Ring_h09
+      for (const n of ["GhostHoldRing_2", "Ring_h16", "SuggestGlow", "SuggestLabel", "GhostNumber_2", "Tag_h20"]) {
         want(alphaOf(n) > 0.5, `${n} drawn at alpha ${alphaOf(n).toFixed(2)} at 2.5 s`)
       }
       want(main.isRingGlowing("up") && main.isLabelVisible() && main.getLabelText() === "R hand",
@@ -139,7 +141,7 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
       badge2("h09", "2 · LH")
       want(main.getTagText("h20") === "TOP", `h20 tag "${main.getTagText("h20")}", want TOP`)
       // session 20: no toggle has been pinched: the take opens with no override
-      want(main.getLimbOverride() === null && main.getOverrideLabel() === "Limb override: none", `override ${main.getLimbOverride()}, panel "${main.getOverrideLabel()}"`)
+      want(main.getLimbOverride() === null && main.getOverrideLabel() === "", `override ${main.getLimbOverride()}, panel "${main.getOverrideLabel()}"`)
       {
         const off = notOnScreen(["SuggestLabel", "GhostNumber_2", "GhostNumber_3", "Tag_h20"], camera())
         want(!off.length, `not fully in view: ${off.join(", ")}`)
@@ -152,9 +154,12 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
       // (the suggestion label fades by itself in Ground, so the badge is the overlay text checked here)
       want(alphaOf("GhostNumber_2") > 0.5 && alphaOf("Ring_up") > 0.5, "badge 2 or Ring_up is still faded out")
       {
+        // session 24: a hold under a step tag shows the neutral outline instead of its ring
         const occupied = (id: string) => ["LH", "RH", "LF", "RF"].some((l) => (pos as any)[l] === id)
-        const free = main.getProblemHolds().filter((id) => !occupied(id)).sort().join()
-        want(ringsShown().sort().join() === free, `rings ${ringsShown().join(",")}, want every free problem hold ${free}`)
+        const tagged = (id: string) => [2, 3].some((n) => mustFind("Ghost_" + n).enabled && main.getGhostHold(n) === id && !main.isRingGlowing(id))
+        const free = main.getProblemHolds().filter((id) => !occupied(id) && !tagged(id)).sort().join()
+        want(ringsShown().sort().join() === free, `rings ${ringsShown().join(",")}, want every free problem hold not under a tag ${free}`)
+        want(mustFind("GhostHoldRing_2").enabled, "no neutral outline under badge 2")
       }
       want(main.isRingGlowing("up") && main.getLabelText() === "R hand", `glow/label: up glowing ${main.isRingGlowing("up")}, "${main.getLabelText()}"`)
       badge2("h09", "2 · LH")
@@ -183,12 +188,12 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
       badge2("h09", "2 · LH")
       break
     case "s4-155":
-      want(main.getHeightCm() === 155 && main.getHeightLabel() === "Height 155 cm", `height ${main.getHeightCm()} "${main.getHeightLabel()}", want 155`)
+      want(main.getHeightCm() === 155 && main.getHeightLabel() === "155 cm" && main.getPlannedLine() === "Planned for 155 cm", `height ${main.getHeightCm()} "${main.getHeightLabel()}", want 155`)
       badge2("h09", "2 · LH")
       heightInShot()
       break
     case "s4-195":
-      want(main.getHeightCm() === 195 && main.getHeightLabel() === "Height 195 cm", `height ${main.getHeightCm()} "${main.getHeightLabel()}", want 195`)
+      want(main.getHeightCm() === 195 && main.getHeightLabel() === "195 cm" && main.getPlannedLine() === "Planned for 195 cm", `height ${main.getHeightCm()} "${main.getHeightLabel()}", want 195`)
       badge2("h10", "2 · LH")
       heightInShot()
       break

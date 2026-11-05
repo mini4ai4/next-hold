@@ -1,8 +1,10 @@
 // Session 23, "Show my beta" (v7 A1): a real pinch on the button sets betaShown, and the full v6 read
 // appears in that pinch's own frame: every free ring in the rule's colour, the glow with its word, the
 // 1-2-3 by the test's own search, the best limb lit, the outlines and START gone. On the wall: one ring
-// and its word. The button is at least 8 cm wide, 2 cm or more from its neighbour, and in the row's free
-// slot: the row doesn't grow. It resets on a new problem, and on the new attempt after topping out.
+// and its word. It resets on a new problem, and on the new attempt after topping out.
+// Session 24 (G and the judges' fix 4): it is a toggle, "Show my beta" / "Hide beta"; hiding it again takes the
+// read down but the go stays "with beta". It shows on the mats only (Ground), in the climb page's top-left cell:
+// at least 10 x 10 cm, 3 cm or more from its neighbours, and it doesn't change the row's size.
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
@@ -10,7 +12,7 @@ import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {Button} from "SpectaclesUIKit.lspkg/Scripts/Components/Button/Button"
 import {HOLDS, PRESET_START, PRESET_TOP} from "../../Scripts/Wall/WallLayout"
-import {checkTagRingsAgree, checkNothingRevealed, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, renderedRingColour, restorePreset} from "./NextHoldTestKit"
+import {checkTagRingsAgree, checkNothingRevealed, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, renderedRingColour, restorePreset, tagOn} from "./NextHoldTestKit"
 import {REF_LIMBS, RefLimb, RefPosition} from "./NextHoldReferenceRule"
 
 /** the full read, as drawn, against the test's own rule */
@@ -20,8 +22,9 @@ function checkFull(main: NextHoldMain, errs: string[], tag: string): void {
   const occupied = (id: string) => REF_LIMBS.some((l) => pos[l] === id)
   for (const h of HOLDS) {
     if (mustFind("Outline_" + h.id).enabled) errs.push(`${tag}: Outline_${h.id} still shows`)
-    const free = main.isInProblem(h.id) && !occupied(h.id)
-    if (mustFind("Ring_" + h.id).enabled !== free) errs.push(`${tag}: Ring_${h.id} shown ${mustFind("Ring_" + h.id).enabled}, a free hold of the problem ${free}`)
+    // session 24: a hold under a step tag wears the neutral outline (renderedRingColour checks it), no ring
+    const free = main.isInProblem(h.id) && !occupied(h.id) && tagOn(h.id, main) === null
+    if (mustFind("Ring_" + h.id).enabled !== free) errs.push(`${tag}: Ring_${h.id} shown ${mustFind("Ring_" + h.id).enabled}, a free untagged hold of the problem ${free}`)
     if (PRESET_START.indexOf(h.id) >= 0 && main.getTagText(h.id) === "START") errs.push(`${tag}: START still shows on ${h.id}`)
   }
   for (const r of ref.perHold(pos)) {
@@ -46,19 +49,25 @@ export class H2ShowMyBetaScenario extends Scenario {
     await restorePreset(main, false)
     const errs: string[] = []
 
-    // ── the button: its place in the row, its size, its gap ──
-    const row = mustFind("ViewRow").getTransform().getInvertedWorldTransform()
-    const button = mustFind("ShowBetaButton").getComponent(Button.getTypeName()) as Button
-    const view = mustFind("ViewToggle").getComponent(Button.getTypeName()) as Button
-    const xB = row.multiplyPoint(mustFind("ShowBetaButton").getTransform().getWorldPosition()).x
-    const xV = row.multiplyPoint(mustFind("ViewToggle").getTransform().getWorldPosition()).x
-    const gap = Math.abs(xB - xV) - button.size.x / 2 - view.size.x / 2
-    const size = main.controlRow.getSize()
-    print(`[H2] button ${button.size.x} x ${button.size.y} cm, gap to the view switch ${gap.toFixed(2)} cm; panel ${size ? size.x.toFixed(1) + " x " + size.y.toFixed(1) : "?"} cm`)
-    if (button.size.x < 8 || button.size.y < 5) errs.push(`the button is ${button.size.x} x ${button.size.y} cm`)
-    if (gap < 2 - 1e-3) errs.push(`the gap to the view switch is ${gap.toFixed(2)} cm, want 2 or more`)
-    // the free slot: the row's width is three buttons and two gaps, as before
-    if (size && Math.abs(size.x - (3 * 8 + 2 * 2 + 2.8)) > 0.1) errs.push(`the panel is ${size.x.toFixed(2)} cm wide: the button should use the free slot`)
+    // ── the button: its cell, its size, its gaps (session 24, G) ──
+    const grid = mustFind("ButtonGrid").getTransform().getInvertedWorldTransform()
+    const at = (n: string) => grid.multiplyPoint(mustFind(n).getTransform().getWorldPosition())
+    const sz = (n: string) => (mustFind(n).getComponent(Button.getTypeName()) as Button).size
+    const button = sz("ShowBetaButton")
+    const b = at("ShowBetaButton"), ask = at("AskButton"), body = at("BodyButton")
+    const gapX = Math.abs(ask.x - b.x) - button.x / 2 - sz("AskButton").x / 2
+    const gapY = Math.abs(b.y - body.y) - button.y / 2 - sz("BodyButton").y / 2
+    const size0 = main.controlRow.getSize()
+    print(`[H2] button ${button.x} x ${button.y} cm at ${b.x.toFixed(1)},${b.y.toFixed(1)}; gaps ${gapX.toFixed(2)} to "?", ${gapY.toFixed(2)} to Body; panel ${size0 ? size0.x.toFixed(1) + " x " + size0.y.toFixed(1) : "?"} cm`)
+    if (button.x < 10 || button.y < 10) errs.push(`the button is ${button.x} x ${button.y} cm, want 10 or more each way`)
+    if (gapX < 3 - 1e-3 || gapY < 3 - 1e-3) errs.push(`gaps ${gapX.toFixed(2)} / ${gapY.toFixed(2)} cm, want 3 or more`)
+    if (!(b.x < ask.x && b.y > body.y)) errs.push("the button is not in the top-left cell")
+    if (!mustFind("ShowBetaButton").isEnabledInHierarchy) errs.push("the button doesn't show on the mats")
+    // on the wall it is gone: a reveal there would be made while hanging
+    await pinch("ViewToggle"); await frames(3)
+    if (main.getView() !== "wall" || mustFind("ShowBetaButton").isEnabledInHierarchy) errs.push(`on the wall (view ${main.getView()}) the button still shows`)
+    await pinch("ViewToggle"); await frames(3)
+    if (main.getView() !== "ground" || !mustFind("ShowBetaButton").isEnabledInHierarchy) errs.push(`back on the mats (view ${main.getView()}) the button doesn't show`)
 
     // ── the pinch: the full read in its own frame ──
     const ripples0 = main.getRippleLog().length
@@ -72,12 +81,24 @@ export class H2ShowMyBetaScenario extends Scenario {
     print(`[H2] in the pinch frame: betaShown ${got.value}, ${frameErrs.length} problems, position ${fmtPos(main.getPosition() as RefPosition)}`)
     await frames(3)
     checkFull(main, errs, "after the pinch")
-    if (main.getShowBetaLabel() !== "Beta\nshown" || !main.isShowBetaLit()) errs.push(`after the pinch the button reads "${main.getShowBetaLabel()}", lit ${main.isShowBetaLit()}`)
+    if (main.getShowBetaLabel() !== "Hide\nbeta" || !main.isShowBetaLit()) errs.push(`after the pinch the button reads "${main.getShowBetaLabel()}", lit ${main.isShowBetaLit()}`)
     if (!main.getRippleLog().slice(ripples0).some((r) => r.target === "ShowBetaButton")) errs.push("no ripple on the button")
+    if (!main.isBetaSeenThisGo()) errs.push("the go isn't marked with beta")
+    const size1 = main.controlRow.getSize()
+    if (size0 && size1 && (Math.abs(size0.x - size1.x) > 0.01 || Math.abs(size0.y - size1.y) > 0.01)) errs.push(`the row changed size: ${size0} -> ${size1}`)
 
-    // once shown, a second pinch changes nothing, and the button stays lit (UI Kit's toggle flips itself)
+    // session 24: a second pinch hides it again ("Hide beta"), in its own frame; the go stays "with beta"
+    const hid: string[] = []
+    const hide = await pinchCapture("ShowBetaButton", () => { checkNothingRevealed(main, hid, "hide, pinch frame"); return main.isBetaShown() })
+    errs.push(...hid)
+    await frames(3)
+    print(`[H2] "Hide beta": betaShown ${hide.value}, ${hid.length} leaks in the pinch frame, button "${main.getShowBetaLabel()}" lit ${main.isShowBetaLit()}, go with beta ${main.isBetaSeenThisGo()}`)
+    if (hide.value !== false || main.isShowBetaLit() || main.getShowBetaLabel() !== "Show my\nbeta") errs.push(`hide: betaShown ${hide.value}, lit ${main.isShowBetaLit()}, "${main.getShowBetaLabel()}"`)
+    if (!main.isBetaSeenThisGo()) errs.push("hiding the beta cleared \"with beta\" for the go")
+    checkNothingRevealed(main, errs, "hidden again")
+    // and a third shows it again
     await pinch("ShowBetaButton"); await frames(3)
-    if (!main.isBetaShown() || !main.isShowBetaLit()) errs.push(`a second pinch: betaShown ${main.isBetaShown()}, lit ${main.isShowBetaLit()}`)
+    if (!main.isBetaShown() || !main.isShowBetaLit()) errs.push(`a third pinch: betaShown ${main.isBetaShown()}, lit ${main.isShowBetaLit()}`)
     // "?" arms as in v6, with no ladder
     await pinch("AskButton"); await frames(2)
     if (!main.isAskArmed() || main.getHintStep() !== 0) errs.push(`"?" with beta shown: armed ${main.isAskArmed()}, hint step ${main.getHintStep()}`)

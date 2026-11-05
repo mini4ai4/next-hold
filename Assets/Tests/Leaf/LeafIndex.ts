@@ -29,6 +29,12 @@ import {H3HintLadderScenario} from "./H3HintLadderScenario"
 import {H4HintCueScenario} from "./H4HintCueScenario"
 import {H5CameOffScenario} from "./H5CameOffScenario"
 import {E1TagOwnBadgeScenario} from "./E1TagOwnBadgeScenario"
+import {G1ControlCountScenario} from "./G1ControlCountScenario"
+import {K1ResultCardScenario} from "./K1ResultCardScenario"
+import {K2FallAgainPinnedScenario} from "./K2FallAgainPinnedScenario"
+import {K3KeptScenario} from "./K3KeptScenario"
+import {K4ReopenWriteScenario} from "./K4ReopenScenario"
+import {K5ReopenReadScenario} from "./K5ReopenReadScenario"
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -62,6 +68,12 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "h4-hint-cue", typename: H4HintCueScenario.getTypeName()},
     {id: "h5-came-off", typename: H5CameOffScenario.getTypeName()},
     {id: "e1-tag-own-badge", typename: E1TagOwnBadgeScenario.getTypeName()},
+    {id: "g1-control-count", typename: G1ControlCountScenario.getTypeName()},
+    {id: "k1-result-card", typename: K1ResultCardScenario.getTypeName()},
+    {id: "k2-fall-again-pinned", typename: K2FallAgainPinnedScenario.getTypeName()},
+    {id: "k3-kept", typename: K3KeptScenario.getTypeName()},
+    {id: "k4-reopen-write", typename: K4ReopenWriteScenario.getTypeName()},
+    {id: "k5-reopen-read", typename: K5ReopenReadScenario.getTypeName()},
     {id: "d1-demo-autopilot", typename: D1DemoAutopilotScenario.getTypeName()},
   ]
 }

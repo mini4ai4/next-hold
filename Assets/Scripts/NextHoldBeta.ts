@@ -1,4 +1,5 @@
-// NextHoldBeta — beta on request (v7 part A, session 23): what the climber is shown, and when.
+// NextHoldBeta — beta on request (v7 part A, session 23; goes and pinned hints, session 24): what the
+// climber is shown, and when.
 //
 // A plain state machine with no Lens globals, no scene access and no scoring, so it is unit-checked
 // outside Lens Studio (tests/scoring.port.test.mjs). NextHoldMain owns one BetaState, calls these
@@ -6,75 +7,123 @@
 // the colours, the suggestion and the 1-2-3 are worked out as before, and only what is shown changes.
 //
 // betaShown false (the default): from the mats the problem's holds show a neutral outline with START
-// and TOP; on the wall only the four position markers. "Show my beta" sets it: the full v6 read.
+// and TOP; on the wall only the four position markers. "Show my beta" sets it: the full v6 read. Session
+// 24: it is a toggle ("Hide beta" takes it down again), and once shown the go stays "with beta".
 // The hint ladder, each step on request with "?": (1) grip-coloured rings on the holds in reach,
-// (2) the glow and the one word for the next move, (3) "?" arms, as it always has, and the next pinch
-// on a ring shows its why-line, one-shot. A move ends the hint: the next position starts from nothing.
+// (2) the glow and the one word for the next move, (3) that move's why-line, shown at once (session 24:
+// no extra pinch on a ring). A move ends the hint: the next position starts from nothing.
 //
-// Came off: the eye was on the wall and steps back to the mats, with beta hidden, below the top and
-// with a move made since the last time. It ends the attempt and offers the hint at that position,
-// which stays as it was: N is the move the climber was going for (moves made + 1).
-// With beta shown, stepping back isn't a came-off: nothing is hidden, so there is nothing to offer,
-// and the plan moves on with you as in v6.
+// A go (session 24): it ends at the top or at a fall. Every fall counts as a go, beta shown or not; only
+// the card is skipped with beta shown, as there is nothing hidden to offer. Each go records the hints
+// taken (rungs 2 and 3, the ones that name the move) and whether the beta was seen, and B's ONSIGHT /
+// FLASH / SEND is worked out from that (NextHoldAttempt.tickFor).
+//
+// Came off: the eye was on the wall and steps back to the mats, below the top and with a move made
+// since the last time. The card offers the hint at that position, which stays as it was: N is the move
+// the climber was going for (moves made + 1). A hint taken there is pinned to that position: it shows
+// again whenever the climber is back there (after Again, say), and goes once the move from there is made.
 
 export type HintStep = 0 | 1 | 2 | 3
 
 export interface BetaState {
   betaShown: boolean
   hintStep: HintStep
-  /** 1 until an attempt has ended: the cue doesn't show before that */
+  /** the go: the one under way, or the one the next move starts (1 = the first go on this problem) */
   attempt: number
-  /** moves made since this attempt's position was last the start */
+  /** moves made since the position was last the start */
   moves: number
   /** the move a came-off offers a hint for while its card is up; null = no card */
   cameOffMove: number | null
-  /** `moves` when the climber last came off: the same fall isn't counted twice */
+  /** `moves` when the last go ended (a fall or the top): the same fall isn't counted twice */
   fellAtMoves: number
   /** the time the idle clock runs from: the last move, or arriving on the wall */
   idleFrom: number
+  /** session 24, this go: the hints taken (rungs 2 and 3) */
+  hintsThisGo: number
+  /** session 24, this go: the beta was shown at some point */
+  betaSeenThisGo: boolean
+  /** session 24: a hint taken after a fall, pinned to the position it was taken at, and how far up the ladder */
+  pin: {at: string; step: HintStep} | null
+  /** session 24: the current position, as a key (the pin is matched against it) */
+  here: string
 }
 
 export const CUE_SECONDS = 20
 export const CUE_TEXT = "? for a hint"
 
-export function initialBeta(betaShown: boolean, now: number): BetaState {
-  return {betaShown, hintStep: 0, attempt: 1, moves: 0, cameOffMove: null, fellAtMoves: 0, idleFrom: now}
+export function initialBeta(betaShown: boolean, now: number, attempt = 1, here = ""): BetaState {
+  return {betaShown, hintStep: 0, attempt, moves: 0, cameOffMove: null, fellAtMoves: 0, idleFrom: now,
+    hintsThisGo: 0, betaSeenThisGo: betaShown, pin: null, here}
 }
 
-/** "Show my beta": the full read. It also answers the card, if one is up. */
+/** a position as a key: which hold each limb is on */
+export function positionKey(p: {LH: string | null; RH: string | null; LF: string | null; RF: string | null}): string {
+  return [p.LH, p.RH, p.LF, p.RF].map((h) => h || "-").join("/")
+}
+
+/** "Show my beta": the full read. It also answers the card, if one is up. The go is now "with beta". */
 export function showBeta(s: BetaState): BetaState {
-  return {...s, betaShown: true, cameOffMove: null}
+  return {...s, betaShown: true, betaSeenThisGo: true, cameOffMove: null}
+}
+
+/** "Hide beta": back to the hidden read, from the start of the ladder. The go stays "with beta". */
+export function hideBeta(s: BetaState): BetaState {
+  return {...s, betaShown: false, hintStep: 0}
+}
+
+/** the ladder's step after `from`, and whether it is a hint that names the move (rungs 2 and 3) */
+function climb(s: BetaState, step: HintStep): BetaState {
+  const counted = step >= 2 && step > s.hintStep
+  const pin = s.pin && s.pin.at === s.here ? {at: s.pin.at, step} : s.pin
+  return {...s, hintStep: step, hintsThisGo: s.hintsThisGo + (counted ? 1 : 0), pin}
 }
 
 /**
- * A pinch on "?". `armed`: is "?" armed now. Returns the new state and whether it is armed after this.
- * With the card up: the same as pinching the card. Beta hidden: step 1, step 2, then step 3, which arms
- * it. Otherwise it toggles as it always has. Topped out with beta hidden there is no next move to hint.
+ * A pinch on "?". `armed`: is "?" armed now. Returns the new state, whether it is armed after this, and
+ * whether the next move's why-line is to show now (rung 3). With the card up: the same as pinching the
+ * card. Beta hidden: step 1, step 2, step 3 (the why-line, at once; again on each further pinch). Beta
+ * shown: it arms and disarms as in v6. Topped out with beta hidden there is no next move to hint.
  */
-export function ask(s: BetaState, armed: boolean, topped: boolean): {state: BetaState; armed: boolean} {
-  if (s.cameOffMove !== null) return {state: takeHint(s), armed: false}
-  if (s.betaShown) return {state: s, armed: !armed}
-  if (topped) return {state: s, armed: false}
-  if (s.hintStep === 0) return {state: {...s, hintStep: 1}, armed: false}
-  if (s.hintStep === 1) return {state: {...s, hintStep: 2}, armed: false}
-  if (s.hintStep === 2) return {state: {...s, hintStep: 3}, armed: true}
-  return {state: s, armed: !armed}
+export function ask(s: BetaState, armed: boolean, topped: boolean): {state: BetaState; armed: boolean; why: boolean} {
+  if (s.cameOffMove !== null) return {state: takeHint(s), armed: false, why: false}
+  if (s.betaShown) return {state: s, armed: !armed, why: false}
+  if (topped) return {state: s, armed: false, why: false}
+  const step = Math.min(3, s.hintStep + 1) as HintStep
+  return {state: climb(s, step), armed: false, why: step === 3}
 }
 
-/** One pinch on the card: the ladder opens at the fall's position, on its first step. */
+/** One pinch on the card: the ladder opens at the fall's position, on its first step, pinned there. */
 export function takeHint(s: BetaState): BetaState {
-  return {...s, cameOffMove: null, hintStep: 1}
+  return {...s, cameOffMove: null, hintStep: 1, pin: {at: s.here, step: 1}}
 }
 
-/** A limb moved: the idle clock restarts, the hint and any card are over. */
-export function moved(s: BetaState, now: number): BetaState {
-  return {...s, moves: s.moves + 1, hintStep: 0, cameOffMove: null, idleFrom: now}
+/** A limb moved to the position `to`. The move from a pinned position uses the pin up. The idle clock
+ *  restarts, the card is over, and the hint is the pinned one if this is its position, else none. */
+export function moved(s: BetaState, now: number, to = ""): BetaState {
+  const pin = s.pin && s.pin.at === s.here ? null : s.pin
+  const hintStep: HintStep = pin && pin.at === to ? pin.step : 0
+  return {...s, moves: s.moves + 1, hintStep, cameOffMove: null, idleFrom: now, here: to, pin}
 }
 
-/** The eye went from on the wall to the mats. Came off, or nothing changes (see the header). */
+/** the ended go's counts start afresh for the next one */
+function nextGo(s: BetaState): BetaState {
+  return {...s, attempt: s.attempt + 1, fellAtMoves: s.moves, hintStep: 0, hintsThisGo: 0, betaSeenThisGo: s.betaShown}
+}
+
+/** a go is under way: a move was made since the last one ended */
+export function isLive(s: BetaState): boolean {
+  return s.moves > s.fellAtMoves
+}
+
+/** The eye went from on the wall to the mats. A fall ends the go (whatever the beta), or nothing changes. */
 export function steppedBack(s: BetaState, topped: boolean): BetaState {
-  if (s.betaShown || topped || s.moves <= s.fellAtMoves) return s
-  return {...s, attempt: s.attempt + 1, hintStep: 0, cameOffMove: s.moves + 1, fellAtMoves: s.moves}
+  if (topped || !isLive(s)) return s
+  return {...nextGo(s), cameOffMove: s.betaShown ? null : s.moves + 1}
+}
+
+/** A hand reached the top hold: the go ends (its result is read from `s` before this). */
+export function toppedOut(s: BetaState): BetaState {
+  return {...nextGo(s), pin: null, cameOffMove: null}
 }
 
 /** The view became On wall: the idle clock starts here, and the card, if unanswered, goes. */
@@ -82,9 +131,20 @@ export function arrivedOnWall(s: BetaState, now: number): BetaState {
   return {...s, cameOffMove: null, idleFrom: now}
 }
 
-/** A new attempt: betaShown goes back to `betaDefault` (false, outside tests and the demo). */
+/** A hand off the top climbs on: a new go, with betaShown back to `betaDefault` (false outside tests and the demo). */
 export function newAttempt(s: BetaState, betaDefault: boolean, now: number): BetaState {
-  return {...initialBeta(betaDefault, now), attempt: s.attempt + 1}
+  return {...initialBeta(betaDefault, now, s.attempt, s.here), pin: s.pin}
+}
+
+/**
+ * "Again" (or resetAttempt): back at the start holds, `start` the position's key. A go still under way
+ * counts as ended (the climber stepped off). Beta goes back to `betaDefault`; a pinned hint stays pinned
+ * to its own position, and shows if that is the start.
+ */
+export function again(s: BetaState, betaDefault: boolean, now: number, start: string): BetaState {
+  const attempt = isLive(s) ? s.attempt + 1 : s.attempt
+  const pin = s.pin
+  return {...initialBeta(betaDefault, now, attempt, start), pin, hintStep: pin && pin.at === start ? pin.step : 0}
 }
 
 /** A cue only: it changes no state and nothing in reveal(). */
@@ -95,6 +155,12 @@ export function cueShown(s: BetaState, c: {onWall: boolean; climbing: boolean; t
 
 export function cameOffLine(move: number): string {
   return `Came off at move ${move}. Hint for that move?`
+}
+
+/** Session 24: the step dots on "?", one per rung: "●○○" on rung 1. Empty with beta shown (no ladder). */
+export function askDots(s: BetaState): string {
+  if (s.betaShown) return ""
+  return "●●●".slice(0, s.hintStep) + "○○○".slice(0, 3 - s.hintStep)
 }
 
 export interface Reveal {

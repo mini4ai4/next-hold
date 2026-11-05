@@ -86,7 +86,7 @@ function checkOpenState(main: NextHoldMain, tag: string): string[] {
   // session 20: a second cue, every ring's drawn style is its colour's, and all three show at the open
   const styles = checkRingStyles(main, errs, tag)
   if (!tally.green || !tally.yellow || !tally.red) errs.push(`${tag}: not all three colours show at the open (${JSON.stringify(tally)})`)
-  if (main.getLimbOverride() !== null || main.getOverrideLabel() !== "Limb override: none") errs.push(`${tag}: override ${main.getLimbOverride()}, panel "${main.getOverrideLabel()}"`)
+  if (main.getLimbOverride() !== null || main.getOverrideLabel() !== "") errs.push(`${tag}: override ${main.getLimbOverride()}, panel "${main.getOverrideLabel()}"`)
   print(`[C1] ${tag}: limb ${best.limb}, reference colours green ${tally.green} / yellow ${tally.yellow} / red ${tally.red}, ${errs.length} mismatches; ${styles}`)
   return errs
 }

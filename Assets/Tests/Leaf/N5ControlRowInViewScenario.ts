@@ -27,7 +27,10 @@ import {camera, checkRowClearOfRing, eyeToWallCm, frames, getMain, mustFind, pin
 
 /** the wall root's preset place (BUILD_LOG session 5); this item must not move it */
 const WALL_ROOT = new vec3(-10.5, -166, -125)
-const CONTROLS = ["OverrideLabel", "Toggle_LF", "Toggle_RF", "ModeSwitch", "ViewToggle", "SafetyNote", "Toggle_LH", "Toggle_RH", "AskButton"]
+// session 24 (G): what the climb page shows; the top line is empty by default (nothing renders), "Show my beta"
+// only on the mats
+const CONTROLS = ["ShowBetaButton", "AskButton", "BodyButton", "SetupButton", "PlannedLine", "SafetyNote"]
+const WALL_CONTROLS = ["AskButton", "BodyButton", "SetupButton", "PlannedLine", "SafetyNote"]
 
 function visualsUnder(so: SceneObject, out: BaseMeshVisual[]): BaseMeshVisual[] {
   if (!so.isEnabledInHierarchy) return out
@@ -199,7 +202,7 @@ export class N5ControlRowInViewScenario extends Scenario {
     const top = main.getTopHold()
     if (top && main.getTagText(top) !== null) errs.push(`on wall: the top hold is tagged "${main.getTagText(top)}"`)
     const wallErrs: string[] = []
-    for (const c of CONTROLS) wallErrs.push(...outOfView(c, live, "on wall"))
+    for (const c of WALL_CONTROLS) wallErrs.push(...outOfView(c, live, "on wall"))
     wallErrs.push(...outOfView("ControlRow", live, "on wall"))
     // session 18: below the one ring, never over it on screen
     print(`[N5] on wall, preset: ${checkRowClearOfRing(live, wallErrs, "on wall, preset")}`)
@@ -208,7 +211,7 @@ export class N5ControlRowInViewScenario extends Scenario {
     if (sug) {
       await pinch("Hold_" + sug.holdId)
       await frames(3)
-      for (const c of ["Toggle_LF", "Toggle_RF", "ModeSwitch", "ViewToggle", "SafetyNote"]) wallErrs.push(...outOfView(c, live, `on wall, after ${sug.limb} -> ${sug.holdId}`))
+      for (const c of WALL_CONTROLS) wallErrs.push(...outOfView(c, live, `on wall, after ${sug.limb} -> ${sug.holdId}`))
       print(`[N5] on wall, after ${sug.limb} -> ${sug.holdId}: ${checkRowClearOfRing(live, wallErrs, `on wall, after ${sug.limb} -> ${sug.holdId}`)}`)
     }
     print(`[N5] on wall: ${wallErrs.length ? wallErrs.length + " out of view" : "every control in the straight-ahead view"}`)

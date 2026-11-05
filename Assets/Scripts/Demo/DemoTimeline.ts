@@ -20,7 +20,7 @@ export const START_DELAY = 3
 export interface DemoScene { n: number; start: number; title: string }
 export interface CameraKey { t: number; x: number; y: number; z: number; pitch: number; yaw: number; cut?: boolean }
 export type DemoActionName = "pressLimb" | "pressHold" | "pressHeight" | "pressAsk" | "pressMode" | "pressView" |
-  "pickType" | "pressStart" | "pressTop" | "pressDone" | "pressRemove" | "showLabel"
+  "pickType" | "pressStart" | "pressTop" | "pressDone" | "pressRemove" | "showLabel" | "pressSetup"
 export interface DemoAction { t: number; do: DemoActionName; arg?: string | number }
 export interface DemoCheck { t: number; key: string }
 
@@ -133,6 +133,9 @@ export const ACTIONS: DemoAction[] = [
   // on them. Then Height − to 155 cm, and + to 195 cm (badge 2 jumps from h09 to h10 at 185); RH to up
   // stays the best move at every height, so the glow stays
   {t: 66.3, do: "pressHold", arg: "rh"},
+  // session 24: height lives behind Setup now: open it (the −/+ come up where ? and Body were), and close it
+  // once back at 175 in scene 5
+  {t: 67.4, do: "pressSetup"},
   {t: 68.5, do: "pressHeight", arg: -1},
   {t: 69.1, do: "pressHeight", arg: -1},
   {t: 69.7, do: "pressHeight", arg: -1},
@@ -152,6 +155,7 @@ export const ACTIONS: DemoAction[] = [
   {t: 91.1, do: "pressHeight", arg: -1},
   {t: 91.7, do: "pressHeight", arg: -1},
   {t: 92.3, do: "pressHeight", arg: -1},
+  {t: 93.1, do: "pressSetup"},
   {t: 94, do: "pressHold", arg: "up"},
   {t: 96.2, do: "pressHold", arg: "h09"},
   {t: 97.4, do: "pressLimb", arg: "LF"},

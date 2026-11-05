@@ -83,12 +83,12 @@ export class C5AskWhyScenario extends Scenario {
     if (pos2[target.limb] !== target.holdId) errs.push(`next pinch after the why did not move ${target.limb} to ${target.holdId} (${fmtPos(pos2)})`)
     if (main.isWhyVisible()) errs.push("why line still shown after a move")
 
-    // a hold under a step tag: at the preset "2 · LH" sits on h09. Session 23: its ring keeps its own
-    // colour, so "?" on it explains the move a pinch on it makes from here
+    // a hold under a step tag: at the preset "2 · LH" sits on h09. Session 24 (the judges' fix 1): it wears the
+    // neutral outline, and "?" on it names the step ("PINCH HOLD · STEP 2"), placed against that outline
     await restorePreset(main)
     await frames(3)
-    const tagged = [2, 3].map((n) => main.getGhostHold(n)).filter((id) => id && main.isRingVisible(id) && !main.isRingGlowing(id))[0]
-    if (!tagged) errs.push("setup: no tagged hold with its own ring at the preset")
+    const tagged = [2, 3].map((n) => main.getGhostHold(n)).filter((id) => id && !main.isRingGlowing(id) && main.getHoldColour(id) !== null)[0]
+    if (!tagged) errs.push("setup: no free tagged hold at the preset")
     else {
       const wantT = expectedWhy(main, tagged)
       await pinch("AskButton")
@@ -96,7 +96,8 @@ export class C5AskWhyScenario extends Scenario {
       await pinch("Hold_" + tagged)
       await frames(3)
       print(`[C5] tagged ${tagged} (${wantT ? wantT.from : "-"}): ${checkWhyAgrees(camera(), main, errs, "tagged " + tagged)}`)
-      if (!wantT || wantT.from.indexOf("best limb") !== 0) errs.push(`tagged ${tagged}: the reference explains ${wantT ? wantT.from : "nothing"}, want the best limb's move`)
+      if (!wantT || wantT.from.indexOf("step tag") !== 0 || !/ HOLD · STEP [23]$/.test(main.getWhyText())) errs.push(`tagged ${tagged}: "${main.getWhyText()}" (${wantT ? wantT.from : "nothing"}), want the step named`)
+      if (main.isRingVisible(tagged)) errs.push(`tagged ${tagged}: its grip ring shows`)
     }
     await restorePreset(main)
 

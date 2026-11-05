@@ -3,7 +3,9 @@
 // ticked (or a LEAF scenario calls play()): with it off this component binds nothing and changes nothing.
 //
 // The timeline is data, in DemoTimeline.ts. At play() it sets the beta shown (no pinch, no ripple), and
-// leaves it so: the take's beats are the full read, as before beta on request. While it plays:
+// leaves it so: the take's beats are the full read, as before beta on request. Session 24: it also hands
+// the Lens a fresh in-memory store and sets 175 cm, so a height or a best kept in the preview never changes
+// the take, and the take keeps nothing. While it plays:
 // - it holds the wearer's camera: device tracking is paused and the eye eases between CAMERA keys
 //   (walking in and out, looking up, down and away); tracking comes back at the end;
 // - ACTIONS call the same NextHoldMain functions a real pinch calls (pressLimb, pressHold,
@@ -99,6 +101,12 @@ export class DemoAutopilot extends BaseScriptComponent {
     this.sceneLog = []
     this.pendingCheck = null
     if (!this.takeCamera()) return
+    // session 24: the take starts from a known state, whatever the preview's store holds: a fresh in-memory
+    // store (no kept height, no best, go 1, and nothing the take does is kept), the brief's 175 cm, the go's
+    // count from here
+    this.main.useStore(GeneralDataStore.create())
+    this.main.setHeightCm(175)
+    this.main.reloadFromStore()
     // session 23: the Lens opens with beta hidden; the take is the full read, from its first frame
     this.main.setBetaShown()
     while (this.nextAction < ACTIONS.length && ACTIONS[this.nextAction].t < this.from) this.run(ACTIONS[this.nextAction++])
@@ -198,6 +206,7 @@ export class DemoAutopilot extends BaseScriptComponent {
       case "pressAsk": m.pressAsk(); break
       case "pressMode": m.pressMode(); break
       case "pressView": m.pressView(); break
+      case "pressSetup": m.pressSetup(); break
       case "pickType": m.pickType(a.arg as string); break
       case "pressStart": m.pressStart(); break
       case "pressTop": m.pressTop(); break

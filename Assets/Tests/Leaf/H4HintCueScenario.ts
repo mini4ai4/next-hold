@@ -10,7 +10,8 @@ import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {camera, checkNothingRevealed, frames, getMain, mustFind, pinch, restorePreset, samePosition} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 
-const NOT_YET = "Limb override: none"
+// session 24: the top line is empty unless there is something to say
+const NOT_YET = ""
 const CUE = "? for a hint"
 
 /** Watch every frame for `seconds`: nothing is revealed and nothing changes. Returns when the cue first

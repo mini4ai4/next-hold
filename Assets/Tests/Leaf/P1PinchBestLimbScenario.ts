@@ -34,7 +34,7 @@ async function pinchMoves(main: NextHoldMain, ref: ReferenceRule, hold: string, 
   print(`[P1] ${tag}: pinch on ${hold}: ${fmtPos(pos0)} -> ${fmtPos(f.pos)} (want ${limb} to move)`)
   if (!samePosition(f.pos, want)) errs.push(`${tag}: in the pinch frame ${fmtPos(f.pos)}, want ${fmtPos(want)}`)
   if (f.marker[limb] !== hold) errs.push(`${tag}: Marker_${limb} on ${f.marker[limb]} in the pinch frame, want ${hold}`)
-  if (f.over !== null || f.label !== "Limb override: none") errs.push(`${tag}: after the move: override ${f.over}, panel "${f.label}"`)
+  if (f.over !== null || f.label !== "") errs.push(`${tag}: after the move: override ${f.over}, panel "${f.label}"`)
   // the rings, each for the limb a pinch on it moves now, in that same frame
   for (const r of ref.perHold(want)) {
     if (f.colour[r.holdId] !== r.colour) errs.push(`${tag}: pinch-frame ring ${r.holdId} ${f.colour[r.holdId]}, rule ${r.limb} ${r.colour}`)
@@ -57,7 +57,8 @@ export class P1PinchBestLimbScenario extends Scenario {
     // ── at the preset the glow is RH's, and the panel names the toggles what they are ──
     const sug = main.getSuggestion()!
     if (sug.limb !== "RH" || sug.holdId !== "up") errs.push(`precondition: glow ${sug.limb}->${sug.holdId}, want RH->up`)
-    if (main.getOverrideLabel() !== "Limb override: none" || !mustFind("OverrideLabel").enabled) errs.push(`panel "${main.getOverrideLabel()}", shown ${mustFind("OverrideLabel").enabled}`)
+    // session 24: the top line is empty by default (the judges' fix 3); it is still there, for an override or the cue
+    if (main.getOverrideLabel() !== "" || !mustFind("OverrideLabel").enabled) errs.push(`panel "${main.getOverrideLabel()}", shown ${mustFind("OverrideLabel").enabled}`)
 
     // ── each free hold's ring is the move a pinch on it makes, not the glow limb's ──
     const rule = ref.perHold(pos0)

@@ -436,8 +436,12 @@ check("ladder 1: rings on the holds in reach, no glow, no limb, not armed",
   a1.state.hintStep === 1 && !a1.armed && r1.rings === "reach" && !r1.glow && !r1.limb && !r1.steps, r1);
 check("ladder 2: the glow and the word too, still no 1-2-3, not armed",
   a2.state.hintStep === 2 && !a2.armed && r2.rings === "reach" && r2.glow && r2.limb && !r2.steps, r2);
-check("ladder 3: arms '?', shows nothing more", a3.state.hintStep === 3 && a3.armed && shownKeys(B.reveal(a3.state)) === shownKeys(r2));
-check("after the ladder '?' toggles as it always has", a4.state.hintStep === 3 && !a4.armed && B.ask(a4.state, false, false).armed);
+check("ladder 3 (session 24): the why-line at once, not armed, nothing else shows", a3.state.hintStep === 3 && !a3.armed && a3.why && shownKeys(B.reveal(a3.state)) === shownKeys(r2));
+check("after the ladder '?' shows the why-line again, never arms", a4.state.hintStep === 3 && !a4.armed && a4.why);
+check("hints this go: rung 1 isn't one, rungs 2 and 3 are, a repeat of 3 isn't",
+  a1.state.hintsThisGo === 0 && a2.state.hintsThisGo === 1 && a3.state.hintsThisGo === 2 && a4.state.hintsThisGo === 2, [a1, a2, a3, a4].map((a) => a.state.hintsThisGo));
+check("step dots on '?': one per rung, none with beta shown",
+  B.askDots(B0) === "○○○" && B.askDots(a1.state) === "●○○" && B.askDots(a2.state) === "●●○" && B.askDots(a3.state) === "●●●" && B.askDots(B.showBeta(B0)) === "");
 const aShown = B.ask(B.showBeta(B0), false, false);
 check("beta shown: '?' arms at once, as in v6", aShown.armed && aShown.state.hintStep === 0 && !B.ask(aShown.state, true, false).armed);
 check("hidden and topped out: '?' does nothing, there is no next move", (() => { const t = B.ask(B0, false, true); return t.state === B0 && !t.armed; })());
@@ -448,7 +452,9 @@ const m2 = B.moved(m1, 140);
 check("stepping back with no move made is not a fall", B.steppedBack(B0, false) === B0);
 check("stepping back on the top hold is not a fall", B.steppedBack(m2, true) === m2);
 const shownM = B.moved(B.showBeta(B0), 110);
-check("stepping back with beta shown is not a fall: the plan moves on with you", B.steppedBack(shownM, false) === shownM);
+const shownOff = B.steppedBack(shownM, false);
+check("session 24: with beta shown a fall is a go too, only the card is skipped",
+  shownOff.attempt === 2 && shownOff.cameOffMove === null && shownOff.betaShown && shownOff.betaSeenThisGo && shownOff.moves === 1, shownOff);
 const off = B.steppedBack(m2, false);
 check("two moves made, came off: the card names move 3, the attempt is over, the position's count stays",
   off.cameOffMove === 3 && off.attempt === 2 && off.moves === 2 && off.hintStep === 0, off);
@@ -475,8 +481,8 @@ check("no cue on the mats, in setup, topped out, with beta shown, or once a hint
   !cue(B.showBeta(back), 300) && !cue(B.ask(back, false, false).state, 300));
 check("the cue is pure: it changes nothing in the state", (() => { const j = JSON.stringify(back); cue(back, 300); return JSON.stringify(back) === j; })());
 // a new attempt or a new problem
-const fresh = B.newAttempt(B.showBeta(m2), false, 200);
-check("a new attempt hides beta again, clears the hint and the count", !fresh.betaShown && fresh.hintStep === 0 && fresh.moves === 0 && fresh.attempt === 2 && fresh.idleFrom === 200);
+const fresh = B.newAttempt(B.toppedOut(B.showBeta(m2)), false, 200);
+check("a hand off the top: a new go (counted at the top), beta hidden again, the hint and the count cleared", !fresh.betaShown && fresh.hintStep === 0 && fresh.moves === 0 && fresh.attempt === 2 && fresh.idleFrom === 200 && !fresh.betaSeenThisGo, fresh);
 check("the same with beta kept on by a test's default", B.newAttempt(m2, true, 200).betaShown);
 check("problemKey: order doesn't matter; holds, start holds and top do",
   B.problemKey(["a", "b"], ["a"], "b") === B.problemKey(["b", "a"], ["a"], "b") && B.problemKey(["a", "b"], ["a"], "b") !== B.problemKey(["a", "b", "c"], ["a"], "b") &&
@@ -511,6 +517,117 @@ check("problemKey: order doesn't matter; holds, start holds and top do",
   console.log(`  hint rings over ${states} states at 3 heights: ${redIn} rings in reach but red, ${noReach} states with nothing in reach`);
   check("in every state a pinch can reach, the glow's hold is among the hint's rings", states > 100 && offRing === 0, { states, offRing });
   check("an in-reach red ring exists (it says too hard, not out of reach), and no out-of-reach hold is ringed", redIn > 0 && outOfReachShown === 0, { redIn });
+}
+
+// ---- 6b. goes and pinned hints (session 24, NextHoldBeta.ts) ----------------------------------------
+{
+  const s0 = B.initialBeta(false, 0, 1, "S");
+  const go1 = B.moved(B.moved(s0, 1, "A"), 2, "P");
+  check("a go is live once a move is made", !B.isLive(s0) && B.isLive(go1));
+  const seen = B.hideBeta(B.showBeta(go1));
+  check("Hide beta takes the read down, the go stays \"with beta\"", !seen.betaShown && seen.betaSeenThisGo && seen.hintStep === 0);
+  const fell = B.steppedBack(B.ask(B.ask(seen, false, false).state, false, false).state, false);
+  check("a fall ends the go: the next go starts with no hints and, beta hidden, not \"with beta\"",
+    fell.attempt === 2 && fell.hintsThisGo === 0 && !fell.betaSeenThisGo && fell.cameOffMove === 3, fell);
+  const topped = B.toppedOut(B.moved(B.showBeta(s0), 1, "T"));
+  check("topping out ends the go too: attempt 2, counts cleared, stepping back from the top isn't another go",
+    topped.attempt === 2 && topped.hintsThisGo === 0 && B.steppedBack(topped, false) === topped, topped);
+  // pinned: the hint taken on the card at P
+  const taken = B.takeHint(fell);
+  check("the card's hint is pinned to the fall's position, on rung 1", taken.pin && taken.pin.at === "P" && taken.pin.step === 1 && taken.hintStep === 1);
+  const up2 = B.ask(taken, false, false).state;
+  check("climbing the ladder there moves the pin up with it, and counts the hint for the next go", up2.pin.step === 2 && up2.hintsThisGo === 1);
+  const back = B.again(up2, false, 10, "S");
+  check("Again: at the start holds, no hint shows, the pin waits at P, no new go counted (the fall ended it)",
+    back.hintStep === 0 && back.pin && back.pin.at === "P" && back.attempt === 2 && back.moves === 0 && back.here === "S", back);
+  const atA = B.moved(back, 11, "A"), atP = B.moved(atA, 12, "P");
+  check("on the way up nothing shows; back at P the pinned rung shows again", atA.hintStep === 0 && atP.hintStep === 2 && atP.pin.at === "P", atP);
+  const past = B.moved(atP, 13, "Q");
+  check("the move from P is made: the pin is gone", past.pin === null && past.hintStep === 0);
+  const elsewhere = B.moved(B.moved(back, 11, "X"), 12, "Y");
+  check("a different way up keeps the pin for when the climber is at P", elsewhere.pin && elsewhere.pin.at === "P" && elsewhere.hintStep === 0);
+  check("climbing on from the fall without Again: the hint is already showing at P, and goes with the next move",
+    taken.here === "P" && B.moved(taken, 20, "Q").pin === null);
+  const liveAgain = B.again(go1, false, 30, "S");
+  check("Again (resetAttempt) in the middle of a go counts that go as ended", liveAgain.attempt === 2 && liveAgain.moves === 0);
+  check("Again puts beta back to the default", !B.again(B.showBeta(go1), false, 30, "S").betaShown && B.again(go1, true, 30, "S").betaShown);
+  check("positionKey: one key per placement of the four limbs",
+    B.positionKey({ LH: "a", RH: "b", LF: null, RF: "c" }) === "a/b/-/c" && B.positionKey({ LH: "b", RH: "a", LF: null, RF: "c" }) !== "a/b/-/c");
+}
+
+// ---- 7. the climb in climbing's words, and what is kept (session 24, NextHoldAttempt.ts) -------------
+import * as A from "../Assets/Scripts/NextHoldAttempt.ts";
+{
+  check("ONSIGHT: first go, no beta, no hints; FLASH: first go with beta or a hint; SEND: any later go",
+    A.tickFor(1, false, 0) === "ONSIGHT" && A.tickFor(1, true, 0) === "FLASH" && A.tickFor(1, false, 1) === "FLASH" &&
+    A.tickFor(2, false, 0) === "SEND" && A.tickFor(5, true, 3) === "SEND");
+  const send3 = { tick: "SEND", go: 3, moves: 7, hints: 1 };
+  const send4 = { tick: "SEND", go: 4, moves: 6, hints: 2 };
+  check("better: the tick first, then fewer moves, then fewer hints, then the earlier go",
+    A.better({ tick: "FLASH", go: 1, moves: 9, hints: 3 }, send3) && A.better(send4, send3) && !A.better(send3, send4) &&
+    A.better({ ...send3, hints: 0 }, send3) && A.better({ ...send3, go: 2 }, send3) && !A.better(send3, send3) && A.better(send3, null));
+  const l = A.cardLines({ tick: "SEND", go: 4, moves: 6, hints: 1 }, 6, { ...send3, moves: 5 });
+  check("the card, word for word: SEND (attempt N) / moves · par for your body / Hints · Best",
+    l[0] === "SEND (attempt 4)" && l[1] === "6 moves · par for your body 6" && l[2] === "Hints: 1 · Best: SEND in 3, 5 moves", l);
+  check("a go that beats the best says so", A.cardLines(send4, 5, send3)[2] === "Hints: 2 · New best");
+  check("an onsight: \"Clean onsight. Pick something harder?\" on line 3",
+    A.cardLines({ tick: "ONSIGHT", go: 1, moves: 5, hints: 0 }, 5, null).join(" | ") === "ONSIGHT | 5 moves · par for your body 5 | Clean onsight. Pick something harder?");
+  check("a FLASH best reads without a go number; no par reads so",
+    A.fmtBest({ tick: "FLASH", go: 1, moves: 6, hints: 1 }) === "FLASH, 6 moves" && A.cardLines(send3, null, null)[1] === "7 moves · no par for your body");
+  check("no timer and no points anywhere on the card", !A.cardLines(send4, 5, send3).join(" ").match(/\d:\d\d|point|pts/i));
+  check("FNV-1a known values", A.fnv1a("") === "811c9dc5" && A.fnv1a("a") === "e40c292c", [A.fnv1a(""), A.fnv1a("a")]);
+  const pk = B.problemKey(PRESET_PROBLEM, PRESET_START, PRESET_TOP);
+  check("the best's key covers the problem and the height",
+    A.bestKey(pk, 175) === A.bestKey(pk, 175) && A.bestKey(pk, 175) !== A.bestKey(pk, 155) &&
+    A.bestKey(pk, 175) !== A.bestKey(B.problemKey(PRESET_PROBLEM.slice(1), PRESET_START, PRESET_TOP), 175) && A.bestKey(pk, 175).startsWith("nh.best."), A.bestKey(pk, 175));
+  const rec = { goes: 3, best: send3 };
+  check("a record survives the store; garbage reads as no record",
+    JSON.stringify(A.decodeRecord(A.encodeRecord(rec))) === JSON.stringify(rec) && A.decodeRecord("{oops").goes === 0 &&
+    A.decodeRecord('{"g":2,"b":{"t":"WIN","n":1,"m":1,"h":0}}').best === null && A.decodeRecord('{"g":-1}').goes === 0 && A.decodeRecord("").best === null);
+  check("a stored height is snapped to 5 cm in 150-200, anything else is no height",
+    A.cleanHeight(160) === 160 && A.cleanHeight(161) === 160 && A.cleanHeight(149) === null && A.cleanHeight(0) === null && A.cleanHeight(NaN) === null && A.cleanHeight(201) === null);
+  // a store with GeneralDataStore's methods, a size cap, and a switch to make it throw
+  class FakeStore {
+    constructor(max) { this.m = new Map(); this.max = max; this.boom = false; }
+    t() { if (this.boom) throw new Error("boom"); }
+    has(k) { this.t(); return this.m.has(k); }
+    getString(k) { this.t(); const v = this.m.get(k); return typeof v === "string" ? v : ""; }
+    putString(k, v) { this.t(); this.m.set(k, v); }
+    getInt(k) { this.t(); const v = this.m.get(k); return typeof v === "number" ? v : 0; }
+    putInt(k, v) { this.t(); this.m.set(k, v); }
+    remove(k) { this.t(); this.m.delete(k); }
+    getAllKeys() { this.t(); return [...this.m.keys()]; }
+    getMaxSizeInBytes() { this.t(); return this.max; }
+  }
+  const st = new FakeStore(10000), save = new A.NextHoldSave(st), key = A.bestKey(pk, 175);
+  check("an empty store: no record, no height", save.readRecord(key).goes === 0 && save.readRecord(key).best === null && save.readHeight() === null);
+  check("write and read back a record and a height", save.writeRecord(key, rec) && JSON.stringify(save.readRecord(key)) === JSON.stringify(rec) &&
+    save.writeHeight(160) && save.readHeight() === 160 && st.getInt("nh.height") === 160);
+  check("rewriting a key replaces it (the size check counts the old value out)", save.writeRecord(key, { goes: 4, best: send3 }) && save.readRecord(key).goes === 4);
+  const full = new FakeStore(10000); full.putString("filler", "x".repeat(8990));
+  const sf = new A.NextHoldSave(full);
+  check("a full store: nothing written, nothing thrown", !sf.writeRecord(key, rec) && !full.has(key) && !sf.writeHeight(170) && sf.lastWrite.startsWith("skipped"));
+  const zero = new FakeStore(0), nomax = new A.NextHoldSave(zero);
+  check("a store that reports no cap (as GeneralDataStore.create() does) gets our own 10 KB one: written, and stopped there",
+    nomax.maxBytes() === A.FALLBACK_MAX_BYTES && nomax.writeRecord(key, rec) && (() => { zero.putString("filler", "x".repeat(9200)); return !nomax.writeHeight(170); })());
+  const broken = new FakeStore(10000); broken.putString(key, A.encodeRecord(rec)); broken.boom = true;
+  const sb = new A.NextHoldSave(broken);
+  check("a store that throws: reads give no record and no height, writes give false, nothing escapes",
+    sb.readRecord(key).goes === 0 && sb.readHeight() === null && !sb.writeRecord(key, rec) && !sb.writeHeight(170));
+  const none = new A.NextHoldSave(null);
+  check("no store at all: the same", !none.hasStore() && none.readRecord(key).goes === 0 && !none.writeHeight(170));
+  check("a record is small: under 100 bytes", A.encodeRecord({ goes: 99, best: { tick: "ONSIGHT", go: 99, moves: 99, hints: 99 } }).length + key.length < 100);
+  // par for your body: the planner's shortest secure route from the preset start, at three heights
+  const ph = {}, tp = {};
+  for (const h of HOLDS) if (PRESET_PROBLEM.includes(h.id)) { ph[h.id] = { x: h.x, y: h.y }; tp[h.id] = h.type; }
+  const par = (cm) => { const r = P.routeToTop({ holds: ph, holdTypes: tp, position: { ...PRESET_POSITION }, reach: cm * 0.44, top: PRESET_TOP }); return r ? r.length : null; };
+  console.log(`  par for your body from the preset start: 155 cm ${par(155)}, 175 cm ${par(175)}, 195 cm ${par(195)}`);
+  const plan = (cm) => { const r = P.fullRoute({ holds: ph, holdTypes: tp, position: { ...PRESET_POSITION }, reach: cm * 0.44, top: PRESET_TOP }); return r ? r.length : null; };
+  // t1 takes 5 by following the glow move by move (after LF to lh the glow prefers the surer RF to rh);
+  // the 1-2-3 seen from the start (glow + route) is a par route
+  check("par at 175 cm is 4 (LH h09, RH up, LF lh, LH h20 yellow), and at every height the 1-2-3 from the start is that long",
+    par(175) === 4 && [155, 175, 195].every((cm) => plan(cm) === par(cm)), [155, 175, 195].map((cm) => [par(cm), plan(cm)]));
+  check("par differs with the body: a taller climber's par is never longer", par(195) <= par(175) && par(175) <= par(155), [par(155), par(175), par(195)]);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

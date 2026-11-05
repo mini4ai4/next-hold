@@ -1,38 +1,36 @@
 // Session 23, the ring and the tag (v7 E): a step tag never sits on a ring whose colour means something
-// else. A tag is its own badge colour, solid, and is never green, yellow or red. A ring's colour only ever
-// means grip / reach for you from here, by the test's own rule, tag or no tag. On a hold a limb is on,
-// which has no score, the tag pins onto the neutral outline. The case that started this: at 195 cm "2 · LH"
-// sits on h10, whose ring from the start is red. It used to be painted green.
-// Input path: real SIK pinches on HeightUp and Hold_<id>; rings read as drawn.
+// else. A tag is its own badge colour, solid, and is never green, yellow or red.
+// Session 24 (the A+E judges' fix 1): session 23 left the hold's own grip ring under the tag, so at 195 cm
+// "2 · LH" sat on h10's red, broken ring and "?" there said "JUG HOLD · OUT OF REACH": the plan pointing at a
+// hold that the ring and the why-line both called out of reach. Now a hold under a drawn step tag says nothing
+// about gripping it from here: no Ring_<id>, only the neutral outline (the one an occupied hold and the hidden
+// read use), and "?" on it names the step ("JUG HOLD · STEP 2"), never "OUT OF REACH". A refused pinch there
+// still says "STEP 1 FIRST". The glowing hold (step 1) keeps its own colour.
+// Input path: real SIK pinches on HeightUp (behind Setup), AskButton and Hold_<id>; rings read as drawn.
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
-import {BADGE_COLOR, NEUTRAL_COLOR, STYLE_FOR, checkTagRingsAgree, frames, getMain, isColour, isHued, makeReference, mustFind, pinch, renderedRingColour, renderedStyle, restorePreset} from "./NextHoldTestKit"
+import {BADGE_COLOR, NEUTRAL_COLOR, checkTagRingsAgree, frames, getMain, isColour, isHued, mustFind, pinch, renderedStyle, restorePreset} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 
-/** the two meanings apart: under every shown tag, the ring is what the rule says of that hold from here */
+/** under every shown tag (not the glow): no grip ring, the neutral outline, solid, with no hue */
 function checkTagged(main: NextHoldMain, errs: string[], tag: string): string {
-  const pos = main.getPosition() as RefPosition
-  const rule = makeReference(main.getHeightCm())
   const out: string[] = []
   for (const n of [2, 3]) {
     if (!mustFind("Ghost_" + n).enabled) continue
     const id = main.getGhostHold(n)!
     if (!isColour("Ghost_" + n, BADGE_COLOR)) errs.push(`${tag}: badge ${n} on ${id} is not the badge colour`)
     if (renderedStyle("Ghost_" + n) !== "solid") errs.push(`${tag}: badge ${n} draws ${renderedStyle("Ghost_" + n)}`)
-    const occupied = ["LH", "RH", "LF", "RF"].some((l) => pos[l] === id)
-    if (occupied) {
-      if (!mustFind("GhostHoldRing_" + n).enabled || !isColour("GhostHoldRing_" + n, NEUTRAL_COLOR)) errs.push(`${tag}: badge ${n} on occupied ${id}: no neutral outline`)
-      if (isHued((mustFind("GhostHoldRing_" + n).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4)) errs.push(`${tag}: the outline on ${id} has a hue`)
-      out.push(`${n} on ${id}: neutral outline`)
-    } else if (!main.isRingGlowing(id)) {
-      const want = rule.bestForHold(id, pos).colour, got = renderedRingColour(id, main)
-      if (got !== want) errs.push(`${tag}: under badge ${n} Ring_${id} renders ${got}, the rule says ${want} from here`)
-      if (renderedStyle("Ring_" + id) !== STYLE_FOR[want]) errs.push(`${tag}: Ring_${id} draws ${renderedStyle("Ring_" + id)}, ${want} is ${STYLE_FOR[want]}`)
-      out.push(`${n} on ${id}: ring ${got}`)
-    } else out.push(`${n} on ${id}: the glow`)
+    if (main.isRingGlowing(id)) { out.push(`${n} on ${id}: the glow`); continue }
+    const ring = mustFind("Ring_" + id).enabled
+    const outline = mustFind("GhostHoldRing_" + n)
+    const rgb = (outline.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4
+    if (ring) errs.push(`${tag}: under badge ${n} Ring_${id} shows a grip colour`)
+    if (!outline.enabled || !isColour("GhostHoldRing_" + n, NEUTRAL_COLOR) || isHued(rgb)) errs.push(`${tag}: under badge ${n} on ${id}: no neutral outline (shown ${outline.enabled})`)
+    if (outline.enabled && renderedStyle("GhostHoldRing_" + n) !== "solid") errs.push(`${tag}: the outline on ${id} draws ${renderedStyle("GhostHoldRing_" + n)}`)
+    out.push(`${n} on ${id}: ${ring ? "RING" : "neutral outline"} (its score from here ${main.getHoldColour(id) || "none, occupied"})`)
   }
   return out.join(", ")
 }
@@ -53,29 +51,33 @@ export class E1TagOwnBadgeScenario extends Scenario {
     }
     if (!isHued(BADGE_COLOR)) errs.push("the badge colour has no hue")
 
-    // ── at the preset: "2 · LH" on h09's own ring, "3 · LF" on lh, which LH is on now ──
+    // ── at the preset: "2 · LH" on h09, "3 · LF" on lh (which LH is on): both on the neutral outline ──
     print(`[E1] preset: ${checkTagged(main, errs, "preset")}; ${checkTagRingsAgree(main, errs, "preset")}`)
-    if (main.getGhostHold(3) !== "lh" || !mustFind("GhostHoldRing_3").enabled) errs.push(`precondition: badge 3 on ${main.getGhostHold(3)}, its outline ${mustFind("GhostHoldRing_3").enabled}`)
+    if (main.getGhostHold(2) !== "h09" || main.getGhostHold(3) !== "lh") errs.push(`precondition: badges on ${main.getGhostHold(2)}, ${main.getGhostHold(3)}`)
 
-    // ── 195 cm: the tag on a ring that says "not from here". Painted green before; red now, and its gap shows ──
+    // ── 195 cm: the case the judges found. h10 scores red from here; it carries "2 · LH" ──
     for (let i = 0; i < 4; i++) { await pinch("HeightUp"); await frames(2) }
     if (main.getHeightCm() !== 195 || main.getGhostHold(2) !== "h10") errs.push(`precondition: ${main.getHeightCm()} cm, badge 2 on ${main.getGhostHold(2)}`)
+    if (main.getHoldColour("h10") !== "red") errs.push(`precondition: h10 scores ${main.getHoldColour("h10")} from the start at 195 cm, the case is a red one`)
     print(`[E1] 195 cm: ${checkTagged(main, errs, "195 cm")}`)
-    if (renderedRingColour("h10", main) !== "red") errs.push(`at 195 cm Ring_h10 renders ${renderedRingColour("h10", main)}, want its own red`)
-    if (renderedStyle("Ring_h10") !== "broken") errs.push(`at 195 cm Ring_h10 draws ${renderedStyle("Ring_h10")}`)
-    // "?" on it explains that ring, not the step
-    const pos0 = main.getPosition() as RefPosition
-    const wantWhy = makeReference(195).bestForHold("h10", pos0).why
+    // "?" on it names the step, never "OUT OF REACH"
     await pinch("AskButton"); await frames(2)
     await pinch("Hold_h10"); await frames(2)
-    print(`[E1] ? on h10: "${main.getWhyText()}" (rule "${wantWhy}")`)
-    if (main.getWhyText() !== wantWhy) errs.push(`? on h10 reads "${main.getWhyText()}", the ring shows "${wantWhy}"`)
+    print(`[E1] ? on h10: "${main.getWhyText()}"`)
+    if (main.getWhyText() !== "JUG HOLD · STEP 2") errs.push(`? on h10 reads "${main.getWhyText()}", want "JUG HOLD · STEP 2"`)
+    if (main.getWhyText().indexOf("OUT OF REACH") >= 0) errs.push("the why-line on a step says OUT OF REACH")
+    // a pinch on it is refused (red for every limb from here) and says so as a step
+    const pos0 = main.getPosition() as RefPosition
+    await pinch("Hold_h10"); await frames(2)
+    print(`[E1] pinch on h10: why "${main.getWhyText()}", LH on ${main.getPosition().LH}`)
+    if (main.getWhyText() !== "STEP 1 FIRST" || main.getPosition().LH !== pos0.LH) errs.push(`the refused pinch on the step: "${main.getWhyText()}", LH ${main.getPosition().LH}`)
 
-    // ── the same hold once the plan reaches it: the move is there now, the ring says so ──
+    // ── step 1 made: the plan moves on; whatever carries a tag now wears the outline ──
     await pinch("Hold_up"); await frames(2)
-    print(`[E1] 195 cm, after step 1: ${checkTagged(main, errs, "after step 1")}; h10 ${renderedRingColour("h10", main)}`)
+    print(`[E1] 195 cm, after step 1: ${checkTagged(main, errs, "after step 1")}; h10 glowing ${main.isRingGlowing("h10")}, its own colour ${main.getHoldColour("h10")}`)
+    if (main.isRingGlowing("h10") && main.getHoldColour("h10") === "red") errs.push("the glow sits on a red move")
 
-    // ── through the climb, each position, the tags never change what a ring says ──
+    // ── through the climb at 175, each position ──
     await restorePreset(main)
     for (const hold of ["up", "h09", "lh", "rh"]) {
       await pinch("Hold_" + hold); await frames(2)

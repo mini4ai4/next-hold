@@ -1,6 +1,6 @@
 // Extra (not a done criterion): can a standing user physically operate the
-// control row? Drives an IK arm + head (Bitmoji avatar) onto Toggle_LF and
-// AskButton. LEAF's diagnostic recorder fails the scenario if a reach is out
+// control row? Drives an IK arm + head (Bitmoji avatar) onto BodyButton, Toggle_LF and
+// AskButton (session 24: the toggles are behind Body). LEAF's diagnostic recorder fails the scenario if a reach is out
 // of range, out of view, or cross-body; the routing (direct poke vs far-field
 // ray) is printed for each target, including two holds for information.
 
@@ -21,13 +21,18 @@ export class ReachIKScenario extends Scenario {
     await restorePreset(main)
     const errs: string[] = []
 
-    for (const name of ["Toggle_LF", "AskButton", "Hold_up", "Hold_lf"]) {
+    for (const name of ["BodyButton", "AskButton", "Hold_up", "Hold_lf"]) {
       print(`[IK] ${name}: right hand routes ${this.ik.right.isIndirect(interactable(name)) ? "INDIRECT (far-field ray)" : "direct"}`)
     }
 
     const before = DiagnosticRecorder.getInstance().getAll().length
+    // session 24 (G): the limb toggles sit behind Body; both reached by the IK arm
+    await this.ik.trigger(interactable("BodyButton"))
+    await frames(3)
+    if (main.getPage() !== "body") errs.push(`IK pinch on BodyButton: page ${main.getPage()}`)
     await this.ik.trigger(interactable("Toggle_LF"))
     await frames(3)
+    if (main.getPage() !== "climb") errs.push(`picking LF didn't close the body cluster: page ${main.getPage()}`)
     if (main.getSelectedLimb() !== "LF") errs.push(`IK pinch on Toggle_LF: selected ${main.getSelectedLimb()}`)
 
     await this.ik.trigger(interactable("AskButton"))
