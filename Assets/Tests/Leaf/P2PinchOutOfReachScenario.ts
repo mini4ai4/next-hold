@@ -3,8 +3,8 @@
 // a pinch moves a limb only if that move is green or yellow. Otherwise nothing moves, the hold's ring
 // gives a short pulse, and the why-line says "OUT OF REACH" for about 1.5 s. An override wins only if
 // its move is green or yellow; otherwise it is the same refusal, and the override stays.
-// Session 22: a hold under a step tag wears that step's colour, so "OUT OF REACH" on its green ring read
-// as a contradiction: a refused pinch on a hold with a drawn "2 · LH" or "3 · LF" says "STEP 1 FIRST".
+// Session 22: a refused pinch on a hold with a drawn "2 · LH" or "3 · LF" says "STEP 1 FIRST": it is in the
+// plan, just not yet. Session 23: the ring under the tag keeps its own colour (red here); the line stays.
 // The tags are only drawn in Ground and never on the glowing hold; everywhere else it stays OUT OF REACH.
 // Input path: real SIK pinches on Hold_<id> and the buttons. Every frame from before the pinch is
 // sampled (the simulated pinch only returns after its release, too late to see the frames in between).
@@ -200,15 +200,15 @@ export class P2PinchOutOfReachScenario extends Scenario {
     if (main.getGhostHold(3) !== PRESET_TOP || main.getGhostHold(2) === PRESET_TOP || makeReference(150).pinchMoves(PRESET_TOP, pos3)) errs.push(`precondition: at 150 cm badge 2 on ${main.getGhostHold(2)}, badge 3 on ${main.getGhostHold(3)}, the rule moves a limb to ${PRESET_TOP}: ${makeReference(150).pinchMoves(PRESET_TOP, pos3)}`)
     await refused(main, PRESET_TOP, errs, "under its step 3 tag", STEP_FIRST)
 
-    // ── from the start at 195 cm: the green "2 · LH" on h10 refuses, and the top hold, with no step tag, still says OUT OF REACH ──
+    // ── from the start at 195 cm: "2 · LH" on h10, whose own ring is red, refuses, and the top hold, with no step tag, still says OUT OF REACH ──
     await restorePreset(main)
     for (let i = 0; i < 4; i++) main.pressHeight(1)
     await frames(2)
     const ref195 = makeReference(195)
-    if (main.getGhostHold(2) !== "h10" || drawnRing("h10", main) !== "green" || ref195.pinchMoves("h10", pos0)) errs.push(`precondition: at 195 cm badge 2 on ${main.getGhostHold(2)}, h10's ring drawn ${drawnRing("h10", main)}, the rule moves a limb to h10: ${ref195.pinchMoves("h10", pos0)}`)
+    if (main.getGhostHold(2) !== "h10" || drawnRing("h10", main) !== "red" || ref195.pinchMoves("h10", pos0)) errs.push(`precondition: at 195 cm badge 2 on ${main.getGhostHold(2)}, h10's ring drawn ${drawnRing("h10", main)}, the rule moves a limb to h10: ${ref195.pinchMoves("h10", pos0)}`)
     if (main.getGhostHold(2) === PRESET_TOP || main.getGhostHold(3) === PRESET_TOP || ref195.pinchMoves(PRESET_TOP, pos0)) errs.push(`precondition: at 195 cm from the start ${PRESET_TOP} should be refused with no step tag`)
-    await refused(main, "h10", errs, "195 cm, green 2 · LH", STEP_FIRST)
-    if (drawnRing("h10", main) !== "green") errs.push(`after the refusal h10's ring is drawn ${drawnRing("h10", main)}, want its tag's green`)
+    await refused(main, "h10", errs, "195 cm, 2 · LH on a red ring", STEP_FIRST)
+    if (drawnRing("h10", main) !== "red") errs.push(`after the refusal h10's ring is drawn ${drawnRing("h10", main)}, want its own red`)
     await refused(main, PRESET_TOP, errs, "195 cm, the top hold", REFUSED)
 
     // ── the next refusal says its own line, whichever was up ──
@@ -244,7 +244,7 @@ export class P2PinchOutOfReachScenario extends Scenario {
   }
 }
 
-/** the colour the hold's ring is drawn in, the one the climber sees (under a tag, not its score's) */
+/** the colour the hold's ring is drawn in, the one the climber sees */
 function drawnRing(id: string, main: NextHoldMain): string {
   return classifyColour((mustFind("Ring_" + id).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4, main)
 }

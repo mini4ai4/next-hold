@@ -2,11 +2,9 @@
 // suggestion with its label; after it, since session 15, the start of the cheapest
 // secure route to the top, searched over every limb and hold. Steps 2 and 3 show as
 // small badges pinned on their own hold's ring, naming the limb: "2 · LH", "3 · LF".
-// They update in the same frame as the main rings. Each badge's outline wears its
-// step's colour; a step onto a hold a limb is on now gets a ring in that colour, so
-// no ring on the wall is white (session 15, item 3). Session 16: the ring of a hold
-// a tag sits on wears the tag's colour too, so no tag disagrees with its ring (also
-// forced: a green tag on a hold whose score ring is red).
+// They update in the same frame as the main rings. Session 23: each badge is its own
+// colour, the ring under it keeps its own grip colour (also forced: a tag on a hold
+// whose ring is red), and a step onto a hold a limb is on now gets the neutral outline.
 // Attribution (strict review 29.10): on screen the ring nearest each badge is its
 // own hold's, by at least 2 cm, and its text names the limb that moves in that
 // step. Every badge stays readable: no glow ring and no other badge covers it,
@@ -83,16 +81,15 @@ export class N3SequencePreviewScenario extends Scenario {
     if (!sug0 || ids0[0] !== sug0.holdId) errs.push(`step 1 (${ids0[0]}) is not the suggested hold ${sug0 ? sug0.holdId : "none"}`)
     if (ids0.length !== 3) errs.push(`preset look-ahead has ${ids0.length} moves, want 3`)
 
-    // session 15: each badge's outline wears its step's colour (how secure that move is at its
-    // turn, by the test's own search), its text stays light; and nothing on the wall is a white
-    // ring: a step onto a hold a limb is on now (no score ring) gets a ring in that step's colour
+    // each step is a move you can make, by the test's own search; a badge's text stays light; a step
+    // onto a hold a limb is on now (no score ring) gets the neutral outline (session 23)
     print(`[N3] preset colours: ${checkStepColours(main, s0.pos, s0.selected, errs, "preset")}`)
     for (const n of BADGE_STEPS) {
       const tc = (mustFind("GhostNumber_" + n).getComponent("Component.Text") as Text).textFill.color
       if (Math.min(tc.x, tc.y, tc.z) < 0.75) errs.push(`badge ${n} text colour ${tc} is not light`)
     }
     const occupiedStep = s0.steps.findIndex((id, i) => i > 0 && !!id && Object.keys(s0.pos).some((l) => s0.pos[l] === id))
-    if (occupiedStep < 0) errs.push("precondition: no preset step goes onto a hold a limb is on now (the case the white ring was)")
+    if (occupiedStep < 0) errs.push("precondition: no preset step goes onto a hold a limb is on now (the case the outline is for)")
     else if (!mustFind("GhostHoldRing_" + (occupiedStep + 1)).enabled) errs.push(`step ${occupiedStep + 1} is onto an occupied hold but has no ring`)
 
     // ── a real pinch on the suggestion: badges and rings in the same frame ──
@@ -135,7 +132,7 @@ export class N3SequencePreviewScenario extends Scenario {
       const third = main.getGhostHold(2) !== sug.holdId ? main.getGhostHold(2)! : main.getGhostHold(3)!
       // a match: steps 2 and 3 on one hold, joined by an arc around it
       let want = [{limb: sug.limb, holdId: sug.holdId}, {limb: "LH", holdId: third}, {limb: "RH", holdId: third}]
-      vis.apply({...vis.state, ghosts: want.map((m) => ({hold: m.holdId, limb: m.limb, colour: "green"}))})
+      vis.apply({...vis.state, ghosts: want.map((m) => ({hold: m.holdId, limb: m.limb}))})
       let tag = `match ${third},${third}`
       const hold = mustFind("Hold_" + third).getTransform().getWorldPosition()
       const b2 = ghostBadge(2), b3 = ghostBadge(3)
@@ -148,42 +145,45 @@ export class N3SequencePreviewScenario extends Scenario {
       else if (Math.max(...r) - Math.min(...r) > 0.3 || Math.min(...r) < edge) errs.push(`${tag}: GhostPath_2 is not an arc around Hold_${third}: dots ${Math.min(...r).toFixed(2)}-${Math.max(...r).toFixed(2)} cm from it (ring edge ${edge.toFixed(2)})`)
       print(`[N3] ${tag}: badges ${gap.toFixed(1)} cm apart, arc of ${dots.length} dots; ${checkBadgeAttribution(camera(), main, want, errs, tag)}; ${checkGhostNumbersClear(camera(), errs, tag, main)}`)
 
-      // session 16, the judge's picture: a green "2 · LH" on a hold whose score ring (the selected
-      // limb's, from here) is red. The ring under the tag must take the tag's green
+      // the judge's picture: a "2 · LH" on a hold whose ring, from here, is red. Session 23: the ring stays
+      // red, and the tag is neither green nor red: its own badge colour
       const red = problem.filter((id) => id !== sug.holdId && mustFind("Ring_" + id).enabled && main.getHoldColour(id) === "red")[0]
       if (!red) errs.push("precondition: no red ring at the preset to put a green tag on")
       else {
         want = [{limb: sug.limb, holdId: sug.holdId}, {limb: "LH", holdId: red}]
-        vis.apply({...vis.state, ghosts: [{hold: sug.holdId, limb: sug.limb, colour: "green"}, {hold: red, limb: "LH", colour: "green"}]})
-        tag = `green tag on ${red} (score red)`
+        vis.apply({...vis.state, ghosts: [{hold: sug.holdId, limb: sug.limb}, {hold: red, limb: "LH"}]})
+        tag = `tag on ${red} (score red)`
         const c = classifyColour((mustFind("Ring_" + red).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4, main)
-        if (c !== "green") errs.push(`${tag}: Ring_${red} renders ${c} under the green tag`)
+        if (c !== "red") errs.push(`${tag}: Ring_${red} renders ${c} under the tag, its own score is red`)
         print(`[N3] ${tag}: Ring_${red} renders ${c}; ${checkBadgeAttribution(camera(), main, want, errs, tag)}`)
       }
 
       // step 2 on the glowing hold (two limbs onto it in a row): badge 2 sits on the glow's outer ring
       want = [{limb: sug.limb, holdId: sug.holdId}, {limb: "LH", holdId: sug.holdId}, {limb: "RF", holdId: third}]
-      vis.apply({...vis.state, ghosts: want.map((m) => ({hold: m.holdId, limb: m.limb, colour: "green"}))})
+      vis.apply({...vis.state, ghosts: want.map((m) => ({hold: m.holdId, limb: m.limb}))})
       tag = `step 2 on the glow ${sug.holdId}`
       if (mustFind("GhostPath_1").enabled) errs.push(`${tag}: GhostPath_1 shows, but step 2 is on the glowing hold itself`)
       print(`[N3] ${tag}: ${checkBadgeAttribution(camera(), main, want, errs, tag)}; ${checkGhostNumbersClear(camera(), errs, tag, main)}`)
 
-      // session 20, forced: each colour on the glow, on a step tag, on a ring under a tag and on the
-      // ring of an occupied hold: the style follows the colour on every one of them
+      // session 20, forced: each colour on the glow and on a ring under a tag: the style follows the colour.
+      // Session 23: the tags and the outline on an occupied hold have no grip colour: always solid
       const occ = main.getPosition().RF as string
       const free = problem.filter((id) => id !== sug.holdId && mustFind("Ring_" + id).enabled)
       for (const c of ["green", "yellow", "red"]) {
-        vis.apply({...vis.state, rings: {...vis.state.rings, [sug.holdId]: c},
-          ghosts: [{hold: sug.holdId, limb: sug.limb, colour: c}, {hold: occ, limb: "RF", colour: c}, {hold: free[0], limb: "LH", colour: c}]})
+        vis.apply({...vis.state, rings: {...vis.state.rings, [sug.holdId]: c, [free[0]]: c},
+          ghosts: [{hold: sug.holdId, limb: sug.limb}, {hold: occ, limb: "RF"}, {hold: free[0], limb: "LH"}]})
         tag = `forced ${c}`
         const glowC = classifyColour((mustFind("SuggestGlow").getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4, main)
         if (glowC !== c) errs.push(`${tag}: the glow renders ${glowC}`)
         if (!mustFind("GhostHoldRing_2").enabled) errs.push(`${tag}: no ring on the occupied hold ${occ}`)
         const want3 = STYLE_FOR[c]
-        for (const n of ["SuggestGlow", "Ghost_2", "Ghost_3", "GhostHoldRing_2", "Ring_" + free[0]]) {
+        for (const n of ["SuggestGlow", "Ring_" + free[0]]) {
           if (renderedStyle(n) !== want3) errs.push(`${tag}: ${n} draws ${renderedStyle(n)}, want ${want3}`)
         }
-        print(`[N3] ${tag}: glow, both tags, the occupied hold's ring and the ring under a tag draw ${want3}; ${checkRingStyles(main, errs, tag)}`)
+        for (const n of ["Ghost_2", "Ghost_3", "GhostHoldRing_2"]) {
+          if (renderedStyle(n) !== "solid") errs.push(`${tag}: ${n} draws ${renderedStyle(n)}, want solid`)
+        }
+        print(`[N3] ${tag}: glow and the ring under a tag draw ${want3}, tags solid; ${checkRingStyles(main, errs, tag)}`)
       }
     }
 

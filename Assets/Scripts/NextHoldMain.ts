@@ -22,9 +22,12 @@
 // isMarkVisible(id), getTagText(id), getPreview(), getGhostHold(n), getView(),
 // getTorso(), getGroundViewCm(), getGroundSizedCm(), getRingLineWidth(), getFigureMask(), isTopped(), getToppedAt().
 // Session 21: getRefusalLog(), getRingPulse().
+// Session 23: isBetaShown(), getHintStep(), getMovesMade(), getAttempt(), isOutlineVisible(id), isCueVisible(),
+// isCameOffVisible(), getCameOffText(), getShowBetaLabel(), isShowBetaLit(). The score reads (getHoldColour,
+// getSuggestion, ...) answer with beta hidden too: what is drawn is what the reveal allows (NextHoldBeta).
 // Test hooks: setSizingCamera(cam) sizes Ground from another camera's distance; forceMove(limb, id)
-// sets a position up, red moves included (a pinch can't make those).
-// Action API mirrors a pinch: pressHold(id), pressLimb(limb), pressAsk(),
+// sets a position up, red moves included (a pinch can't make those); resetBetaForTests(shown).
+// Action API mirrors a pinch: pressHold(id), pressLimb(limb), pressAsk(), pressShowBeta(), pressCameOffHint(),
 // pressMode(), pressView(), pressHeight(±1), pickType(type), pressStart(), pressTop(), pressRemove(), pressDone().
 // The climber's height (150-200 cm, set in the Lens) is state too: every reach is a share of it.
 //
@@ -45,7 +48,11 @@ import {
 } from "./NextHoldWallVisuals"
 import {NextHoldControlRowUI} from "./NextHoldControlRowUI"
 import {NextHoldTypePickerUI} from "./NextHoldTypePickerUI"
-import {NextHoldCalloutUI, WHY_HALF_H, whyHalfWidth} from "./NextHoldCalloutUI"
+import {CARD_HALF_H, CARD_HALF_W, NextHoldCalloutUI, WHY_HALF_H, whyHalfWidth} from "./NextHoldCalloutUI"
+import {
+  BetaState, CUE_TEXT, HintStep, arrivedOnWall, ask, cameOffLine, cueShown, inReach, initialBeta, moved, newAttempt, problemKey,
+  reveal, showBeta, steppedBack, takeHint,
+} from "./NextHoldBeta"
 import {NextHoldOffViewArrow} from "./NextHoldOffViewArrow"
 import {NextHoldPinchRipple, RippleEvent} from "./NextHoldPinchRipple"
 import {GLOW_PROFILE} from "./Wall/ProceduralTextures"
@@ -110,9 +117,9 @@ export const TOPPED_FADE_SECONDS = 0.6
 /** session 21, a pinch no limb can make: nothing moves, the hold's ring pulses (NextHoldWallVisuals)
  *  and the why-line says this for REFUSED_SECONDS. */
 export const REFUSED_TEXT = "OUT OF REACH"
-/** session 22: said instead on a hold with a drawn step tag, whose ring wears that step's colour:
- *  "OUT OF REACH" on a green ring read as a contradiction. Step 1, for tag 3 too: the numbers are
- *  worked out again after every move, and only the glow is sure to be a move a pinch can make. */
+/** session 22: said instead on a hold with a drawn step tag: it is in the plan, just not yet. Step 1,
+ *  for tag 3 too: the numbers are worked out again after every move, and only the glow is sure to be a
+ *  move a pinch can make. Session 23: the ring under the tag keeps its own colour now; the line stays. */
 export const REFUSED_STEP_TEXT = "STEP 1 FIRST"
 export const REFUSED_SECONDS = 1.5
 
@@ -237,6 +244,13 @@ export class NextHoldMain extends BaseScriptComponent {
   private refusedText = REFUSED_TEXT
   /** every refused pinch (newest last), for the read API */
   private refusalLog: {hold: string; time: number}[] = []
+  /** session 23: beta on request (NextHoldBeta): what the climber is shown, the hint ladder, came off */
+  private beta: BetaState = initialBeta(false, 0)
+  /** what a new attempt or problem goes back to: hidden; only LEAF's reset changes it */
+  private betaDefault = false
+  /** which problem it was when setup opened: leaving setup with another one starts it from nothing */
+  private setupFromKey = ""
+  private cueOn = false
   /** the control row outline last pushed to the stick figure */
   private lastMask: WallPt[] | null = null
   /** the control row's laid-out size it was last placed with ("" = not laid out yet) */
@@ -295,7 +309,10 @@ export class NextHoldMain extends BaseScriptComponent {
       this.controlRow.onModePressed.add(() => this.pressMode())
       this.controlRow.onViewPressed.add(() => this.pressView())
       this.controlRow.onHeightStep.add((d) => this.pressHeight(d))
+      this.controlRow.onShowBetaPressed.add(() => this.pressShowBeta())
+      this.callouts.onCameOffPressed.add(() => this.pressCameOffHint())
       this.controlRow.setHeight(this.heightCm)
+      this.beta = initialBeta(this.betaDefault, getTime())
       this.typePicker.onTypePicked.add((t) => this.pickType(t))
       this.typePicker.onStartPressed.add(() => this.pressStart())
       this.typePicker.onTopPressed.add(() => this.pressTop())
@@ -316,6 +333,7 @@ export class NextHoldMain extends BaseScriptComponent {
       if (!this.ready) return
       this.tickTopped(getTime())
       this.tickRefused(getTime())
+      this.tickCue(getTime())
       // the row lays itself out late (after a start or a refresh): once its real size is known, or
       // whenever it changes, place it again, or in Ground it sits too close and covers a ring
       const size = this.controlRow.getSize()
@@ -342,7 +360,21 @@ export class NextHoldMain extends BaseScriptComponent {
     if (d === null) return false
     const side: View | null = d < ON_WALL_CM ? "wall" : d > GROUND_CM ? "ground" : this.distanceView
     if (side === this.distanceView || side === null) return false
+    const from = this.distanceView
     this.distanceView = side
+    // session 23, came off: the preview has no body, so the eye stands in. It was closer than ON_WALL_CM
+    // and is now further than GROUND_CM: the climber left the wall. Only the eye crossing counts, not the
+    // view button; NextHoldBeta.steppedBack decides whether that is a fall.
+    if (from === "wall" && side === "ground" && this.mode === "climb") {
+      const was = this.beta
+      this.beta = steppedBack(was, this.isTopped())
+      if (this.beta !== was) {
+        this.askArmed = false
+        this.controlRow.setAskArmed(false)
+        this.callouts.hideWhy()
+        this.recompute()
+      }
+    }
     if (side === this.view) return false
     this.setView(side)
     return true
@@ -412,6 +444,9 @@ export class NextHoldMain extends BaseScriptComponent {
     const wasTopped = this.isTopped()
     this.position[limb] = id
     this.override = null
+    this.beta = moved(this.beta, getTime())
+    // session 23: topping out ended the attempt: the hand coming off the top starts a new one
+    if (wasTopped && !this.isTopped()) this.beta = newAttempt(this.beta, this.betaDefault, getTime())
     // a hand just reached the top hold: the problem is done, "TOPPED" from this frame
     if (!wasTopped && this.isTopped()) {
       this.toppedAt = getTime()
@@ -442,20 +477,85 @@ export class NextHoldMain extends BaseScriptComponent {
    *  it as the overlays come in, since the label from the Lens's start has faded by then. */
   showLabelAgain(): void {
     const s = this.getSuggestion()
-    if (s) this.callouts.showSuggestion(this.labelPos(s.holdId), this.wallRot(), s.label)
+    if (s && this.overlay && this.overlay.glowHoldId === s.holdId) this.callouts.showSuggestion(this.labelPos(s.holdId), this.wallRot(), s.label)
   }
 
+  /** Beta shown: arms for the next pinch on a ring, as ever. Beta hidden: the next step of the hint
+   *  ladder (NextHoldBeta.ask), whose third step arms it. */
   pressAsk(): void {
     if (!this.ready) return
     this.rippleButton("AskButton")
-    this.askArmed = this.mode === "climb" ? !this.askArmed : false
+    if (this.mode !== "climb") {
+      this.askArmed = false
+      this.controlRow.setAskArmed(false)
+      return
+    }
+    const was = this.beta
+    const next = ask(was, this.askArmed, this.isTopped())
+    this.beta = next.state
+    this.askArmed = next.armed
     this.controlRow.setAskArmed(this.askArmed)
+    if (next.state.hintStep !== was.hintStep || next.state.cameOffMove !== was.cameOffMove) this.recompute()
   }
+
+  /** "Show my beta": the full read appears, in this frame. Only while climbing, and once. */
+  pressShowBeta(): void {
+    if (!this.ready || this.mode !== "climb" || this.beta.betaShown) return
+    this.rippleButton("ShowBetaButton")
+    this.beta = showBeta(this.beta)
+    this.recompute()
+  }
+
+  /** One pinch on the came-off card: the hint ladder opens at that position. */
+  pressCameOffHint(): void {
+    if (!this.ready || this.beta.cameOffMove === null) return
+    this.rippleButton("CameOffCard")
+    this.beta = takeHint(this.beta)
+    this.recompute()
+  }
+
+  /** The beta on, with no pinch and no ripple: the demo autopilot sets it at its start, so the take
+   *  reads the full v6 read from its first frame. */
+  setBetaShown(): void {
+    if (!this.ready) return
+    this.beta = showBeta(this.beta)
+    this.recompute()
+  }
+
+  /** Tests only: start over from the opening state, with beta shown or hidden, and keep that as what
+   *  a new attempt or problem goes back to. The LEAF reset uses true, so scenarios written for the full
+   *  read keep their meaning; the hidden path's scenarios use false. */
+  resetBetaForTests(shown: boolean): void {
+    if (!this.ready) return
+    this.betaDefault = shown
+    this.beta = initialBeta(shown, getTime())
+    this.askArmed = false
+    this.controlRow.setAskArmed(false)
+    this.recompute()
+  }
+
+  private currentProblemKey(): string {
+    return problemKey(this.getProblemHolds(), this.getStartHolds(), this.getTopHold())
+  }
+
+  /** Each frame: the cue in the row's top line, while it applies. It shows, and does nothing else. */
+  private tickCue(time: number): void {
+    const on = cueShown(this.beta, {onWall: this.view === "wall", climbing: this.mode === "climb", topped: this.isTopped(), now: time})
+    if (on === this.cueOn) return
+    this.cueOn = on
+    this.controlRow.setCue(on ? CUE_TEXT : null)  }
 
   pressMode(): void {
     if (!this.ready) return
     this.rippleButton("ModeSwitch")
     this.mode = this.mode === "climb" ? "setup" : "climb"
+    // session 23: a card doesn't outlast a trip to setup; a different problem starts from nothing
+    if (this.mode === "setup") {
+      this.setupFromKey = this.currentProblemKey()
+      this.beta = {...this.beta, cameOffMove: null}
+    } else if (this.currentProblemKey() !== this.setupFromKey) {
+      this.beta = initialBeta(this.betaDefault, getTime())
+    }
     this.visuals.stopPulse()
     this.askArmed = false
     this.controlRow.setAskArmed(false)
@@ -490,6 +590,7 @@ export class NextHoldMain extends BaseScriptComponent {
   /** Only what is shown changes: no rescoring, same state, same frame. */
   private setView(view: View): void {
     this.view = view
+    if (view === "wall") this.beta = arrivedOnWall(this.beta, getTime())
     this.controlRow.setView(this.view)
     if (this.view === "ground") this.updateGroundDistance(true)
     this.pushOverlay()
@@ -592,47 +693,64 @@ export class NextHoldMain extends BaseScriptComponent {
       this.toppedAt = -1
       this.toppedShown = false
     }
+    // session 23: what the climber is shown. Everything above is worked out either way; setup always
+    // shows its own marks, so the reveal only speaks while climbing
+    const show = reveal(this.beta)
+    // the toggle a climber picked stays lit; the best limb lights only when the next move is on show
+    const limbShown = !climb || show.limb || !!this.override
     const rings: {[id: string]: RingColour | null} = {}
     const marks: {[id: string]: boolean} = {}
     const tags: {[id: string]: string} = {}
+    const tagsBelow: {[id: string]: boolean} = {}
+    const outlines: {[id: string]: boolean} = {}
     for (const id of Object.keys(this.holds)) {
-      rings[id] = climb && this.byHold[id] ? this.byHold[id].colour : null
+      const ringed = show.rings === "all" || (show.rings === "reach" && inReach(this.byHold[id]))
+      rings[id] = climb && ringed && this.byHold[id] ? this.byHold[id].colour : null
+      if (climb && show.outlines && this.problem[id]) outlines[id] = true
       // outside setup the holds that aren't in the problem stay visible, but dim
       this.wall.setHoldDim(id, climb && !this.problem[id])
       // climbing: the goal of the sequence is marked "TOP" (Ground only, see pushOverlay); topped out,
       // "TOPPED" for a moment (both views), then nothing
       if (climb && id === goalTop && !topped) tags[id] = "TOP"
       if (climb && id === goalTop && topped && this.toppedShown) tags[id] = TOPPED_TEXT
+      // with beta hidden the read from the mats marks the start holds too (Ground only, as TOP)
+      if (climb && show.outlines && this.problem[id] && this.startFlags[id] && id !== goalTop) {
+        tags[id] = "START"
+        tagsBelow[id] = true
+      }
       if (climb || !this.problem[id]) continue
       marks[id] = true
       const tag = (this.startFlags[id] ? ["START"] : []).concat(goalTop === id ? ["TOP"] : [])
       if (tag.length) tags[id] = tag.join(" · ")
     }
     // topped out there is no next move: no glow, no label, no 1-2-3, no arrow (the rings stay)
-    const sug = climb && !topped ? this.evaluation.suggestion : null
+    const sug = climb && !topped && show.glow ? this.evaluation.suggestion : null
     // look-ahead from the same position, in the same frame as the rings
-    this.preview = climb && sug
+    this.preview = climb && sug && show.steps
       ? sequence({holds, holdTypes: this.holdTypes, position: this.position, reach, top: goalTop, limb: this.selected})
       : []
     this.overlay = {
       rings,
       glowHoldId: sug ? sug.holdId : null,
       position: {...this.position},
-      selectedLimb: this.selected,
+      selectedLimb: limbShown ? this.selected : null,
       showMarkers: true,
       marks,
       tags,
       tagsAbove: climb,
-      ghosts: this.preview.map((m) => ({hold: m.holdId, limb: m.limb, colour: m.colour})),
+      tagsBelow,
+      outlines,
+      ghosts: this.preview.map((m) => ({hold: m.holdId, limb: m.limb})),
       // the body: the centre of mass the scoring itself uses for this position
       torso: centreOfMass(this.position, holds),
-      body: this.figureBody(holds, reach),
+      body: !climb || show.figure ? this.figureBody(holds, reach) : null,
     }
     this.pushOverlay()
 
-    this.controlRow.setSelectedLimb(this.selected)
+    this.controlRow.setSelectedLimb(limbShown ? this.selected : null)
     this.controlRow.setMode(this.mode)
     this.controlRow.setView(this.view)
+    this.controlRow.setBetaShown(this.beta.betaShown)
     this.updateFigureMask(true)
 
     if (sug) {
@@ -661,13 +779,15 @@ export class NextHoldMain extends BaseScriptComponent {
       // the rings; the limb markers already show where the hands and feet are
       this.visuals.apply({...s, body: null, viewCm: this.groundCm, glowScale, labelBox})
     } else {
-      const rings: {[id: string]: RingColour | null} = {}
-      if (s.glowHoldId) rings[s.glowHoldId] = s.rings[s.glowHoldId] || null
-      // On wall: one ring and its word; the climbing TOP tag is a Ground thing (setup keeps its tags),
-      // but "TOPPED" is the word when there is no ring left
+      // On wall: one ring and its word; with beta hidden only what the hint ladder has opened (session 23)
+      let rings: {[id: string]: RingColour | null} = {}
+      if (this.mode === "climb" && !this.beta.betaShown) rings = s.rings
+      else if (s.glowHoldId) rings[s.glowHoldId] = s.rings[s.glowHoldId] || null
+      // the climbing TOP tag is a Ground thing (setup keeps its tags), but "TOPPED" is the word when
+      // there is no ring left
       const tags: {[id: string]: string} = this.mode === "climb" ? {} : s.tags
       if (this.mode === "climb") for (const id of Object.keys(s.tags)) if (s.tags[id] === TOPPED_TEXT) tags[id] = TOPPED_TEXT
-      this.visuals.apply({...s, rings, tags, ghosts: [], viewCm: DESIGN_VIEW_CM, glowScale, labelBox})
+      this.visuals.apply({...s, rings, tags, ghosts: [], outlines: {}, viewCm: DESIGN_VIEW_CM, glowScale, labelBox})
     }
     // the label's size changed with the view: keep it just below the ring
     if (s.glowHoldId) this.callouts.moveSuggestion(this.labelPos(s.glowHoldId), this.wallRot())
@@ -678,22 +798,56 @@ export class NextHoldMain extends BaseScriptComponent {
     const whyScore = whyId ? this.shownScore(whyId) : null
     const whyText = this.refusedUntil >= 0 ? this.refusedText : whyScore ? whyScore.why : null
     if (this.callouts.isWhyVisible() && whyId && whyText) this.showWhyFor(whyId, whyText)
+    this.placeCameOffCard()
   }
 
   /**
-   * The score a hold's ring shows, which is the one "?" explains: the limb a pinch on it moves (the
-   * override, or the best limb for that hold), except under a step tag in Ground (not on the glowing hold), where the ring wears the earliest such step's colour
-   * (session 16), so the why-line explains that step's move. Asked about otherwise, "POCKET HOLD ·
-   * HIGH STEP" could sit on a green ring. Null when the hold has no ring.
+   * The came-off card, only from the mats. It stands where the eye is looking, in the first place that
+   * covers no ring or tag of the problem (lower in the view first), kept in view, and sized like the
+   * other panels. World-locked once placed: it moves only when Ground re-sizes for a new distance.
    */
-  private shownScore(id: string): ScoreResult | null {
-    const own = this.byHold[id]
-    if (!own) return null
-    return this.shownStep(id) || own
+  private placeCameOffCard(): void {
+    const move = this.beta.cameOffMove
+    if (move === null || this.view !== "ground" || this.mode !== "climb") {
+      this.callouts.hideCameOff()
+      return
+    }
+    const k = this.panelScale()
+    const hw = CARD_HALF_W * k, hh = CARD_HALF_H * k
+    const finder = WorldCameraFinderProvider.getInstance()
+    const cam = finder ? finder.getComponent() : null
+    const eye = this.eyeOnWall()
+    const h = eye ? eye.z * (cam ? Math.tan(cam.fov / 2) : 0.33) : 80
+    const cx = eye ? eye.x : 120, cy = eye ? eye.y : 150
+    const rings = this.getProblemHolds().map((id) => ({x: this.holds[id].x, y: this.holds[id].y, r: this.ringRadius(id) + this.getRingLineWidth() / 2}))
+    const texts = this.visuals.getTextBoxes()
+    let best: {p: vec3; clear: number} | null = null
+    for (const v of [-0.55, -0.7, -0.4, -0.25, -0.1, 0.1, 0.25, 0.4, 0.55]) {
+      for (const u of [0, -0.2, 0.2]) {
+        // kept in view with room to spare: the card is a 3D prism, drawn k times larger from the mats
+        // (h5's first run: from 2.5 m with a 1 cm margin it was cut 0.8% at the frame's edge)
+        const p = this.keepInView(this.wall.wallToWorld(cx + u * h, cy + v * h, PANEL_Z), hw + 2 * k, hh + 2 * k)
+        const w = this.toWall(p)
+        let clear = 1e9
+        for (const c of rings) clear = Math.min(clear, boxCircleGap(w, hw, hh, c.x, c.y, c.r))
+        for (const b of texts) clear = Math.min(clear, boxBoxGap(w, hw, hh, b))
+        if (!best || clear > best.clear + 1e-6) best = {p, clear}
+        if (clear >= 2) break
+      }
+      if (best && best.clear >= 2) break
+    }
+    this.callouts.showCameOff(best!.p, this.wallRot(), cameOffLine(move), k)
   }
 
-  /** The step whose drawn tag this hold's ring wears: the earliest of steps 2 and 3 on it, in Ground
-   *  and not on the glowing hold. Null otherwise. */
+  /** The score a hold's ring shows, which is the one "?" explains: the limb a pinch on it moves (the
+   *  override, or the best limb for that hold). Session 23: also under a step tag, whose ring now keeps
+   *  this colour. Null when the hold has no score. */
+  private shownScore(id: string): ScoreResult | null {
+    return this.byHold[id] || null
+  }
+
+  /** The step whose tag is drawn on this hold: the earliest of steps 2 and 3 on it, in Ground and not
+   *  on the glowing hold. Null otherwise. */
   private shownStep(id: string): ScoreResult | null {
     if (this.view === "ground" && this.overlay && this.overlay.glowHoldId !== id) {
       for (let n = 2; n <= 3; n++) {
@@ -863,7 +1017,16 @@ export class NextHoldMain extends BaseScriptComponent {
       }
       x = Math.min(220, Math.max(20, x))
       y = Math.max(12, y)
-      this.controlRow.placeAt(this.keepInView(this.wall.wallToWorld(x, y, PANEL_Z), halfW, halfH), this.wallRot(), k)
+      const kept = this.keepInView(this.wall.wallToWorld(x, y, PANEL_Z), halfW, halfH)
+      if (this.mode === "climb" && !this.beta.betaShown) {
+        // session 23, beta hidden: the row (30 x 33 cm in a 40 x 46 cm view) doesn't slide up over the wall
+        // the climber is working out and any hint's rings. It hangs below the hands, the brief's place:
+        // into view sideways and downward only; glance down to it, as for the one ring
+        const kv = this.toWall(kept)
+        this.controlRow.placeAt(this.wall.wallToWorld(kv.x, Math.min(y, kv.y), PANEL_Z), this.wallRot(), k)
+        return
+      }
+      this.controlRow.placeAt(kept, this.wallRot(), k)
       return
     }
     // On wall the one ring and its word are the view: the row goes out of the line of sight to it.
@@ -1206,6 +1369,17 @@ export class NextHoldMain extends BaseScriptComponent {
   getRefusalLog(): {hold: string; time: number}[] { return this.refusalLog.slice() }
   /** the ring pulsing now and how large it is drawn (1 = its own size), or null */
   getRingPulse(): {hold: string; scale: number} | null { return this.visuals ? this.visuals.getPulse() : null }
+  // session 23
+  isBetaShown(): boolean { return this.beta.betaShown }
+  getHintStep(): HintStep { return this.beta.hintStep }
+  getMovesMade(): number { return this.beta.moves }
+  getAttempt(): number { return this.beta.attempt }
+  isOutlineVisible(id: string): boolean { return this.visuals ? this.visuals.isOutlineVisible(id) : false }
+  isCueVisible(): boolean { return this.cueOn }
+  isCameOffVisible(): boolean { return this.callouts.isCameOffVisible() }
+  getCameOffText(): string { return this.callouts.getCameOffText() }
+  getShowBetaLabel(): string { return this.controlRow.getShowBetaLabel() }
+  isShowBetaLit(): boolean { return this.controlRow.isShowBetaLit() }
 }
 
 /** gap (cm) between a box (centre c, half sizes hw x hh) and a circle; < 0 when they overlap */

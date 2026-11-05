@@ -5,9 +5,10 @@
 // SuggestGlow, HoverRing, setup mode's Mark_<id> "in your problem" ring and
 // Tag_<id> START / TOP text, the sequence preview's badges for steps 2 and 3
 // (Ghost_2..3 pill outlines with their GhostNumber_2..3 text "2 · LH", pinned on
-// the hold's ring; GhostHoldRing_2..3 when that hold has no ring of its own because
-// a limb is on it now; the pill, that ring and the hold's own ring under a tag all wear the
-// step's own green / yellow / red, so a tag never sits on a ring of another colour),
+// the hold's ring; GhostHoldRing_2..3, a neutral outline, when that hold has no ring of its
+// own because a limb is on it now. Session 23: the pill is its own badge colour and the ring
+// under it keeps its own grip colour, so ring colour only ever means grip / reach for you;
+// also Outline_<id>, the neutral outline a problem's hold wears with beta hidden),
 // the dotted GhostPath_1 (glow -> badge 2) and GhostPath_2 (badge 2 -> 3),
 // and the stick figure: Figure_Head, Figure_Spine / Shoulders / Hips and two
 // segments per limb, Figure_<limb>_Upper / _Lower, bent at the elbow or knee and
@@ -70,8 +71,8 @@ function pillRuns(style: RingStyle): [number, number][] {
 }
 
 export interface OverlayState {
-  /** ring colour per hold id (the score of the limb a pinch on it moves); null/absent = no ring (occupied, or setup
-   *  mode). A hold under a step 2 / 3 tag is drawn in that step's colour instead (see apply) */
+  /** ring colour per hold id (the score of the limb a pinch on it moves); null/absent = no ring (occupied, setup
+   *  mode, or beta hidden). A ring under a step tag keeps this colour (session 23) */
   rings: {[id: string]: RingColour | null}
   /** hold whose ring glows (the suggestion), or null */
   glowHoldId: string | null
@@ -87,6 +88,10 @@ export interface OverlayState {
   tags: {[id: string]: string}
   /** tags sit above the hold's ring (climb: the top of the problem) instead of under it (setup) */
   tagsAbove?: boolean
+  /** session 23: these tags (START, from the mats) sit under the hold all the same */
+  tagsBelow?: {[id: string]: boolean}
+  /** session 23, beta hidden from the mats: holds wearing the neutral outline; a coloured ring replaces it */
+  outlines?: {[id: string]: boolean}
   /** sequence preview: the next moves in order, each a hold and the limb that moves there. Step 1
    *  is the suggestion (its glow and label show it); steps 2 and 3 get a badge "2 · LH" pinned on
    *  their hold's ring. Empty = none */
@@ -115,9 +120,8 @@ export interface FigureBody {
   headR: number
 }
 
-/** one step of the look-ahead: the hold, the limb that moves onto it, and how secure that move is
- *  for you at its turn (its tag and the ring of the hold it sits on wear this colour) */
-export interface GhostStep {hold: string; limb: string; colour: RingColour}
+/** one step of the look-ahead: the hold and the limb that moves onto it */
+export interface GhostStep {hold: string; limb: string}
 
 export interface OverlayColours {
   green: vec4
@@ -160,7 +164,10 @@ const GHOST_COUNT = 3
 const GHOST_R = 2.6
 const BADGE_TEXT_HALF_W = 2.9
 const BADGE_PAD = 0.8
-const GHOST_COLOR = new vec4(0.86, 0.93, 1.0, 0.95)
+/** session 23: a step tag's own colour: not green, yellow or red, so it never speaks for a grip */
+export const BADGE_COLOR = new vec4(0.48, 0.66, 1.0, 1)
+/** session 23: "no colour": the outline a hold wears when nothing is being said about gripping it */
+export const NEUTRAL_COLOR = new vec4(0.92, 0.93, 0.95, 0.9)
 const GHOST_NUMBER_COLOR = new vec4(0.95, 0.98, 1.0, 1)
 const GHOST_NUMBER_SIZE = 64
 /** clock positions a badge tries on its hold's ring, in order: on top, below, the sides, the diagonals */
@@ -344,6 +351,8 @@ export class NextHoldWallVisuals {
   private glow: {so: SceneObject; mat: Material; meshes: {[r: string]: RenderMesh}; rmv: RenderMeshVisual}
   private hover: {so: SceneObject; rmv: RenderMeshVisual; meshes: {[r: string]: RenderMesh}}
   private marks: {[id: string]: {so: SceneObject; mat: Material}} = {}
+  /** session 23: the neutral outline a problem's hold wears with beta hidden */
+  private outlines: {[id: string]: {so: SceneObject; mat: Material}} = {}
   private textGroup: SceneObject
   private tags: {[id: string]: {so: SceneObject; text: Text}} = {}
   /** badges for steps 2 and 3 (index 0 = step 2): the pill outline, its text, and a thin ring on the
@@ -394,6 +403,12 @@ export class NextHoldWallVisuals {
       mark.so.getTransform().setLocalPosition(this.wallToLocal(h.x, h.y, RING_Z))
       mark.so.enabled = false
       this.marks[h.id] = mark
+
+      const outline = this.makeVisual("Outline_" + h.id, this.ringMesh(r, RING_W))
+      outline.mat.mainPass.baseColor = NEUTRAL_COLOR
+      outline.so.getTransform().setLocalPosition(this.wallToLocal(h.x, h.y, RING_Z))
+      outline.so.enabled = false
+      this.outlines[h.id] = outline
     }
 
     // the glow sits under the ghosts by render order (see ORDER_*), not by hierarchy: overlays
@@ -424,11 +439,11 @@ export class NextHoldWallVisuals {
     }
     for (let n = 2; n <= GHOST_COUNT; n++) {
       const ring = this.makeVisual("Ghost_" + n, this.pillMesh(1, GHOST_R))
-      ring.mat.mainPass.baseColor = GHOST_COLOR
+      ring.mat.mainPass.baseColor = BADGE_COLOR
       ring.so.enabled = false
       ;(ring.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).setRenderOrder(ORDER_GHOST)
-      // a ring like every other, in the step's colour (set in apply)
       const holdRing = this.makeVisual("GhostHoldRing_" + n, this.ringMesh(9, RING_W))
+      holdRing.mat.mainPass.baseColor = NEUTRAL_COLOR
       holdRing.so.enabled = false
       const label = this.makeText("GhostNumber_" + n, vec3.zero(), GHOST_NUMBER_SIZE, GHOST_NUMBER_COLOR)
       label.text.text = "" + n
@@ -482,6 +497,11 @@ export class NextHoldWallVisuals {
         ;(ring.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.ringMesh(HOLD_SIZE[h.type].ringR, ringW, STYLE_OF[c])
       }
       this.marks[h.id].so.enabled = !!s.marks[h.id]
+      // session 23, beta hidden: a neutral outline, the ring's own line for this distance, no grip colour
+      const outline = this.outlines[h.id]
+      const outlined = !!(s.outlines && s.outlines[h.id]) && !c
+      outline.so.enabled = outlined
+      if (outlined) (outline.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.ringMesh(HOLD_SIZE[h.type].ringR, ringW)
       const tag = s.tags[h.id]
       const t = this.tags[h.id]
       t.so.enabled = !!tag
@@ -500,10 +520,12 @@ export class NextHoldWallVisuals {
         }
         // tags grow with the distance like the ring line
         // (session 20: the climbing TOP and TOPPED, read from the mats, grow by readBoost too)
-        const tk = Math.max(1, viewCm / DESIGN_VIEW_CM) * (topped || s.tagsAbove ? readBoost(viewCm) : 1) * (topped ? TOPPED_TAG_SIZE : s.tagsAbove ? TOP_TAG_SIZE : TAG_SIZE) / TAG_SIZE
+        // session 23: START, read from the mats too, goes under its hold at the setup tag's size x the boost
+        const below = !!(s.tagsBelow && s.tagsBelow[h.id])
+        const tk = Math.max(1, viewCm / DESIGN_VIEW_CM) * (topped || s.tagsAbove ? readBoost(viewCm) : 1) * (topped ? TOPPED_TAG_SIZE : s.tagsAbove && !below ? TOP_TAG_SIZE : TAG_SIZE) / TAG_SIZE
         t.text.size = TAG_SIZE * tk
         const r = HOLD_SIZE[h.type].ringR + ringW / 2
-        const dy = s.tagsAbove ? r + TAG_GAP * tk : -(r + TAG_GAP * tk)
+        const dy = s.tagsAbove && !below ? r + TAG_GAP * tk : -(r + TAG_GAP * tk)
         t.so.getTransform().setLocalPosition(this.wallToLocal(h.x, h.y + dy, RING_Z + 0.2))
       }
     }
@@ -515,8 +537,10 @@ export class NextHoldWallVisuals {
     // "2 · LH" pinned on their own hold's ring (on the glow's outer ring if that hold glows), at the
     // first clock position where the badge is clear of the glow, the label, the badge before it and
     // every other hold's ring by BADGE_OTHER_GAP, so the nearest ring to a badge is always its own.
-    // A hold with no ring of its own (a limb is on it now) gets a thin light ring to pin onto.
+    // A hold with no ring of its own (a limb is on it now) gets the neutral outline to pin onto.
     // From further back the badge grows until its text reads at least as large as Body at 110 cm.
+    // Session 23: a tag is its own badge colour, always solid; ring colour only ever means grip / reach
+    // for you from here, so the ring under a tag keeps its own.
     const gk = Math.max(GHOST_NUMBER_SIZE, minReadSize(viewCm) * readBoost(viewCm)) / GHOST_NUMBER_SIZE
     const badgeR = GHOST_R * gk
     const badgeL = Math.max(0, (BADGE_TEXT_HALF_W + BADGE_PAD) * gk - badgeR)
@@ -534,8 +558,6 @@ export class NextHoldWallVisuals {
       boxes.push({x: th.x, y: p.y, hw: s.tags[id].length * TAG_HALF_W_PER_CHAR * tk, hh: TAG_HALF_H * tk})
     }
     const at: GhostAt[] = []
-    // holds whose ring already shows a step's colour (the earlier step keeps it)
-    const stepRinged: {[id: string]: boolean} = {}
     for (let i = 0; i < this.ghosts.length; i++) {
       const g = this.ghosts[i]
       const step = steps[i + 1]
@@ -576,26 +598,15 @@ export class NextHoldWallVisuals {
         if (c > bestClear) { best = p; bestClear = c }
       }
       at.push({x: best.x, y: best.y, hold: h, a: best.a, d: best.d, L: badgeL, R: badgeR})
-      ;(g.ring.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.pillMesh(badgeL, badgeR, STYLE_OF[step.colour], ringW / RING_W)
-      // the tag's outline says how secure its move is at its turn; the text stays light to read
-      g.ring.mat.mainPass.baseColor = this.colours[step.colour]
+      ;(g.ring.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.pillMesh(badgeL, badgeR, "solid", ringW / RING_W)
       g.label.text.size = GHOST_NUMBER_SIZE * gk
       g.label.text.text = (i + 2) + " · " + step.limb
       g.ring.so.getTransform().setLocalPosition(this.wallToLocal(best.x, best.y, RING_Z + 0.15))
       g.label.so.getTransform().setLocalPosition(this.wallToLocal(best.x, best.y, RING_Z + 0.3))
-      if (ownRing && !onGlow && !stepRinged[h.id]) {
-        // a hold with a tag on it wears the tag's colour: how secure that move is at its turn, not
-        // what the selected limb could do from here (a red ring under a green "2 · LH" read as a
-        // contradiction). The score itself is unchanged; only the ring under the tag shows the step.
-        this.rings[h.id].mat.mainPass.baseColor = scaled(this.colours[step.colour], RING_DIM)
-        ;(this.rings[h.id].so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.ringMesh(HOLD_SIZE[h.type].ringR, ringW, STYLE_OF[step.colour])
-      }
-      stepRinged[h.id] = true
       if (!ownRing && !onGlow) {
-        // a limb is on this hold now, so it has no ring of its own: it gets an ordinary ring in
-        // the colour of the step that moves onto it (never white)
-        ;(g.holdRing.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.ringMesh(HOLD_SIZE[h.type].ringR, ringW, STYLE_OF[step.colour])
-        g.holdRing.mat.mainPass.baseColor = scaled(this.colours[step.colour], RING_DIM)
+        // a limb is on this hold now, so nothing can be said of a grip on it: the neutral outline,
+        // the same one the holds wear with beta hidden, for the tag to pin onto
+        ;(g.holdRing.so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh = this.ringMesh(HOLD_SIZE[h.type].ringR, ringW)
         g.holdRing.so.getTransform().setLocalPosition(this.wallToLocal(h.x, h.y, RING_Z))
         g.holdRing.so.enabled = true
       }
@@ -848,6 +859,11 @@ export class NextHoldWallVisuals {
   isRingVisible(id: string): boolean {
     const r = this.rings[id]
     return !!r && r.so.enabled
+  }
+
+  isOutlineVisible(id: string): boolean {
+    const o = this.outlines[id]
+    return !!o && o.so.enabled
   }
 
   isMarkVisible(id: string): boolean {

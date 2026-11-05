@@ -10,8 +10,11 @@
 // 5. sequence(): the 1-2-3 behind the glow and the "2 · LH" tags, a search over limbs and holds for
 //    the cheapest secure route to the top, checked against a brute force over every route, and
 //    at 155 vs 195 cm (two heights, two betas).
+// 6. Beta on request (Assets/Scripts/NextHoldBeta.ts): what is shown and when; the hint ladder, the
+//    cue, came off; the hint's rings against the rule over every state a pinch can reach.
 import { createRequire } from "node:module";
 import * as P from "../Assets/Scripts/NextHoldScoring.ts";
+import * as B from "../Assets/Scripts/NextHoldBeta.ts";
 import { HOLDS, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP, CLIMBER_REACH } from "../Assets/Scripts/Wall/WallLayout.ts";
 
 const require = createRequire(import.meta.url);
@@ -416,6 +419,99 @@ check("following the look-ahead reaches the top hold, and the look-ahead ends th
 check("look-ahead is empty when nothing is reachable",
   P.sequence({ holds: { a: { x: 0, y: 0 }, b: { x: 500, y: 500 } }, holdTypes: { a: "jug", b: "jug" },
                position: { LH: "a", RH: null, LF: null, RF: null }, reach: 77 }).length === 0);
+
+// ---- 6. beta on request (session 23): what is shown, and when (NextHoldBeta.ts) ----------------
+const B0 = B.initialBeta(false, 100);
+const shownKeys = (r) => JSON.stringify(r);
+check("beta is hidden by default, at step 0, first attempt", !B0.betaShown && B0.hintStep === 0 && B0.attempt === 1 && B0.moves === 0);
+const r0 = B.reveal(B0);
+check("hidden: no rings, glow, limb, 1-2-3 or figure; outlines from the mats",
+  r0.rings === "none" && !r0.glow && !r0.limb && !r0.steps && !r0.figure && r0.outlines, r0);
+const rShown = B.reveal(B.showBeta(B0));
+check("Show my beta: the full read, no outlines", rShown.rings === "all" && rShown.glow && rShown.limb && rShown.steps && rShown.figure && !rShown.outlines, rShown);
+// the ladder, pinch by pinch
+const a1 = B.ask(B0, false, false), a2 = B.ask(a1.state, a1.armed, false), a3 = B.ask(a2.state, a2.armed, false), a4 = B.ask(a3.state, a3.armed, false);
+const r1 = B.reveal(a1.state), r2 = B.reveal(a2.state);
+check("ladder 1: rings on the holds in reach, no glow, no limb, not armed",
+  a1.state.hintStep === 1 && !a1.armed && r1.rings === "reach" && !r1.glow && !r1.limb && !r1.steps, r1);
+check("ladder 2: the glow and the word too, still no 1-2-3, not armed",
+  a2.state.hintStep === 2 && !a2.armed && r2.rings === "reach" && r2.glow && r2.limb && !r2.steps, r2);
+check("ladder 3: arms '?', shows nothing more", a3.state.hintStep === 3 && a3.armed && shownKeys(B.reveal(a3.state)) === shownKeys(r2));
+check("after the ladder '?' toggles as it always has", a4.state.hintStep === 3 && !a4.armed && B.ask(a4.state, false, false).armed);
+const aShown = B.ask(B.showBeta(B0), false, false);
+check("beta shown: '?' arms at once, as in v6", aShown.armed && aShown.state.hintStep === 0 && !B.ask(aShown.state, true, false).armed);
+check("hidden and topped out: '?' does nothing, there is no next move", (() => { const t = B.ask(B0, false, true); return t.state === B0 && !t.armed; })());
+const m1 = B.moved(a2.state, 130);
+check("a move ends the hint and restarts the idle clock", m1.hintStep === 0 && m1.moves === 1 && m1.idleFrom === 130 && B.reveal(m1).rings === "none");
+// came off
+const m2 = B.moved(m1, 140);
+check("stepping back with no move made is not a fall", B.steppedBack(B0, false) === B0);
+check("stepping back on the top hold is not a fall", B.steppedBack(m2, true) === m2);
+const shownM = B.moved(B.showBeta(B0), 110);
+check("stepping back with beta shown is not a fall: the plan moves on with you", B.steppedBack(shownM, false) === shownM);
+const off = B.steppedBack(m2, false);
+check("two moves made, came off: the card names move 3, the attempt is over, the position's count stays",
+  off.cameOffMove === 3 && off.attempt === 2 && off.moves === 2 && off.hintStep === 0, off);
+check("the card's line, word for word", B.cameOffLine(3) === "Came off at move 3. Hint for that move?");
+check("stepping back again with no new move is the same fall", B.steppedBack({ ...off, cameOffMove: null }, false).attempt === 2 && B.steppedBack({ ...off, cameOffMove: null }, false).cameOffMove === null);
+const hint = B.takeHint(off);
+check("one pinch on the card opens the ladder on step 1, at that position",
+  hint.cameOffMove === null && hint.hintStep === 1 && hint.moves === 2 && B.reveal(hint).rings === "reach" && !B.reveal(hint).glow);
+const viaAsk = B.ask(off, false, false);
+check("'?' with the card up does the same as the card", viaAsk.state.hintStep === 1 && viaAsk.state.cameOffMove === null && !viaAsk.armed);
+const again = B.steppedBack(B.moved(B.arrivedOnWall(hint, 170), 175), false);
+check("climbing on from there, the next fall names the next move", again.cameOffMove === 4 && again.attempt === 3, again);
+check("walking back in leaves the card unanswered, and the idle clock starts there",
+  (() => { const w = B.arrivedOnWall(off, 170); return w.cameOffMove === null && w.idleFrom === 170 && w.hintStep === 0; })());
+check("a move answers the card too", B.moved(off, 170).cameOffMove === null);
+// the cue
+const cue = (s, now, o = {}) => B.cueShown(s, { onWall: true, climbing: true, topped: false, now, ...o });
+const back = B.arrivedOnWall(off, 170);
+check("no cue on the first attempt before a fall, however long", !cue(B0, 100 + 1000));
+check("after a fall: no cue at 19.9 s on the wall, a cue at 20 s", !cue(back, 189.9) && cue(back, 190));
+check("the idle clock counts from the last move", !cue(B.moved(back, 185), 200) && cue(B.moved(back, 185), 205));
+check("no cue on the mats, in setup, topped out, with beta shown, or once a hint was asked",
+  !cue(back, 300, { onWall: false }) && !cue(back, 300, { climbing: false }) && !cue(back, 300, { topped: true }) &&
+  !cue(B.showBeta(back), 300) && !cue(B.ask(back, false, false).state, 300));
+check("the cue is pure: it changes nothing in the state", (() => { const j = JSON.stringify(back); cue(back, 300); return JSON.stringify(back) === j; })());
+// a new attempt or a new problem
+const fresh = B.newAttempt(B.showBeta(m2), false, 200);
+check("a new attempt hides beta again, clears the hint and the count", !fresh.betaShown && fresh.hintStep === 0 && fresh.moves === 0 && fresh.attempt === 2 && fresh.idleFrom === 200);
+check("the same with beta kept on by a test's default", B.newAttempt(m2, true, 200).betaShown);
+check("problemKey: order doesn't matter; holds, start holds and top do",
+  B.problemKey(["a", "b"], ["a"], "b") === B.problemKey(["b", "a"], ["a"], "b") && B.problemKey(["a", "b"], ["a"], "b") !== B.problemKey(["a", "b", "c"], ["a"], "b") &&
+  B.problemKey(["a", "b"], ["a"], "b") !== B.problemKey(["a", "b"], ["b"], "b") && B.problemKey(["a", "b"], ["a"], "b") !== B.problemKey(["a", "b"], ["a"], "a"));
+// the hint's rings against the real rule: the glow is always on a ringed hold, over every state a pinch can reach
+{
+  const pIds = PRESET_PROBLEM, tp = {}, ph = {};
+  for (const h of HOLDS) if (pIds.includes(h.id)) { ph[h.id] = { x: h.x, y: h.y }; tp[h.id] = h.type; }
+  let states = 0, offRing = 0, redIn = 0, outOfReachShown = 0, noReach = 0;
+  for (const height of [150, 175, 200]) {
+    const seen = new Set(), todo = [{ ...PRESET_POSITION }], reach = height * 0.44;
+    while (todo.length) {
+      const pos = todo.pop(), key = JSON.stringify(pos);
+      if (seen.has(key)) continue;
+      seen.add(key); states++;
+      const args = { holds: ph, holdTypes: tp, position: pos, reach, top: PRESET_TOP };
+      const per = P.bestPerHold(args), ringed = per.filter((r) => B.inReach(r));
+      if (!ringed.length) noReach++;
+      for (const r of per) {
+        if (B.inReach(r) && r.colour === "red") redIn++;
+        if (B.inReach(r) && r.parts.reachFactor === 0) outOfReachShown++;
+      }
+      const best = P.bestMove(args);
+      if (best && !ringed.some((r) => r.holdId === best.holdId)) offRing++;
+      if ([pos.LH, pos.RH].includes(PRESET_TOP)) continue;
+      for (const r of per) {
+        const m = P.pinchMove({ ...args, holdId: r.holdId });
+        if (m.moves) todo.push({ ...pos, [m.limb]: r.holdId });
+      }
+    }
+  }
+  console.log(`  hint rings over ${states} states at 3 heights: ${redIn} rings in reach but red, ${noReach} states with nothing in reach`);
+  check("in every state a pinch can reach, the glow's hold is among the hint's rings", states > 100 && offRing === 0, { states, offRing });
+  check("an in-reach red ring exists (it says too hard, not out of reach), and no out-of-reach hold is ringed", redIn > 0 && outOfReachShown === 0, { redIn });
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

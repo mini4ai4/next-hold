@@ -2,7 +2,7 @@
 // "<TYPE> HOLD", e.g. "PINCH HOLD · LONG REACH", so the word "pinch" can't be
 // read as a gesture instruction.
 // Input path: real SIK pinches on AskButton then Hold_<id>, for the tagged pinch
-// h09 (its "2 · LH" step, session 18), a jug in comfortable reach (up), the
+// h09 (under its "2 · LH" tag), a jug in comfortable reach (up), the
 // out-of-reach top (h20) and an untagged hold at a long reach for RH. Expected
 // text from the test's own reference.
 
@@ -32,9 +32,8 @@ export class N4WhyWordingScenario extends Scenario {
     const limb = main.getSelectedLimb()
     if (limb !== "RH") errs.push(`precondition: preset selects ${limb}, want RH`)
 
-    // session 18: "?" explains the score the ring shows. h09 carries "2 · LH" at the preset, so it
-    // wears LH's colour and explains LH's move there ("PINCH HOLD"), no longer RH's long reach. The
-    // LONG REACH wording is checked last, on a hold with no tag, for another limb (at the preset
+    // session 18: "?" explains the score the ring shows. Session 23: h09 carries "2 · LH" at the preset
+    // and keeps its own ring: the move a pinch on it makes, LH's ("PINCH HOLD"). The LONG REACH wording is checked last, on a hold with no tag, for another limb (at the preset
     // every long reach for RH is under a tag)
     const h09 = expectedWhy(main, "h09")
     const cases: {hold: string; want: string; limb?: string}[] = [
@@ -43,7 +42,7 @@ export class N4WhyWordingScenario extends Scenario {
       {hold: "h20", want: "JUG HOLD · OUT OF REACH"},
       {hold: "", want: "", limb: "LONG REACH"},
     ]
-    if (!h09 || h09.from.indexOf("step 2") !== 0 || h09.why !== "PINCH HOLD") errs.push(`precondition: h09's ring shows ${h09 ? h09.from + ' "' + h09.why + '"' : "nothing"}, want step 2 "PINCH HOLD"`)
+    if (!h09 || h09.from !== "best limb LH" || h09.why !== "PINCH HOLD") errs.push(`precondition: h09's ring shows ${h09 ? h09.from + ' "' + h09.why + '"' : "nothing"}, want LH's "PINCH HOLD"`)
     for (const c of cases) {
       if (c.limb) {
         // select each other limb with a real pinch until one has an untagged LONG REACH hold

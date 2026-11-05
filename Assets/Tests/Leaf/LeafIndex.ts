@@ -23,6 +23,12 @@ import {L1LabelSizesScenario} from "./L1LabelSizesScenario"
 import {P1PinchBestLimbScenario} from "./P1PinchBestLimbScenario"
 import {P2PinchOutOfReachScenario} from "./P2PinchOutOfReachScenario"
 import {R8ArrowClearOfPanelScenario} from "./R8ArrowClearOfPanelScenario"
+import {H1HiddenReadScenario} from "./H1HiddenReadScenario"
+import {H2ShowMyBetaScenario} from "./H2ShowMyBetaScenario"
+import {H3HintLadderScenario} from "./H3HintLadderScenario"
+import {H4HintCueScenario} from "./H4HintCueScenario"
+import {H5CameOffScenario} from "./H5CameOffScenario"
+import {E1TagOwnBadgeScenario} from "./E1TagOwnBadgeScenario"
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -50,6 +56,12 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "l1-label-sizes", typename: L1LabelSizesScenario.getTypeName()},
     {id: "p1-pinch-best-limb", typename: P1PinchBestLimbScenario.getTypeName()},
     {id: "p2-pinch-out-of-reach", typename: P2PinchOutOfReachScenario.getTypeName()},
+    {id: "h1-hidden-read", typename: H1HiddenReadScenario.getTypeName()},
+    {id: "h2-show-my-beta", typename: H2ShowMyBetaScenario.getTypeName()},
+    {id: "h3-hint-ladder", typename: H3HintLadderScenario.getTypeName()},
+    {id: "h4-hint-cue", typename: H4HintCueScenario.getTypeName()},
+    {id: "h5-came-off", typename: H5CameOffScenario.getTypeName()},
+    {id: "e1-tag-own-badge", typename: E1TagOwnBadgeScenario.getTypeName()},
     {id: "d1-demo-autopilot", typename: D1DemoAutopilotScenario.getTypeName()},
   ]
 }

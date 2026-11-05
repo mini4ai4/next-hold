@@ -1,15 +1,15 @@
 // NextHoldControlRowUI — the compact control row on the wall plane (brief:
 // "Control row"). Four limb toggles (LH, RH, LF, RF), a '?' button, a
-// Setup/Climb mode switch, a Ground / On wall view switch and the climber's
-// height (− / +), plus the small not-a-spotter note underneath.
+// Setup/Climb mode switch, a Ground / On wall view switch, "Show my beta" and the
+// climber's height (− / +), plus the small not-a-spotter note underneath.
 //
 // Owns: the row's UIKit widgets and their lit/unlit look. Passive view.
-// Main -> UI: setSelectedLimb(), setAskArmed(), setMode(), setView(), setHeight(), placeAt().
-// UI -> Main: onLimbPressed, onAskPressed, onModePressed, onViewPressed, onHeightStep (-1 / +1).
+// Main -> UI: setSelectedLimb(), setAskArmed(), setMode(), setView(), setHeight(), setBetaShown(), setCue(), placeAt().
+// UI -> Main: onLimbPressed, onAskPressed, onModePressed, onViewPressed, onShowBetaPressed, onHeightStep (-1 / +1).
 // Must not: hold climbing state or decide anything; Main owns all state.
 //
 // Stable scene names for tests: Toggle_LH, Toggle_RH, Toggle_LF, Toggle_RF, OverrideLabel,
-// AskButton, ModeSwitch, ViewToggle, HeightDown, HeightUp, HeightLabel, SafetyNote.
+// AskButton, ModeSwitch, ViewToggle, ShowBetaButton, HeightDown, HeightUp, HeightLabel, SafetyNote.
 
 import {BackPlate} from "SpectaclesUIKit.lspkg/Scripts/BackPlate"
 import {Button} from "SpectaclesUIKit.lspkg/Scripts/Components/Button/Button"
@@ -45,6 +45,9 @@ const BUTTON_LABEL_Z = 1.6
 const VIEW_DISTANCE_CM = 110
 
 const LIMB_ORDER = ["LH", "RH", "LF", "RF"]
+
+const SHOW_BETA_TEXT = "Show my\nbeta"
+const BETA_SHOWN_TEXT = "Beta\nshown"
 
 /** UI Kit's current Specs look (SnapOS 3 prism buttons); set before the button initialises */
 const BUTTON_VARIANT = {theme: "SnapOS3", shape: "Rectangle", style: "Prism"}
@@ -95,6 +98,8 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
   private _onModePressed = new Event<void>()
   private _onViewPressed = new Event<void>()
   private _onHeightStep = new Event<number>()
+  private _onShowBetaPressed = new Event<void>()
+  get onShowBetaPressed(): PublicApi<void> { return this._onShowBetaPressed.publicApi() }
   get onLimbPressed(): PublicApi<string> { return this._onLimbPressed.publicApi() }
   get onAskPressed(): PublicApi<void> { return this._onAskPressed.publicApi() }
   get onModePressed(): PublicApi<void> { return this._onModePressed.publicApi() }
@@ -111,6 +116,11 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
   private heightLabel: Text
   private overrideLabel: Text
   private backPlate: BackPlate
+  private betaButton: Button
+  private betaLabel: Text
+  private betaShown = false
+  private overrideLimb: string | null = null
+  private cue: string | null = null
 
   private selectedLimb: string | null = null
   private askArmed = false
@@ -196,6 +206,14 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
         this._onViewPressed.invoke()
         this.resync.reset(0)
       })
+      // session 23: the free slot beside the view switch. Two short lines, so it fits one 8 cm button
+      const beta = this.addButton(row, "ShowBetaButton", SHOW_BETA_TEXT, this.buttonWidth, this.buttonHeight, "Headline2")
+      this.betaButton = beta.btn
+      this.betaLabel = beta.label
+      beta.btn.onTriggerUp.add(() => {
+        this._onShowBetaPressed.invoke()
+        this.resync.reset(0)
+      })
     })
     // the climber's height: reach comes from it, so a step recolours the wall for that body
     const stepW = this.buttonHeight
@@ -263,11 +281,33 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
 
   /** The limb the next pinch on a hold will move instead of the best one, or null. */
   setOverride(limb: string | null): void {
-    if (this.overrideLabel) this.overrideLabel.text = "Limb override: " + (limb || "none")
+    this.overrideLimb = limb
+    this.applyTopLine()
   }
 
-  /** Read-back for tests: the override line as shown. */
+  /** Session 23: a small cue for the top line, or null. An override, the climber's own choice, keeps the line. */
+  setCue(text: string | null): void {
+    this.cue = text
+    this.applyTopLine()
+  }
+
+  private applyTopLine(): void {
+    if (!this.overrideLabel) return
+    this.overrideLabel.text = this.overrideLimb ? "Limb override: " + this.overrideLimb : this.cue || "Limb override: none"
+  }
+
+  /** Session 23: lit, and says so, once the beta is shown. */
+  setBetaShown(shown: boolean): void {
+    this.betaShown = shown
+    this.applyStates()
+  }
+
+  /** Read-back for tests: the top line as shown. */
   getOverrideLabel(): string { return this.overrideLabel ? this.overrideLabel.text : "" }
+
+  /** Read-back for tests: the "Show my beta" button. */
+  getShowBetaLabel(): string { return this.betaLabel ? this.betaLabel.text : "" }
+  isShowBetaLit(): boolean { return this.betaButton ? this.betaButton.isOn : false }
 
   /** Read-back for tests: the height as shown. */
   getHeightLabel(): string { return this.heightLabel ? this.heightLabel.text : "" }
@@ -308,6 +348,8 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
     if (this.modeLabel) this.modeLabel.text = this.mode === "setup" ? this.setupLabel : this.climbLabel
     if (this.viewButton) this.viewButton.isOn = this.view === "wall"
     if (this.viewLabel) this.viewLabel.text = this.view === "wall" ? this.onWallLabel : this.groundLabel
+    if (this.betaButton) this.betaButton.isOn = this.betaShown
+    if (this.betaLabel) this.betaLabel.text = this.betaShown ? BETA_SHOWN_TEXT : SHOW_BETA_TEXT
   }
 
   /** Read-back for tests: the view switch's label as shown. */

@@ -109,8 +109,10 @@ export class C1OpenRingsScenario extends Scenario {
     const errs: string[] = []
     const fresh = samePosition(main.getPosition() as RefPosition, presetPosition())
     if (fresh) {
-      // the Lens is still at its untouched open state: check it as-is first
-      errs.push(...checkOpenState(main, "as opened"))
+      // the Lens is still at its untouched open state. Session 23: untouched, it opens with beta hidden
+      // (h1 reads that state in full), so the rings are checked after the test's reset gives the full read
+      if (main.isBetaShown()) errs.push(...checkOpenState(main, "as opened"))
+      else if (HOLDS.some((h) => mustFind("Ring_" + h.id).enabled)) errs.push("as opened: beta is hidden, yet a ring shows")
     } else {
       print("[C1] Lens was not at the preset on entry (earlier scenario moved it); checking after restore only")
     }

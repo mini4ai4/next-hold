@@ -4,13 +4,18 @@
 //                 On wall it stays, since it is the only word there.
 //   WhyLine:      that hold's "why" line, only when asked for with '?', in
 //                 capitals: "PINCH HOLD · LONG REACH".
+//   CameOffCard:  session 23, on the mats after a fall: "Came off at move 3. Hint for
+//                 that move?"; one pinch on it opens the hint.
 //
 // Owns: the text widgets, the label's fade timer. Passive view.
 // Main -> UI: showSuggestion(), moveSuggestion(), hideSuggestion(), showWhy(), hideWhy(),
-//             setLabelMinSize().
+//             setLabelMinSize(), showCameOff(), hideCameOff().
+// UI -> Main: onCameOffPressed.
 // Must not: score anything or pick the suggestion; Main does that.
 
 import {BackPlate} from "SpectaclesUIKit.lspkg/Scripts/BackPlate"
+import {Button} from "SpectaclesUIKit.lspkg/Scripts/Components/Button/Button"
+import Event, {PublicApi} from "SpectaclesInteractionKit.lspkg/Utils/Event"
 import {FlexLayout} from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexLayout"
 import {FlexItem} from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexItem"
 import {FlexAlign, FlexDirection, FlexJustify} from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexTypes"
@@ -42,6 +47,9 @@ const WHY_MIN_W = 12
 const WHY_PAD_X = 1.4
 /** half the why plate's height: the 3 cm text line and 1 cm padding above and below */
 export const WHY_HALF_H = 2.5
+/** session 23, half the came-off card at its 110 cm size (cm): two lines of the panel's headline text */
+export const CARD_HALF_W = 16
+export const CARD_HALF_H = 5
 
 /** the why-line text's width (cm, at its 110 cm size): as wide as its words, at most WHY_W (longer lines shrink) */
 function whyTextWidth(text: string): number {
@@ -98,6 +106,12 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
   private whyWanted = false
   private whyReady = false
   private whyHoldId: string | null = null
+  private cardRoot: SceneObject
+  private cardText: Text
+  private cardWanted = false
+  private cardReady = false
+  private _onCameOffPressed = new Event<void>()
+  get onCameOffPressed(): PublicApi<void> { return this._onCameOffPressed.publicApi() }
 
   onAwake() {
     this.sceneObject.createComponent("Component.Canvas")
@@ -165,8 +179,49 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
       this.whyRoot.enabled = this.whyWanted
     })
 
+    // ── CameOffCard (session 23): one big target, a pinch anywhere on it opens the hint ──
+    this.cardRoot = this.obj(this.sceneObject, "CameOffCard")
+    const card = this.cardRoot.createComponent(Button.getTypeName()) as Button
+    card.setVariant({theme: "SnapOS3", shape: "Rectangle", style: "Prism"})
+    card.size = new vec3(2 * CARD_HALF_W, 2 * CARD_HALF_H, 1)
+    card.setIsToggleable(false)
+    card.onTriggerUp.add(() => this._onCameOffPressed.invoke())
+    const cardTextSO = this.obj(this.cardRoot, "CameOffText", new vec3(0, 0, 1.6))
+    this.cardText = cardTextSO.createComponent("Component.Text") as Text
+    this.cardText.depthTest = true
+    applyTextRole(this.cardText, "Headline2")
+    this.cardText.horizontalAlignment = HorizontalAlignment.Center
+    this.cardText.verticalAlignment = VerticalAlignment.Center
+    this.cardText.horizontalOverflow = HorizontalOverflow.Wrap
+    this.cardText.verticalOverflow = VerticalOverflow.Overflow
+    this.cardText.layoutRect = Rect.create(-CARD_HALF_W + 1, CARD_HALF_W - 1, -CARD_HALF_H + 0.5, CARD_HALF_H - 0.5)
+    // start hidden, but only after the button has initialised
+    card.onInitialized.add(() => {
+      this.cardReady = true
+      this.cardRoot.enabled = this.cardWanted
+    })
+
     this.createEvent("UpdateEvent").bind(() => this.tickLabel())
   }
+
+  /** Show the came-off card at worldPos; scale 1 = its 110 cm size. */
+  showCameOff(worldPos: vec3, worldRot: quat, text: string, scale = 1): void {
+    const tr = this.cardRoot.getTransform()
+    tr.setWorldPosition(worldPos)
+    tr.setWorldRotation(worldRot)
+    tr.setWorldScale(vec3.one().uniformScale(scale))
+    this.cardText.text = text
+    this.cardWanted = true
+    if (this.cardReady) this.cardRoot.enabled = true
+  }
+
+  hideCameOff(): void {
+    this.cardWanted = false
+    if (this.cardReady) this.cardRoot.enabled = false
+  }
+
+  isCameOffVisible(): boolean { return this.cardWanted }
+  getCameOffText(): string { return this.cardWanted && this.cardText ? this.cardText.text : "" }
 
   // ── Main -> UI ────────────────────────────────────────────────────────────
   /** Show the limb label centred at worldPos (just below the suggested ring), then fade it. */

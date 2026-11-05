@@ -2,7 +2,8 @@
 // take is the real Lens running, smooth and the same every time. OFF unless "Play On Start" is
 // ticked (or a LEAF scenario calls play()): with it off this component binds nothing and changes nothing.
 //
-// The timeline is data, in DemoTimeline.ts. While it plays:
+// The timeline is data, in DemoTimeline.ts. At play() it sets the beta shown (no pinch, no ripple), and
+// leaves it so: the take's beats are the full read, as before beta on request. While it plays:
 // - it holds the wearer's camera: device tracking is paused and the eye eases between CAMERA keys
 //   (walking in and out, looking up, down and away); tracking comes back at the end;
 // - ACTIONS call the same NextHoldMain functions a real pinch calls (pressLimb, pressHold,
@@ -98,6 +99,8 @@ export class DemoAutopilot extends BaseScriptComponent {
     this.sceneLog = []
     this.pendingCheck = null
     if (!this.takeCamera()) return
+    // session 23: the Lens opens with beta hidden; the take is the full read, from its first frame
+    this.main.setBetaShown()
     while (this.nextAction < ACTIONS.length && ACTIONS[this.nextAction].t < this.from) this.run(ACTIONS[this.nextAction++])
     while (this.nextCheck < CHECKS.length && CHECKS[this.nextCheck].t < this.from) this.nextCheck++
     while (this.nextScene < SCENES.length && SCENES[this.nextScene].start < this.from) this.nextScene++

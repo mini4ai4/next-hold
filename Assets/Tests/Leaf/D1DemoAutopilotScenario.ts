@@ -16,6 +16,7 @@
 // The view is the Lens's own: the autopilot moves the wearer's camera, so Main measures the real
 // eye distance (no sizing camera). It also checks that idle the autopilot touches nothing, every
 // scene start is logged in order, and stop() hands back tracking, hidden objects and colours.
+// Session 23: the Lens opens with beta hidden; play() sets it shown itself, so this starts from hidden.
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
@@ -281,7 +282,7 @@ export class D1DemoAutopilotScenario extends Scenario {
   async run(): Promise<void> {
     await sleep(1500)
     const main = getMain()
-    await restorePreset(main)
+    await restorePreset(main, false)
     const errs: string[] = []
     const pilot = mustFind("DemoAutopilot").getComponent(DemoAutopilot.getTypeName()) as DemoAutopilot
     if (!pilot) throw new Error("DemoAutopilot component not found")

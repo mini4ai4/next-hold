@@ -2,8 +2,8 @@
 // that hold's "why" line without moving any limb; it's one-shot.
 // Input path: real SIK pinches on AskButton and Hold_<id>. The expected why
 // string comes from the test's own port of scoring.js.
-// Session 18: on a hold under a step tag the ring wears the step's colour, so "?" explains that
-// step's score; the line covers no ring and its nearest ring on screen is the asked hold's.
+// Session 18: the line covers no ring and its nearest ring on screen is the asked hold's. Session 23:
+// a ring under a step tag keeps its own colour, so "?" there explains the hold's own move from here.
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
@@ -57,7 +57,7 @@ export class C5AskWhyScenario extends Scenario {
     for (const l of REF_LIMBS) markers0[l] = main.getMarkerHold(l as any)
 
     // ── pinch the ringed hold ──
-    // session 18: "?" explains the score the ring shows: the limb a pinch moves, or the step's under a step tag
+    // session 18: "?" explains the score the ring shows: the limb a pinch moves
     const want = expectedWhy(main, target.holdId)
     const wantWhy = want ? want.why : target.why
     await pinch("Hold_" + target.holdId)
@@ -83,8 +83,8 @@ export class C5AskWhyScenario extends Scenario {
     if (pos2[target.limb] !== target.holdId) errs.push(`next pinch after the why did not move ${target.limb} to ${target.holdId} (${fmtPos(pos2)})`)
     if (main.isWhyVisible()) errs.push("why line still shown after a move")
 
-    // session 18: a hold under a step tag. At the preset "2 · LH" sits on h09 while RH is selected:
-    // its ring wears LH's colour at that step, so "?" on it explains LH's move there, not RH's
+    // a hold under a step tag: at the preset "2 · LH" sits on h09. Session 23: its ring keeps its own
+    // colour, so "?" on it explains the move a pinch on it makes from here
     await restorePreset(main)
     await frames(3)
     const tagged = [2, 3].map((n) => main.getGhostHold(n)).filter((id) => id && main.isRingVisible(id) && !main.isRingGlowing(id))[0]
@@ -96,7 +96,7 @@ export class C5AskWhyScenario extends Scenario {
       await pinch("Hold_" + tagged)
       await frames(3)
       print(`[C5] tagged ${tagged} (${wantT ? wantT.from : "-"}): ${checkWhyAgrees(camera(), main, errs, "tagged " + tagged)}`)
-      if (!wantT || wantT.from.indexOf("step") !== 0) errs.push(`tagged ${tagged}: the reference does not see it as a step's hold (${wantT ? wantT.from : "none"})`)
+      if (!wantT || wantT.from.indexOf("best limb") !== 0) errs.push(`tagged ${tagged}: the reference explains ${wantT ? wantT.from : "nothing"}, want the best limb's move`)
     }
     await restorePreset(main)
 

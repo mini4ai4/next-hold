@@ -11,6 +11,7 @@ import {LeafHandInteractor} from "Leaf.lspkg/Interactors/interactor/LeafTwoHandI
 import {findInteractableByName} from "Leaf.lspkg/Interactors/InteractableUtils"
 import {findSceneObjectByName, findSceneObjectsByName, nextFrame} from "Leaf.lspkg/Utils/common/Utils"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
+import {BADGE_COLOR, NEUTRAL_COLOR} from "../../Scripts/NextHoldWallVisuals"
 import {HOLDS, HOLD_SIZE, PRESET_POSITION, PRESET_PROBLEM, PRESET_START, PRESET_TOP, holdById} from "../../Scripts/Wall/WallLayout"
 import {GLOW_PROFILE, HOVER_PROFILE, RING_PROFILE} from "../../Scripts/Wall/ProceduralTextures"
 import {RefColour, RefLimb, RefPosition, RefPt, RefResult, ReferenceRule, REF_LIMBS} from "./NextHoldReferenceRule"
@@ -142,10 +143,9 @@ export function fmtPos(p: RefPosition): string {
 // ── what is actually rendered ────────────────────────────────────────────────
 
 /**
- * Session 16: holds a step 2 / 3 tag sits on (its badge shows) that are not the glowing hold, with
- * that step's colour from the Lens's look-ahead (r3 and r7 check the look-ahead against the test's
- * own search). Their ring wears the step's colour, not the selected limb's score. The earlier step
- * keeps a hold.
+ * Holds a step 2 / 3 tag sits on (its badge shows) that are not the glowing hold, with that step's
+ * colour from the Lens's look-ahead. The earlier step keeps a hold. Session 23: the ring under a tag
+ * keeps its own colour; this only says which holds carry a tag.
  */
 export function taggedHolds(main: NextHoldMain): {[id: string]: RefColour} {
   const out: {[id: string]: RefColour} = {}
@@ -159,22 +159,14 @@ export function taggedHolds(main: NextHoldMain): {[id: string]: RefColour} {
   return out
 }
 
-/**
- * Colour of the rendered Ring_<id> material, classified against the Lens's three ring colours; null
- * if the ring object is off. Rings are the score of the limb a pinch moves (ringRule), except under a
- * step tag (taggedHolds), where the ring renders in the step's colour: there this returns the Lens's score
- * colour for the hold when the ring shows the step's colour (callers check it against the rule; C1
- * also checks the state directly), else the colour it renders. That a tagged ring really shows its
- * step's colour is checked by checkTagRingsAgree (in checkBadgeAttribution: r3, r7, a2).
- */
+/** Colour of the rendered Ring_<id> material, classified against the Lens's three ring colours; null
+ *  if the ring object is off. Rings are the score of the limb a pinch moves (ringRule), under a step
+ *  tag too (session 23). */
 export function renderedRingColour(id: string, main: NextHoldMain): RefColour | null {
   const so = mustFind("Ring_" + id)
   if (!so.enabled) return null
   const rmv = so.getComponent("Component.RenderMeshVisual") as RenderMeshVisual
-  const c = classifyColour(rmv.mainMaterial.mainPass.baseColor as vec4, main)
-  const step = taggedHolds(main)[id]
-  if (step) return c === step ? (main.getHoldColour(id) as RefColour | null) : c
-  return c
+  return classifyColour(rmv.mainMaterial.mainPass.baseColor as vec4, main)
 }
 
 export function classifyColour(c: vec4, main: NextHoldMain): RefColour {
@@ -254,7 +246,12 @@ export function groundSizesFor(distanceCm: number): {D: number; line: number; la
  * U = inner / total to U = (inner + core) / total, so it is the radius at the second minus the first.
  */
 export function renderedLineWidth(id: string): number {
-  const mesh = (mustFind("Ring_" + id).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh
+  return renderedLineWidthOf("Ring_" + id)
+}
+
+/** the same for any object drawn with the ring's mesh (session 23: Outline_<id>) */
+export function renderedLineWidthOf(name: string): number {
+  const mesh = (mustFind(name).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mesh
   const pos = mesh.getVertexDataForAttribute("position")
   const uv = mesh.getVertexDataForAttribute("texture0")
   const {inner, core, outer} = RING_PROFILE
@@ -397,8 +394,9 @@ function visualColour(name: string, main: NextHoldMain): RefColour {
 }
 
 /**
- * Every shown ring, the glow, each shown step tag's outline and the ring on an occupied hold: the
- * style it draws must be its colour's (green solid, yellow dashed, red broken). Returns what it saw.
+ * Every shown ring and the glow: the style it draws must be its colour's (green solid, yellow dashed,
+ * red broken). Session 23: a step tag's outline and the outline on an occupied hold have no grip colour,
+ * and are always solid. Returns what it saw.
  */
 export function checkRingStyles(main: NextHoldMain, errs: string[], tag: string): string {
   const seen: {[k: string]: number} = {}
@@ -411,7 +409,11 @@ export function checkRingStyles(main: NextHoldMain, errs: string[], tag: string)
   }
   for (const h of HOLDS) one("Ring_" + h.id)
   one("SuggestGlow")
-  for (const n of BADGE_STEPS) { one("Ghost_" + n); one("GhostHoldRing_" + n) }
+  for (const n of BADGE_STEPS) {
+    for (const name of ["Ghost_" + n, "GhostHoldRing_" + n]) {
+      if (mustFind(name).enabled && renderedStyle(name) !== "solid") errs.push(`${tag}: ${name} draws ${renderedStyle(name)}, want solid: it has no grip colour`)
+    }
+  }
   return "styles: " + Object.keys(seen).map((k) => `${k} x${seen[k]}`).join(", ")
 }
 
@@ -525,11 +527,19 @@ function overlayColour(name: string, main: NextHoldMain): RefColour {
   return classifyColour(c, main)
 }
 
+/** the named overlay's material colour is this one (rgb) */
+export function isColour(name: string, want: vec4): boolean {
+  const c = (mustFind(name).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4
+  return Math.abs(c.x - want.x) + Math.abs(c.y - want.y) + Math.abs(c.z - want.z) < 0.02
+}
+
+export {BADGE_COLOR, NEUTRAL_COLOR}
+
 /**
- * Session 16, the red ring under a green "2 · LH": no hold may show a step tag whose colour
- * disagrees with the ring it sits on. For every shown badge, the ring on its hold, as rendered
- * (the glow if the hold glows, its own Ring_<id>, or the GhostHoldRing on a hold a limb is on now),
- * must be the badge outline's colour, and there must be one. Returns a summary.
+ * Session 23, part E: a step tag has its own badge colour, and ring colour only ever means grip / reach
+ * for you from here. For every shown badge: its outline is the badge colour, and solid; the ring on its
+ * hold is the hold's own (the glow, or Ring_<id> in the colour of the hold's score from here), or, on a
+ * hold a limb is on, which has no score, the neutral outline. Returns a summary.
  */
 export function checkTagRingsAgree(main: NextHoldMain, errs: string[], tag: string): string {
   const out: string[] = []
@@ -537,16 +547,21 @@ export function checkTagRingsAgree(main: NextHoldMain, errs: string[], tag: stri
     if (!mustFind("Ghost_" + n).enabled) continue
     const id = main.getGhostHold(n)
     if (!id) { errs.push(`${tag}: badge ${n} shows but names no hold`); continue }
-    const badge = overlayColour("Ghost_" + n, main)
-    let ring: RefColour | null = null, what = ""
-    if (main.isRingGlowing(id)) { ring = overlayColour("SuggestGlow", main); what = "glow" }
-    else if (mustFind("Ring_" + id).enabled) { ring = overlayColour("Ring_" + id, main); what = "ring" }
-    else if (mustFind("GhostHoldRing_" + n).enabled) { ring = overlayColour("GhostHoldRing_" + n, main); what = "occupied-hold ring" }
-    if (!ring) errs.push(`${tag}: badge ${n} on ${id} sits on no ring`)
-    else if (ring !== badge) errs.push(`${tag}: badge ${n} on ${id} is ${badge} but its ${what} is ${ring}`)
-    out.push(`${n} on ${id}: tag ${badge}, ${what} ${ring}`)
+    if (!isColour("Ghost_" + n, BADGE_COLOR)) errs.push(`${tag}: badge ${n} on ${id} is not the badge colour`)
+    let what = ""
+    if (main.isRingGlowing(id)) what = "glow"
+    else if (mustFind("Ring_" + id).enabled) {
+      const ring = overlayColour("Ring_" + id, main), own = main.getHoldColour(id)
+      what = "ring " + ring
+      if (ring !== own) errs.push(`${tag}: under badge ${n} Ring_${id} is ${ring}, the hold's own score is ${own}`)
+    } else if (mustFind("GhostHoldRing_" + n).enabled) {
+      what = "neutral outline"
+      if (!isColour("GhostHoldRing_" + n, NEUTRAL_COLOR)) errs.push(`${tag}: GhostHoldRing_${n} on ${id} is not neutral`)
+    }
+    if (!what) errs.push(`${tag}: badge ${n} on ${id} sits on no ring`)
+    out.push(`${n} on ${id}: ${what}`)
   }
-  return `tag vs ring: ${out.join(", ") || "no tags"}; ${checkRingStyles(main, errs, tag)}`
+  return `tags: ${out.join(", ") || "none"}; ${checkRingStyles(main, errs, tag)}`
 }
 
 /** A ring colour, not white: the weakest channel well below the strongest (white is ~0.9 of it,
@@ -557,10 +572,9 @@ export function isHued(c: vec4): boolean {
 }
 
 /**
- * Session 15, the white ring: every ring-like object on the wall (score rings and the ring a step
- * puts on a hold a limb is on now) must be green, yellow or red. Each badge's outline and its
- * GhostHoldRing (when shown) must be the colour of its step at its turn, by the test's own search
- * at `heightCm`; every step after the glow must be green or yellow. Returns a summary line.
+ * Every score ring must be green, yellow or red. Every step after the glow must be a move you can make:
+ * green or yellow at its turn, by the test's own search at `heightCm`. Session 23: each badge's outline
+ * is the badge colour and a GhostHoldRing (when shown) neutral, whatever the step's colour. Returns a summary.
  */
 export function checkStepColours(main: NextHoldMain, pos: RefPosition, selected: string, errs: string[], tag: string,
                                  heightCm = BRIEF_HEIGHT): string {
@@ -580,16 +594,13 @@ export function checkStepColours(main: NextHoldMain, pos: RefPosition, selected:
       continue
     }
     if (step.colour === "red") errs.push(`${tag}: step ${n} ${step.limb}->${step.holdId} is red (${step.score.toFixed(2)}): not a move you can make`)
-    const pill = (mustFind("Ghost_" + n).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4
-    const pc = classifyColour(pill, main)
-    if (!isHued(pill) || pc !== step.colour) errs.push(`${tag}: badge ${n} outline ${pc} (${pill}), step ${n} is ${step.colour}`)
+    if (!isColour("Ghost_" + n, BADGE_COLOR)) errs.push(`${tag}: badge ${n} outline is not the badge colour`)
     let ring = "own ring"
     if (holdRing.enabled) {
-      const c = (holdRing.getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4
-      ring = classifyColour(c, main) + " ring on an occupied hold"
-      if (!isHued(c) || classifyColour(c, main) !== step.colour) errs.push(`${tag}: GhostHoldRing_${n} on ${step.holdId} is ${classifyColour(c, main)} (${c}), step ${n} is ${step.colour}`)
+      ring = "neutral outline on an occupied hold"
+      if (!isColour("GhostHoldRing_" + n, NEUTRAL_COLOR)) errs.push(`${tag}: GhostHoldRing_${n} on ${step.holdId} is not neutral`)
     }
-    out.push(`${n}. ${step.limb}->${step.holdId} ${step.colour} ${step.score.toFixed(2)} (badge ${pc}, ${ring})`)
+    out.push(`${n}. ${step.limb}->${step.holdId} ${step.colour} ${step.score.toFixed(2)} (${ring})`)
   }
   return out.join("; ") || "no steps after the glow"
 }
@@ -791,19 +802,10 @@ export function notOnScreen(names: string[], cam: Camera): string[] {
 }
 
 /** the score the Lens's "?" must explain on hold id, by the test's own rule: what its ring shows from
- *  here (ringRule), unless a shown step tag (2 or 3, not on the glow) sits on it: then that step's, as
- *  its ring wears that step's colour (session 16) */
+ *  here (ringRule); session 23: under a step tag too, as the ring there keeps its own colour */
 export function expectedWhy(main: NextHoldMain, id: string): {why: string; colour: RefColour; from: string} | null {
   const ref = makeReference(main.getHeightCm())
   const pos = main.getPosition() as RefPosition
-  const sel = main.getSelectedLimb() as RefLimb
-  if (main.getView() === "ground" && taggedHolds(main)[id]) {
-    const steps = ref.sequence(pos, sel)
-    for (const n of BADGE_STEPS) {
-      const st = steps[n - 1]
-      if (st && st.holdId === id && main.getGhostHold(n) === id) return {why: st.why, colour: st.colour as RefColour, from: `step ${n} ${st.limb}`}
-    }
-  }
   const r = ringRule(ref, main, pos)[id]
   return r ? {why: r.why, colour: r.colour as RefColour, from: `${main.getLimbOverride() ? "override" : "best limb"} ${r.limb}`} : null
 }
@@ -899,7 +901,9 @@ export function checkArrowPointsAt(cam: Camera, main: NextHoldMain, errs: string
  * move so the Lens re-runs its auto-select exactly as at open. Session 21: forceMove, as
  * a pinch can't make a red move and the way back to the preset may need one.
  */
-export async function restorePreset(main: NextHoldMain): Promise<void> {
+export async function restorePreset(main: NextHoldMain, betaShown = true): Promise<void> {
+  // session 23: the full read, so '?' arms as these scenarios expect and they keep their meaning
+  main.resetBetaForTests(true)
   // the brief's 175 cm climber (the height setting is Lens state; a scenario may have changed it)
   for (let i = 0; i < 20 && main.getHeightCm() !== BRIEF_HEIGHT; i++) main.pressHeight(main.getHeightCm() > BRIEF_HEIGHT ? -1 : 1)
   if (main.getHeightCm() !== BRIEF_HEIGHT) throw new Error("restorePreset: height " + main.getHeightCm())
@@ -933,9 +937,31 @@ export async function restorePreset(main: NextHoldMain): Promise<void> {
   // round-trip one foot so the final action is a move (re-runs auto-select, clears any override)
   main.forceMove("LF", spare(main.getPosition() as RefPosition))
   main.forceMove("LF", target.LF as string)
+  // the moves above were setup: the attempt starts here, beta as asked
+  main.resetBetaForTests(betaShown)
   await frames(3)
   const now = main.getPosition() as RefPosition
   if (!samePosition(now, target)) throw new Error("restorePreset failed: " + fmtPos(now))
+}
+
+/** Session 23: everything the hidden read must not show, as drawn. The holds with coloured rings are
+ *  checked against `rings`; pushes an error per leak, so a scenario can call it every frame. */
+export function checkNothingRevealed(main: NextHoldMain, errs: string[], tag: string, rings: string[] = []): void {
+  for (const h of HOLDS) {
+    const on = mustFind("Ring_" + h.id).enabled
+    if (on !== (rings.indexOf(h.id) >= 0)) errs.push(`${tag}: Ring_${h.id} shown ${on}`)
+  }
+  if (mustFind("SuggestGlow").enabled) errs.push(`${tag}: the glow shows`)
+  if (main.isLabelVisible()) errs.push(`${tag}: the label "${main.getLabelText()}" shows`)
+  if (main.isWhyVisible()) errs.push(`${tag}: a why-line "${main.getWhyText()}" shows`)
+  if (main.isOffViewArrowVisible()) errs.push(`${tag}: the off-view arrow shows`)
+  if (main.getPreview().length) errs.push(`${tag}: a look-ahead is worked out for show`)
+  for (const n of BADGE_STEPS) {
+    for (const name of ["Ghost_" + n, "GhostNumber_" + n, "GhostHoldRing_" + n]) if (mustFind(name).enabled) errs.push(`${tag}: ${name} shows`)
+  }
+  for (const n of [1, 2]) if (mustFind("GhostPath_" + n).enabled) errs.push(`${tag}: GhostPath_${n} shows`)
+  if (mustFind("Figure_Head").enabled) errs.push(`${tag}: the stick figure shows`)
+  if (main.getLitLimb() !== null && main.getLimbOverride() === null) errs.push(`${tag}: the toggle ${main.getLitLimb()} is lit, which names the next move`)
 }
 
 /**
