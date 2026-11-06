@@ -190,12 +190,12 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
       badge2("h09", "2 · LH")
       break
     case "s4-155":
-      want(main.getHeightCm() === 155 && main.getHeightLabel() === "155 cm" && main.getPlannedLine() === "Planned for 155 cm", `height ${main.getHeightCm()} "${main.getHeightLabel()}", want 155`)
+      want(main.getHeightCm() === 155 && main.getHeightLabel() === "155 cm" && main.getPlannedLine() === "Your height: 155 cm", `height ${main.getHeightCm()} "${main.getHeightLabel()}", want 155`)
       badge2("h09", "2 · LH")
       heightInShot()
       break
     case "s4-195":
-      want(main.getHeightCm() === 195 && main.getHeightLabel() === "195 cm" && main.getPlannedLine() === "Planned for 195 cm", `height ${main.getHeightCm()} "${main.getHeightLabel()}", want 195`)
+      want(main.getHeightCm() === 195 && main.getHeightLabel() === "195 cm" && main.getPlannedLine() === "Your height: 195 cm", `height ${main.getHeightCm()} "${main.getHeightLabel()}", want 195`)
       badge2("h10", "2 · LH")
       heightInShot()
       break
@@ -265,7 +265,7 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
       // read right after the take instead (see run()); at real speed it is up from about 137.9 s
       if (SPEED > 1) break
       const lines = main.getResultLines().join(" | ")
-      const wantLines = "SEND · go 2 | 4 moves · your par 4 | 0 hints · ticked on this go"
+      const wantLines = "SEND · go 2 | 4 moves · the shortest for you | No hints · clean send!"
       want(lines === wantLines, `the card reads "${lines}", want "${wantLines}"`)
       want(main.isRowHidden() && main.isAgainVisible(), `row hidden ${main.isRowHidden()}, Again ${main.isAgainVisible()}`)
       checkSideBySide("ResultCard", 2 * RESULT_HALF_W, "AgainButton", AGAIN_W, AGAIN_GAP, e, "the card's Again")
@@ -420,7 +420,7 @@ export class D1DemoAutopilotScenario extends Scenario {
     while (!main.isResultVisible() && getTime() - tCard < 5) await frames(1)
     await frames(2)
     const cardLines = main.getResultLines().join(" | ")
-    const wantCard = "SEND · go 2 | 4 moves · your par 4 | 0 hints · ticked on this go"
+    const wantCard = "SEND · go 2 | 4 moves · the shortest for you | No hints · clean send!"
     print(`[d1] the take's card, ${(getTime() - tCard).toFixed(1)} s after it ended: "${cardLines}", row hidden ${main.isRowHidden()}, Again ${main.isAgainVisible()}`)
     if (cardLines !== wantCard) errs.push(`the take's card reads "${cardLines}", want "${wantCard}"`)
     if (!main.isRowHidden() || !main.isAgainVisible()) errs.push(`the take's card: row hidden ${main.isRowHidden()}, Again ${main.isAgainVisible()}`)

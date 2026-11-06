@@ -209,7 +209,7 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
       const body = this.addButton(grid, "BodyButton", BODY_TEXT, LABEL_CAP_CM, ["climb"], {grid: BL, strip: new vec2(COL, 0)})
       this.bodyButton = body.btn
       body.btn.onTriggerUp.add(() => this.fire(() => this._onBodyPressed.invoke()))
-      const setup = this.addButton(grid, "SetupButton", SETUP_TEXT, LABEL_CAP_CM, ["climb", "settings"], {grid: BR, settings: new vec2(0, -ROW)})
+      const setup = this.addButton(grid, "SetupButton", SETUP_TEXT, LABEL_CAP_CM, ["climb", "settings"], {grid: BR, settings: new vec2(0, 0)})
       this.setupButton = setup.btn
       this.setupLabel = setup.label
       this.items[this.items.length - 1].notOnWall = true
@@ -226,14 +226,17 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
       this.modeButton = mode.btn
       this.modeLabel = mode.label
       mode.btn.onTriggerUp.add(() => this.fire(() => this._onModePressed.invoke()))
-      const view = this.addButton(grid, "ViewToggle", GROUND_TEXT, LABEL_CAP_CM, ["settings"], {settings: new vec2(COL, ROW)})
+      // session 28 (v7.3 P1-7): "Ground" / "On wall" at the small cap: at 2.2 cm "Ground" filled its cell edge to edge
+      const view = this.addButton(grid, "ViewToggle", GROUND_TEXT, SMALL_CAP_CM, ["settings"], {settings: new vec2(COL, ROW)})
       this.viewButton = view.btn
       this.viewLabel = view.label
       view.btn.onTriggerUp.add(() => this.fire(() => this._onViewPressed.invoke()))
       // the climber's height: reach comes from it, so a step recolours the wall for that body. Session 26: full cells
-      const down = this.addButton(grid, "HeightDown", "−", ASK_CAP_CM, ["settings"], {settings: new vec2(-COL, 0)}, false)
+      // session 28 (v7.3 P1-7): − and + on the bottom row, right over the line that says what they change ("Your height:
+      // 175 cm"); Done moves up to the middle row
+      const down = this.addButton(grid, "HeightDown", "−", ASK_CAP_CM, ["settings"], {settings: new vec2(-COL, -ROW)}, false)
       down.btn.onTriggerUp.add(() => this._onHeightStep.invoke(-1))
-      const up = this.addButton(grid, "HeightUp", "+", ASK_CAP_CM, ["settings"], {settings: new vec2(COL, 0)}, false)
+      const up = this.addButton(grid, "HeightUp", "+", ASK_CAP_CM, ["settings"], {settings: new vec2(COL, -ROW)}, false)
       up.btn.onTriggerUp.add(() => this._onHeightStep.invoke(+1))
     })
     this.gridItem = gridSO.getComponent(FlexItem.getTypeName()) as FlexItem
@@ -281,12 +284,17 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
   setMode(mode: string): void { this.mode = mode; this.applyStates() }
   setView(view: string): void { this.view = view; this.applyStates() }
   /** which page shows (Main decides) */
-  setPage(page: RowPage): void { this.page = page; this.applyStates(); this.applyTopLine() }
+  setPage(page: RowPage): void { this.page = page; this.applyStates(); this.applyTopLine(); this.applyPlannedText() }
   getPage(): RowPage { return this.page }
 
   setHeight(cm: number): void {
     this.heightCm = Math.round(cm)
-    if (this.plannedLine) this.plannedLine.text = "Planned for " + this.heightCm + " cm"
+    this.applyPlannedText()
+  }
+
+  /** "Planned for 175 cm" under the climb page; session 28: "Your height: 175 cm" under Setup's − and + (they change it) */
+  private applyPlannedText(): void {
+    if (this.plannedLine) this.plannedLine.text = (this.page === "settings" ? "Your height: " : "Planned for ") + this.heightCm + " cm"
   }
 
   /** Session 26: the whole row hidden while the result card takes its place (Main decides). */

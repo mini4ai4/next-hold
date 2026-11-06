@@ -68,6 +68,11 @@ export class K2FallAgainPinnedScenario extends Scenario {
       const ab = screenBoxOf("AgainButton", camera(), true), rb = screenBoxOf("ControlRow", camera())
       print(`[K2] after the hint: Again ${fmtBox(ab)} (moved ${mustFind("AgainButton").getTransform().getWorldPosition().distance(againAt).toFixed(1)} cm), panel ${fmtBox(rb)}`)
       if (ab && rb && boxesOverlap(ab, rb)) errs.push(`after the card's hint Again (${fmtBox(ab)}) overlaps the panel (${fmtBox(rb)})`)
+      // session 28 (v7.3 P1-7): Again stays where the hand was heading (it jumped 38.9 cm); the panel keeps clear of it
+      {
+        const moved = mustFind("AgainButton").getTransform().getWorldPosition().distance(againAt)
+        if (moved > 1) errs.push(`after the card's hint Again moved ${moved.toFixed(1)} cm, want it to stay (at most 1 cm)`)
+      }
       if (main.getOutlinePulse()) errs.push(`the pulse stays after the card: ${JSON.stringify(main.getOutlinePulse())}`)
 
       // ── Again: the start holds, in its own frame; session 26: the hint taken after the fall is go 2's, kept ──

@@ -33,7 +33,8 @@ export class K3KeptScenario extends Scenario {
     await pinch("HeightDown"); await frames(2)
     print(`[K3] after −: ${main.getHeightCm()} cm, kept ${s1.has(HEIGHT_KEY) ? s1.getInt(HEIGHT_KEY) : "nothing"}, "${main.getPlannedLine()}" (${main.getLastWrite()})`)
     if (!s1.has(HEIGHT_KEY) || s1.getInt(HEIGHT_KEY) !== 170) errs.push(`the height wasn't kept: ${s1.has(HEIGHT_KEY) ? s1.getInt(HEIGHT_KEY) : "none"}`)
-    if (main.getPlannedLine() !== "Planned for 170 cm") errs.push(`"${main.getPlannedLine()}"`)
+    // (session 28: under Setup's − and + the line reads "Your height: N cm"; "Planned for N cm" on the climb page)
+    if (main.getPlannedLine() !== "Your height: 170 cm") errs.push(`"${main.getPlannedLine()}"`)
 
     // ── a later open: the store holds 160 ──
     const s2 = GeneralDataStore.create()
@@ -42,7 +43,9 @@ export class K3KeptScenario extends Scenario {
     main.reloadFromStore()
     await frames(2)
     print(`[K3] opened with 160 kept: ${main.getHeightCm()} cm, reach ${main.getReach().toFixed(1)}, "${main.getPlannedLine()}", label "${main.getHeightLabel()}"`)
-    if (main.getHeightCm() !== 160 || Math.abs(main.getReach() - 70.4) > 1e-6 || main.getPlannedLine() !== "Planned for 160 cm" || main.getHeightLabel() !== "160 cm") errs.push(`the kept 160: ${main.getHeightCm()} cm, reach ${main.getReach()}, "${main.getPlannedLine()}", "${main.getHeightLabel()}"`)
+    // (Setup is still open from the − pinch above: there the line reads "Your height: N cm")
+    const wantLine = (main.getPage() === "settings" ? "Your height: " : "Planned for ") + "160 cm"
+    if (main.getHeightCm() !== 160 || Math.abs(main.getReach() - 70.4) > 1e-6 || main.getPlannedLine() !== wantLine || main.getHeightLabel() !== "160 cm") errs.push(`the kept 160: ${main.getHeightCm()} cm, reach ${main.getReach()}, "${main.getPlannedLine()}", "${main.getHeightLabel()}"`)
     const ref160 = makeReference(160)
     const pos = main.getPosition() as RefPosition
     let ringsOk = 0

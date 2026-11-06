@@ -26,7 +26,7 @@ import {RefPosition} from "./NextHoldReferenceRule"
 
 const SPEED = 8
 /** the card's lines at the end of the take */
-export const D2_CARD = ["SEND · go 2", "4 moves · your par 4", "1 hint · ticked on this go"]
+export const D2_CARD = ["SEND · go 2", "4 moves · the shortest for you", "1 hint · sent! Again without it?"]
 
 function rippleTarget(a: DemoAction): string | null {
   switch (a.do) {
@@ -60,7 +60,7 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
     if (!main.isRowHidden()) want(main.getGroundPanelRank() === 3, `the panel's place is rank ${main.getGroundPanelRank()}, want 3 (over nothing)`)
   }
   const heightAt = (cm: number, hold: string) => {
-    want(main.getHeightCm() === cm && main.getPlannedLine() === `Planned for ${cm} cm`, `height ${main.getHeightCm()}, "${main.getPlannedLine()}"`)
+    want(main.getHeightCm() === cm && main.getPlannedLine() === `Your height: ${cm} cm`, `height ${main.getHeightCm()}, "${main.getPlannedLine()}"`)
     want(badge(main, 2) === `2 · LH on ${hold}`, `badge 2 ${badge(main, 2)}, want 2 · LH on ${hold}`)
     want(main.getPage() === "settings", `page ${main.getPage()}, want the settings`)
     inView(["HeightDown", "HeightUp", "PlannedLine", "GhostNumber_2"])

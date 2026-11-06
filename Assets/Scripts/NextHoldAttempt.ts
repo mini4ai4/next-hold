@@ -7,9 +7,10 @@
 // A go ends at the top (NextHoldBeta.toppedOut) or at a fall. Topped, the result card reads three lines
 // (session 26, the climber's and designer's wording):
 //   SEND · go 2                            (ONSIGHT · go 1 | FLASH · go 1 | SEND · go N | REPEAT · go N)
-//   5 moves · your par 4                   (par: the planner's shortest secure route from the start, at your height)
-//   1 hint · ticked: onsight (go 1)        (on the tick itself: "1 hint · ticked on this go"; an ONSIGHT says
-//                                           "Clean onsight. Pick something harder?")
+//   4 moves · the shortest for you         (session 28; par: the planner's shortest secure route from the start, at
+//                                           your height; over it: "6 moves · shortest for you: 4")
+//   1 hint · sent! Again without it?       (session 28, a first top; a REPEAT: "1 hint · ticked: onsight (go 1)";
+//                                           an ONSIGHT says "Clean onsight. Pick something harder?")
 // ONSIGHT: the first go on this problem, beta never shown and no hint at all (session 26: rung 1 is a hint).
 // FLASH: the first go, with beta or a hint. SEND: the first top on a later go. Session 26: the count stops at the
 // first top: that is the problem's tick, and every later top is a REPEAT. Goes are counted per problem (a new
@@ -78,12 +79,25 @@ export function heroLine(g: Go): string {
 }
 
 /** The result card's three lines for a top from the start. `ticked`: the problem's tick before this go (null: this
- *  go is the tick). */
+ *  go is the tick). Session 28 (v7.3 P1-7, the climber's P2s): par is the fewest secure moves and a pinch only makes
+ *  secure moves, so it can be tied, never beaten: line 2 says "the shortest for you" (over it, "shortest for you: N");
+ *  "ticked on this go" repeated the first line and is gone; a first top that isn't an onsight gets one line that
+ *  points at the next go (SEND is the most common result, and got nothing). */
 export function cardLines(g: Go, par: number | null, ticked: Go | null): string[] {
-  const l2 = par === null ? `${movesText(g.moves)} · no par for your body` : `${movesText(g.moves)} · your par ${par}`
+  const l2 = par === null ? `${movesText(g.moves)} · no par for your body`
+    : g.moves <= par ? `${movesText(g.moves)} · the shortest for you` : `${movesText(g.moves)} · shortest for you: ${par}`
   const l3 = g.tick === "ONSIGHT" ? ONSIGHT_LINE
-    : `${hintsText(g.hints)} · ` + (ticked ? `ticked: ${ticked.tick.toLowerCase()} (go ${ticked.go})` : "ticked on this go")
+    : ticked ? `${hintsText(g.hints)} · ticked: ${ticked.tick.toLowerCase()} (go ${ticked.go})`
+    : firstTopLine(g, par)
   return [heroLine(g), l2, l3]
+}
+
+/** session 28: the third line of a first top that isn't an onsight: the hints, and the next thing to try */
+export function firstTopLine(g: Go, par: number | null): string {
+  const done = g.tick === "FLASH" ? "flashed" : "sent"
+  if (g.hints > 0) return `${hintsText(g.hints)} · ${done}! Again without ${g.hints === 1 ? "it" : "them"}?`
+  if (par !== null && g.moves > par) return `No hints · ${done}! Again in ${par}?`
+  return g.tick === "FLASH" ? "No hints · flashed with your beta" : "No hints · clean send!"
 }
 
 /** Session 26: the card for a top climbed on from a fall (not from the start holds): no tick, no best. */

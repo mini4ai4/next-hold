@@ -441,10 +441,10 @@ check("ladder 3 (session 26): the why at once (under the move's label), not arme
 check("after the ladder '?' shows the why again, never arms", a4.state.hintStep === 3 && !a4.armed && a4.why);
 check("session 26: hints this go: every rung is one (rung 1 too), a repeat of 3 isn't",
   a1.state.hintsThisGo === 1 && a2.state.hintsThisGo === 2 && a3.state.hintsThisGo === 3 && a4.state.hintsThisGo === 3, [a1, a2, a3, a4].map((a) => a.state.hintsThisGo));
-check("step dots on '?': one per rung; session 26: kept (hollow) with beta shown",
-  B.askDots(B0) === "○○○" && B.askDots(a1.state) === "●○○" && B.askDots(a2.state) === "●●○" && B.askDots(a3.state) === "●●●" && B.askDots(B.showBeta(B0)) === "○○○");
-check("session 26: the word under '?' names what the next pinch gives: Hint, Move, Why (Why with beta shown)",
-  B.askWord(B0) === "Hint" && B.askWord(a1.state) === "Move" && B.askWord(a2.state) === "Why" && B.askWord(a3.state) === "Why" && B.askWord(B.showBeta(B0)) === "Why");
+check("step dots on '?': one per rung; session 28: none with the beta shown (no \"Why ○○○\")",
+  B.askDots(B0) === "○○○" && B.askDots(a1.state) === "●○○" && B.askDots(a2.state) === "●●○" && B.askDots(a3.state) === "●●●" && B.askDots(B.showBeta(B0)) === "");
+check("the word under '?' names what the next pinch gives: Hint, Move, Why; session 28: no word at ●●● (a fourth pinch gives nothing new); Why with beta shown",
+  B.askWord(B0) === "Hint" && B.askWord(a1.state) === "Move" && B.askWord(a2.state) === "Why" && B.askWord(a3.state) === "" && B.askWord(B.showBeta(B0)) === "Why");
 const aShown = B.ask(B.showBeta(B0), false, false);
 check("beta shown: '?' arms at once, as in v6", aShown.armed && aShown.state.hintStep === 0 && !B.ask(aShown.state, true, false).armed);
 check("hidden and topped out: '?' does nothing, there is no next move", (() => { const t = B.ask(B0, false, true); return t.state === B0 && !t.armed; })());
@@ -583,14 +583,22 @@ import * as A from "../Assets/Scripts/NextHoldAttempt.ts";
   check("session 26: the count stops at the first top: later tops are REPEAT",
     A.tickOf(null, 2, false, 1) === "SEND" && A.tickOf({ tick: "ONSIGHT", go: 1, moves: 4, hints: 0 }, 2, false, 1) === "REPEAT" && A.tickOf(null, 1, false, 0) === "ONSIGHT");
   const tickedOnsight = { tick: "ONSIGHT", go: 1, moves: 4, hints: 0 };
+  // session 28 (v7.3 P1-7): par can't be beaten, so "the shortest for you"; no "ticked on this go"; a line that points on
   const sendCard = A.cardLines({ tick: "SEND", go: 2, moves: 5, hints: 1 }, 4, null);
-  check("session 26: the card, word for word: \"SEND · go 2\" / \"5 moves · your par 4\" / \"1 hint · ticked on this go\"",
-    sendCard.join(" | ") === "SEND · go 2 | 5 moves · your par 4 | 1 hint · ticked on this go", sendCard);
+  check("session 28: a send over par, word for word: \"SEND · go 2\" / \"5 moves · shortest for you: 4\" / \"1 hint · sent! Again without it?\"",
+    sendCard.join(" | ") === "SEND · go 2 | 5 moves · shortest for you: 4 | 1 hint · sent! Again without it?", sendCard);
+  check("session 28: a send at par: \"4 moves · the shortest for you\"; with no hints \"No hints · clean send!\"; a flash \"flashed\"; two hints \"them\"",
+    A.cardLines({ tick: "SEND", go: 2, moves: 4, hints: 0 }, 4, null).join(" | ") === "SEND · go 2 | 4 moves · the shortest for you | No hints · clean send!" &&
+    A.cardLines({ tick: "FLASH", go: 1, moves: 4, hints: 2 }, 4, null)[2] === "2 hints · flashed! Again without them?" &&
+    A.cardLines({ tick: "FLASH", go: 1, moves: 4, hints: 0 }, 4, null)[2] === "No hints · flashed with your beta" &&
+    A.cardLines({ tick: "SEND", go: 3, moves: 6, hints: 0 }, 4, null)[2] === "No hints · sent! Again in 4?");
   const repCard = A.cardLines({ tick: "REPEAT", go: 3, moves: 4, hints: 1 }, 4, tickedOnsight);
-  check("session 26: a repeat: \"REPEAT · go 3\" / ... / \"1 hint · ticked: onsight (go 1)\"",
-    repCard.join(" | ") === "REPEAT · go 3 | 4 moves · your par 4 | 1 hint · ticked: onsight (go 1)", repCard);
+  check("a repeat: \"REPEAT · go 3\" / \"4 moves · the shortest for you\" / \"1 hint · ticked: onsight (go 1)\"",
+    repCard.join(" | ") === "REPEAT · go 3 | 4 moves · the shortest for you | 1 hint · ticked: onsight (go 1)", repCard);
   check("an onsight: \"Clean onsight. Pick something harder?\" on line 3",
-    A.cardLines({ tick: "ONSIGHT", go: 1, moves: 5, hints: 0 }, 5, null).join(" | ") === "ONSIGHT · go 1 | 5 moves · your par 5 | Clean onsight. Pick something harder?");
+    A.cardLines({ tick: "ONSIGHT", go: 1, moves: 5, hints: 0 }, 5, null).join(" | ") === "ONSIGHT · go 1 | 5 moves · the shortest for you | Clean onsight. Pick something harder?");
+  check("session 28: no card line says \"par\" or \"ticked on this go\"",
+    [sendCard, repCard, A.cardLines({ tick: "SEND", go: 2, moves: 4, hints: 0 }, 4, null)].flat().every((l) => !/\bpar\b|ticked on this go/.test(l)));
   check("no par reads so; one move and one hint in the singular",
     A.cardLines(send3, null, null)[1] === "7 moves · no par for your body" && A.movesText(1) === "1 move" && A.hintsText(0) === "0 hints" && A.hintsText(1) === "1 hint");
   check("session 26 (hound 3a): a top climbed on from a fall: no tick, it says so",

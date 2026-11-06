@@ -97,7 +97,8 @@ function check(main: NextHoldMain, errs: string[], tag: string, page: string, cl
     const t = labelOf(b.name)
     const text = t ? t.text : "(none)"
     if (want[b.name] !== undefined && text !== want[b.name]) errs.push(`${tag}: ${b.name} reads "${text}", want "${want[b.name]}"`)
-    const cap = text === "?" || text === "−" || text === "+" ? ASK_CAP_CM : b.name === "ShowBetaButton" ? SMALL_CAP_CM : LABEL_CAP_CM
+    // (session 28: the view switch at the small cap too, so "Ground" / "On wall" don't fill the cell)
+    const cap = text === "?" || text === "−" || text === "+" ? ASK_CAP_CM : b.name === "ShowBetaButton" || b.name === "ViewToggle" ? SMALL_CAP_CM : LABEL_CAP_CM
     const size = t ? t.size : 0
     if (size < NextHoldControlRowUI.capSize(cap) - 0.01) errs.push(`${tag}: ${b.name}'s label is size ${size.toFixed(1)}, under the ${cap} cm cap (${NextHoldControlRowUI.capSize(cap).toFixed(1)})`)
     // and as drawn: the label's rendered height against its button's (a 10 cm cell)
@@ -125,6 +126,11 @@ function checkAsk(main: NextHoldMain, errs: string[], tag: string, word: string,
   if (main.getAskWord() !== word) errs.push(`${tag}: the word under "?" is "${main.getAskWord()}", want "${word}"`)
   if (main.getAskDots() !== dots) errs.push(`${tag}: dots "${main.getAskDots()}", want "${dots}"`)
   const out: string[] = []
+  // session 28: no dots at all with the beta shown
+  if (dots === "") {
+    for (let i = 1; i <= 3; i++) if (mustFind("AskDot_" + i).isEnabledInHierarchy) errs.push(`${tag}: dot ${i} shows, want none`)
+    return `word "${main.getAskWord()}", no dots`
+  }
   for (let i = 1; i <= 3; i++) {
     const t = mustFind("AskDot_" + i).getComponent("Component.Text") as Text
     const glyph = dots.charAt(i - 1)
@@ -157,15 +163,22 @@ export class G1ControlCountScenario extends Scenario {
     if (main.getOverrideLabel() !== "") errs.push(`mats: the top line reads "${main.getOverrideLabel()}", want empty`)
     if (main.getPlannedLine() !== "Planned for 175 cm") errs.push(`mats: "${main.getPlannedLine()}"`)
 
-    // ── beta shown: the same four, the toggle reads "Hide beta"; the dots stay (session 26) ──
+    // ── beta shown: the same four, the toggle reads "Hide beta"; session 28: "?" reads Why ("?" then a ring), no dots
+    //    (they read as a ladder not yet climbed under a word promising its last rung) ──
     await pinch("ShowBetaButton"); await frames(3)
     print(`[G1] mats, beta shown: ${check(main, errs, "mats, beta shown", "matsBeta", true)}`)
-    print(`[G1] mats, beta shown: ${checkAsk(main, errs, "mats, beta shown", "Why", "○○○")}`)
+    print(`[G1] mats, beta shown: ${checkAsk(main, errs, "mats, beta shown", "Why", "")}`)
     sameSize("beta shown")
     await pinch("ShowBetaButton"); await frames(2)
     // one rung: a filled dot, the next word
     await pinch("AskButton"); await frames(2)
     print(`[G1] rung 1: ${checkAsk(main, errs, "rung 1", "Move", "●○○")}`)
+    // session 28: at ●●● a fourth pinch gives nothing new: no word
+    await pinch("AskButton"); await frames(2)
+    await pinch("AskButton"); await frames(2)
+    print(`[G1] rung 3: ${checkAsk(main, errs, "rung 3", "", "●●●")}`)
+    await restorePreset(main, false)
+    await frames(3)
 
     // ── the body cluster: four limbs in the same cells; a pick closes it ──
     await pinch("BodyButton"); await frames(3)
@@ -182,6 +195,27 @@ export class G1ControlCountScenario extends Scenario {
     await pinch("SetupButton"); await frames(4)
     print(`[G1] setup: ${check(main, errs, "setup", "setup", false)}`)
     if (main.getPage() !== "settings" || !main.isSetupLit() || main.getRowLayout() !== "settings") errs.push(`setup: page ${main.getPage()}, Setup lit ${main.isSetupLit()}, layout ${main.getRowLayout()}`)
+    // session 28 (v7.3 P1-7): − and + on the bottom row, Done above them, and right under − and + the line that says what
+    // they change: "Your height: 175 cm"; the view switch's word inside its cell
+    {
+      const bs = visibleButtons()
+      const at = (n: string) => bs.filter((b) => b.name === n)[0]
+      const dn = at("HeightDown"), up = at("HeightUp"), done = at("SetupButton"), mode = at("ModeSwitch")
+      const lowest = Math.min(...bs.map((b) => b.y))
+      if (!dn || !up || !done || !mode || Math.abs(dn.y - lowest) > 0.01 || Math.abs(up.y - lowest) > 0.01 || !(done.y > dn.y && done.y < mode.y))
+        errs.push(`setup: rows ${bs.map((b) => `${b.name}@${b.y.toFixed(1)}`).join(", ")}; want − and + lowest, Done between them and the top row`)
+      if (main.getPlannedLine() !== "Your height: 175 cm") errs.push(`setup: the line under − and + reads "${main.getPlannedLine()}", want "Your height: 175 cm"`)
+      const grid = mustFind("ButtonGrid").getTransform().getInvertedWorldTransform()
+      const ly = grid.multiplyPoint(mustFind("PlannedLine").getTransform().getWorldPosition()).y
+      if (dn && !(ly < dn.y - dn.h / 2)) errs.push(`setup: the height line (y ${ly.toFixed(1)}) isn't under − and + (y ${dn.y.toFixed(1)})`)
+      const vt = labelOf("ViewToggle")
+      if (vt) {
+        const k = mustFind("ViewToggle").getTransform().getWorldScale().x
+        const w = (vt.worldAabbMax().x - vt.worldAabbMin().x) / k
+        print(`[G1] setup: "${vt.text}" ${w.toFixed(2)} cm wide in an 11 cm cell; the height line "${main.getPlannedLine()}" at y ${ly.toFixed(1)}`)
+        if (w > 10 + 0.01) errs.push(`setup: "${vt.text}" is ${w.toFixed(2)} cm wide, more than its cell's 10 cm of room`)
+      }
+    }
     await pinch("SetupButton"); await frames(3)
     if (main.getPage() !== "climb" || main.isSetupLit()) errs.push(`setup closed: page ${main.getPage()}, lit ${main.isSetupLit()}`)
     sameSize("back from setup")

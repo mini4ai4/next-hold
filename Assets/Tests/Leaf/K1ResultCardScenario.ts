@@ -83,7 +83,9 @@ export class K1ResultCardScenario extends Scenario {
     if (g1.moves.length !== par175) errs.push(`go 1 followed the glow in ${g1.moves.length} moves, par is ${par175}`)
     const l1 = await cardAfterTop(main, g1.time)
     print(`[K1] go 1 card: ${l1.join(" | ")} (par from the test: ${par175})`)
-    const want1 = ["ONSIGHT · go 1", `${g1.moves.length} moves · your par ${par175}`, ONSIGHT_LINE]
+    // session 28: par can't be beaten, so at par "the shortest for you"
+    if (g1.moves.length !== par175) errs.push(`go 1: ${g1.moves.length} moves, par ${par175}: the card's "the shortest for you" needs them equal`)
+    const want1 = ["ONSIGHT · go 1", `${g1.moves.length} moves · the shortest for you`, ONSIGHT_LINE]
     if (l1.join("|") !== want1.join("|")) errs.push(`go 1 card: "${l1.join(" | ")}", want "${want1.join(" | ")}"`)
     if (!main.isResultVisible() || !main.isAgainVisible() || !mustFind("ResultCard").enabled) errs.push(`go 1: card ${main.isResultVisible()}, Again ${main.isAgainVisible()}`)
     checkCardPlace(main, errs, "go 1")
@@ -106,7 +108,7 @@ export class K1ResultCardScenario extends Scenario {
     const g2 = await climbByRule(main, errs, "go 2")
     const l2 = await cardAfterTop(main, g2.time)
     print(`[K1] go 2 card: ${l2.join(" | ")}`)
-    const want2 = ["REPEAT · go 2", `${g2.moves.length} moves · your par ${par175}`, "0 hints · ticked: onsight (go 1)"]
+    const want2 = ["REPEAT · go 2", `${g2.moves.length} moves · the shortest for you`, "0 hints · ticked: onsight (go 1)"]
     if (l2.join("|") !== want2.join("|")) errs.push(`go 2 card: "${l2.join(" | ")}", want "${want2.join(" | ")}"`)
 
     // ── go 3, rungs 1 and 2: both are hints ──
@@ -130,7 +132,7 @@ export class K1ResultCardScenario extends Scenario {
     const g4 = await climbByRule(main, errs, "195 cm")
     const l4 = await cardAfterTop(main, g4.time)
     print(`[K1] 195 cm card: ${l4.join(" | ")} (par from the test: ${par195})`)
-    const want4 = ["REPEAT · go 4", `${g4.moves.length} moves · your par ${par195}`, "0 hints · ticked: onsight (go 1)"]
+    const want4 = ["REPEAT · go 4", `${g4.moves.length} moves · the shortest for you`, "0 hints · ticked: onsight (go 1)"]
     if (l4.join("|") !== want4.join("|")) errs.push(`195 cm card: "${l4.join(" | ")}", want "${want4.join(" | ")}"`)
     if (g4.moves.length !== par195) errs.push(`195 cm: following the glow took ${g4.moves.length}, par ${par195}`)
     const prob4 = record(store, gk)

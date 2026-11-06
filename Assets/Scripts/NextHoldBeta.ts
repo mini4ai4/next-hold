@@ -206,6 +206,9 @@ export function cameOffHintLabel(move: number): string {
 /** The step dots on "?", one per rung: "●○○" on rung 1. Session 26: kept with beta shown too (all hollow until
  *  a rung is taken), so "?" never loses its state. */
 export function askDots(s: BetaState): string {
+  // session 28 (v7.3 P1-7): none with the beta shown: "Why ○○○" read as a ladder not yet climbed under a word that
+  // promised its third rung (S02, S10, S11); with the beta shown "?" then a ring says why, and there is no ladder
+  if (s.betaShown) return ""
   return "●●●".slice(0, s.hintStep) + "○○○".slice(0, 3 - s.hintStep)
 }
 
@@ -214,7 +217,8 @@ export function askDots(s: BetaState): string {
 export function askWord(s: BetaState): string {
   if (s.cameOffMove !== null) return "Hint"
   if (s.betaShown) return "Why"
-  return s.hintStep === 0 ? "Hint" : s.hintStep === 1 ? "Move" : "Why"
+  // session 28 (v7.3 P1-7): at ●●● the next pinch gives nothing new (rung 3 again): no word, not "Why"
+  return s.hintStep === 0 ? "Hint" : s.hintStep === 1 ? "Move" : s.hintStep === 2 ? "Why" : ""
 }
 
 export interface Reveal {

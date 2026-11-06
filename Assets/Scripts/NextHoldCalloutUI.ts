@@ -258,8 +258,12 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     // ── ResultCard (session 24): a plate with three lines, read from the mats; not a button. Session 26: the
     // first line three times the others, the others at least 0.5° from 2.5 m ──
     this.resultRoot = this.obj(this.sceneObject, "ResultCard")
-    const plate = this.resultRoot.createComponent(BackPlate.getTypeName()) as BackPlate
-    plate.size = new vec2(2 * RESULT_HALF_W, 2 * RESULT_HALF_H)
+    // session 28 (v7.3 P1-7): one plate under the card and Again (Main puts Again AGAIN_GAP to the card's right), so the
+    // two read as one object, Again its right-hand cell; it was its own plate beside the card (S08)
+    const plateW = 2 * RESULT_HALF_W + AGAIN_GAP + AGAIN_W + 2
+    const plateSO = this.obj(this.resultRoot, "ResultPlate", new vec3(-RESULT_HALF_W - 1 + plateW / 2, 0, 0))
+    const plate = plateSO.createComponent(BackPlate.getTypeName()) as BackPlate
+    plate.size = new vec2(plateW, 2 * RESULT_HALF_H)
     const caps = [RESULT_HERO_CAP, RESULT_BODY_CAP, RESULT_BODY_CAP]
     const ys = [3.4, -2.0, -4.9]
     for (let i = 0; i < 3; i++) {

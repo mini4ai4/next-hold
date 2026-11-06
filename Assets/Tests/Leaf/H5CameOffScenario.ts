@@ -230,17 +230,17 @@ export class H5CameOffScenario extends Scenario {
       print(`[H5] from 1.25 m: ${checkSideBySide("CameOffCard", HINT_W, "AgainButton", AGAIN_W, AGAIN_GAP, errs, "from 1.25 m")}`)
       if (!main.isCameOffVisible() || !main.isRowHidden()) errs.push(`from 1.25 m: card ${main.isCameOffVisible()}, panel hidden ${main.isRowHidden()}`)
 
-      // session 27, a look that can fail (the session-26 break went uncaught): from 2.5 m, the card's hint taken with a
-      // real pinch: the panel comes back low in view, and Again, now alone, must find a place clear of it. Again first
-      // tries low in view straight ahead, which is where the panel is, so only the keep-clear-of-the-panel rule keeps
-      // them apart. Precondition: the panel covers that first try, else this look proves nothing
+      // session 27, from 2.5 m, the card's hint taken with a real pinch: the panel comes back low in view. Session 28
+      // (v7.3 P1-7): Again stays where it was in the card's block (it jumped 39 cm to a place clear of the panel while the
+      // climber's hand was on its way to it), and the panel keeps clear of Again instead
       tr.setWorldPosition(new vec3(0, 0, 125)); await frames(4)
+      const againBefore = mustFind("AgainButton").getTransform().getWorldPosition()
       await pinch("CameOffCard"); await frames(4)
       const fr = screenBoxOf("ControlRow", camL), fa = screenBoxOf("AgainButton", camL, true)
-      print(`[H5] 2.5 m, the card's hint taken: Again ${fmtBox(fa)}, panel ${fmtBox(fr)}`)
+      const againMoved = mustFind("AgainButton").getTransform().getWorldPosition().distance(againBefore)
+      print(`[H5] 2.5 m, the card's hint taken: Again ${fmtBox(fa)} (moved ${againMoved.toFixed(1)} cm), panel ${fmtBox(fr)} (rank ${main.getGroundPanelRank()})`)
       if (main.isCameOffVisible() || !main.isAgainVisible() || main.isRowHidden()) errs.push(`the card's hint taken: card ${main.isCameOffVisible()}, Again ${main.isAgainVisible()}, panel hidden ${main.isRowHidden()}`)
-      const first = {x: 0.5, y: 0.5 + 0.55 * 0.5}
-      if (!fr || !(fr.x0 < first.x && first.x < fr.x1 && fr.y0 < first.y && first.y < fr.y1)) errs.push(`the card's hint taken: the panel (${fmtBox(fr)}) doesn't cover Again's first try at ${first.x},${first.y}, so this look proves nothing`)
+      if (againMoved > 1) errs.push(`the card's hint taken: Again moved ${againMoved.toFixed(1)} cm, want it to stay`)
       if (fa && fr && boxesOverlap(fa, fr)) errs.push(`the card's hint taken: Again (${fmtBox(fa)}) overlaps the panel (${fmtBox(fr)})`)
       if (!fa || fa.x0 < 0 || fa.x1 > 1 || fa.y0 < 0 || fa.y1 > 1) errs.push(`the card's hint taken: Again isn't fully in view (${fmtBox(fa)})`)
       for (const id of main.getProblemHolds()) {

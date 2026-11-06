@@ -1347,8 +1347,13 @@ export class NextHoldMain extends BaseScriptComponent {
       this.callouts.showAgain(this.wall.wallToWorld(c.x + cw + g / 2, c.y, PANEL_Z), rot, k)
       return
     }
-    // Again alone (the card's hint taken, or a fall with beta shown): the panel is back, so Again takes its own clear
-    // place, clear of the panel too (session 27; it used to stay in the card's slot, which the panel now uses)
+    // Again alone. Session 28 (v7.3 P1-7): after the card's hint it stays where it was, in the card's slot (it jumped
+    // 39 cm to a place clear of the panel: the climber's hand was on its way to it), and the panel keeps clear of it
+    // (cardBoxes). With no card before it (a fall with beta shown) it takes its own clear place, clear of the panel
+    if (this.blockAt) {
+      this.callouts.showAgain(this.againSlot(this.blockAt), rot, this.blockAt.k)
+      return
+    }
     const row = this.rowBoxes()
     this.callouts.showAgain(this.placeMatBlock((AGAIN_W / 2) * k, (AGAIN_H / 2) * k, row, row), rot, k)
   }
@@ -1854,8 +1859,14 @@ export class NextHoldMain extends BaseScriptComponent {
     const b = this.blockAt
     // by the card's own state, not its widget: the widget is hidden later in the same pass (placeMatCards), and a panel
     // placed against a card that is about to go stayed off to one side (h5)
-    const up = this.view === "ground" && this.mode === "climb" && this.beta.cameOffMove !== null
-    return b && up ? [{x: b.x, y: b.y, hw: CARD_HALF_W * b.k, hh: CARD_HALF_H * b.k}] : []
+    const ground = this.view === "ground" && this.mode === "climb"
+    const up = ground && this.beta.cameOffMove !== null
+    if (b && up) return [{x: b.x, y: b.y, hw: CARD_HALF_W * b.k, hh: CARD_HALF_H * b.k}]
+    // session 28: Again left in the card's slot after its hint
+    if (b && ground && this.againOffered && !this.result) {
+      return [{x: b.x + CARD_BUTTON_X * b.k, y: b.y + CARD_BUTTONS_Y * b.k, hw: (AGAIN_W / 2 + 1) * b.k, hh: (AGAIN_H / 2 + 1) * b.k}]
+    }
+    return []
   }
 
   private cameraTransform(): Transform | null {

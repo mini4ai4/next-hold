@@ -90,7 +90,8 @@ export class N11HeightScenario extends Scenario {
     if (main.getPlannedLine() !== "Planned for 175 cm" || !mustFind("PlannedLine").isEnabledInHierarchy) errs.push(`the planned line reads "${main.getPlannedLine()}"`)
     await openPageFor("HeightDown")
     if (!mustFind("HeightDown").isEnabledInHierarchy || !mustFind("HeightUp").isEnabledInHierarchy || !mustFind("PlannedLine").isEnabledInHierarchy) errs.push("the height control is not shown in Setup")
-    if (main.getHeightCm() !== BRIEF_HEIGHT || main.getHeightLabel() !== "175 cm" || main.getPlannedLine() !== "Planned for 175 cm") errs.push(`at open: height ${main.getHeightCm()}, panel "${main.getHeightLabel()}", "${main.getPlannedLine()}"`)
+    // (session 28: in Setup, right under − and +, the line names what they change: "Your height: 175 cm")
+    if (main.getHeightCm() !== BRIEF_HEIGHT || main.getHeightLabel() !== "175 cm" || main.getPlannedLine() !== "Your height: 175 cm") errs.push(`at open: height ${main.getHeightCm()}, panel "${main.getHeightLabel()}", "${main.getPlannedLine()}"`)
     // session 15: "−" and "+" on one line, buttons and glyphs alike (in the grid's own plane); session 26: full
     // 11 x 10 cm cells, side by side, 3 cm apart; the one height readout ("Planned for N cm") under them
     {
@@ -123,7 +124,7 @@ export class N11HeightScenario extends Scenario {
       const v = got.value
       const want = makeReference(150).bestForHold("h09", pos0)
       print(`[r7] in the pinch frame: height ${v.h}, reach ${v.reach.toFixed(1)}, panel "${v.label}", h09 ${v.h09} (${v.score !== null ? v.score.toFixed(3) : "-"}; rule ${want.colour} ${want.score.toFixed(3)})`)
-      if (v.h !== 150 || Math.abs(v.reach - 66) > 1e-9 || v.label !== "150 cm" || main.getPlannedLine() !== "Planned for 150 cm") errs.push(`pinch frame: height ${v.h}, reach ${v.reach}, panel "${v.label}", "${main.getPlannedLine()}"; want 150, 66, "150 cm"`)
+      if (v.h !== 150 || Math.abs(v.reach - 66) > 1e-9 || v.label !== "150 cm" || main.getPlannedLine() !== "Your height: 150 cm") errs.push(`pinch frame: height ${v.h}, reach ${v.reach}, panel "${v.label}", "${main.getPlannedLine()}"; want 150, 66, "150 cm"`)
       if (v.h09 !== want.colour || v.score === null || Math.abs(v.score - want.score) > 1e-9) errs.push(`pinch frame: h09 ${v.h09} ${v.score}, rule at 150 says ${want.colour} ${want.score}`)
     }
     await frames(3)
