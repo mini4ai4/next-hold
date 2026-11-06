@@ -41,8 +41,9 @@ const WALL_X = 4.5 // 10 cm left of between rh and up: the strip, left of the ha
 const WALL_PITCH = 2
 
 export const V7_CAMERA: CameraKey[] = [
-  // 0-2: drift in a little to the mats pose and stay for the read, the beta and the heights
-  {t: 0, x: MATS_X, y: 0, z: MATS_Z + 15, pitch: MATS_PITCH, yaw: 0},
+  // 0-2: the mats pose, held for the read, the beta and the heights. Session 28: no drift in from 4.40 m: the panel was
+  // placed for the drifting eye near the frame's edge, the lazy follow kept it, and its buttons ran 0.012 past the edge
+  {t: 0, x: MATS_X, y: 0, z: MATS_Z, pitch: MATS_PITCH, yaw: 0},
   {t: 7, x: MATS_X, y: 0, z: MATS_Z, pitch: MATS_PITCH, yaw: 0},
   {t: 35.5, x: MATS_X, y: 0, z: MATS_Z, pitch: MATS_PITCH, yaw: 0},
   // 3: walk in: Ground at 1.35 m, On wall under 80 cm
