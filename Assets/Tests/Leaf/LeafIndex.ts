@@ -35,6 +35,7 @@ import {K2FallAgainPinnedScenario} from "./K2FallAgainPinnedScenario"
 import {K3KeptScenario} from "./K3KeptScenario"
 import {K4ReopenWriteScenario} from "./K4ReopenScenario"
 import {K5ReopenReadScenario} from "./K5ReopenReadScenario"
+import {V1VoiceScenario} from "./V1VoiceScenario"
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -74,6 +75,7 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "k3-kept", typename: K3KeptScenario.getTypeName()},
     {id: "k4-reopen-write", typename: K4ReopenWriteScenario.getTypeName()},
     {id: "k5-reopen-read", typename: K5ReopenReadScenario.getTypeName()},
+    {id: "v1-voice", typename: V1VoiceScenario.getTypeName()},
     {id: "d1-demo-autopilot", typename: D1DemoAutopilotScenario.getTypeName()},
   ]
 }

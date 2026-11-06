@@ -76,6 +76,9 @@ export const RESULT_BODY_CAP = 1.0
 export const RESULT_HERO_CAP = 3.0
 export const CARD_HEAD_CAP = 1.8
 export const BUTTON_CAP = 2.2
+/** session 27: half the voice chip (cm, at its 110 cm size): the words heard over the preview's line */
+export const CHIP_HALF_W = 16
+export const CHIP_HALF_H = 4
 
 /** the why-line text's width (cm, at its 110 cm size): as wide as its words, at most WHY_W (longer lines shrink) */
 function whyTextWidth(text: string): number {
@@ -132,6 +135,12 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
   private whyWanted = false
   private whyReady = false
   private whyHoldId: string | null = null
+  private chipRoot: SceneObject
+  private chipPlate: BackPlate
+  private chipHeard: Text
+  private chipLabel: Text
+  private chipWanted = false
+  private chipReady = false
   private blockRoot: SceneObject
   private cardRoot: SceneObject
   private cardText: Text
@@ -277,7 +286,40 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
       this.againRoot.enabled = this.againWanted
     })
 
+    // ── VoiceChip (session 27): what voice heard, for a moment; in the preview, what stands in for speech ──
+    this.chipRoot = this.obj(this.sceneObject, "VoiceChip")
+    this.chipPlate = this.chipRoot.createComponent(BackPlate.getTypeName()) as BackPlate
+    this.chipPlate.size = new vec2(2 * CHIP_HALF_W, 2 * CHIP_HALF_H)
+    this.chipHeard = this.bigText(this.obj(this.chipRoot, "VoiceChipHeard", new vec3(0, 1.4, 0.8)), "", 2 * CHIP_HALF_W - 2, 1.5)
+    this.chipLabel = this.bigText(this.obj(this.chipRoot, "VoiceChipLabel", new vec3(0, -2.2, 0.8)), "", 2 * CHIP_HALF_W - 2, 0.8)
+    ;(this.chipLabel as Text & {weight?: number}).weight = 500
+    this.chipPlate.onInitialized.add(() => {
+      this.chipReady = true
+      this.chipRoot.enabled = this.chipWanted
+    })
+
     this.createEvent("UpdateEvent").bind(() => this.tickLabel())
+  }
+
+  /** Session 27: the voice chip at worldPos: the words heard, and (preview) the line saying typed text stood in */
+  showVoiceChip(worldPos: vec3, worldRot: quat, heard: string, label: string, scale = 1): void {
+    this.place(this.chipRoot, worldPos, worldRot, scale)
+    this.chipHeard.text = heard
+    this.chipLabel.text = label
+    this.chipWanted = true
+    if (this.chipReady) this.chipRoot.enabled = true
+  }
+
+  hideVoiceChip(): void {
+    this.chipWanted = false
+    if (this.chipReady) this.chipRoot.enabled = false
+  }
+
+  getVoiceChipTransform(): Transform { return this.chipRoot.getTransform() }
+
+  /** the chip as shown: its two lines, or null */
+  getVoiceChip(): {heard: string; label: string} | null {
+    return this.chipWanted ? {heard: this.chipHeard.text, label: this.chipLabel.text} : null
   }
 
   /** a one- or two-line text at `capCm` cap height, shrunk to `widthCm` if it is wider */

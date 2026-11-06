@@ -769,5 +769,26 @@ const N = await import("../Assets/Scripts/NextHoldPlan.ts");
     B.footMarkerShown("LF", "lf", "lf", true, false) && B.footMarkerShown("LF", "lh", "lf", false, false) && B.footMarkerShown("LF", "lf", "lf", false, true));
 }
 
+// ---- 9. session 27: voice commands, scoped (Assets/Scripts/NextHoldVoice.ts) ---------------------------------
+const V = await import("../Assets/Scripts/NextHoldVoice.ts");
+{
+  const all = { askOnScreen: true, againOnScreen: true, showBetaOnScreen: true, betaShown: false, whyOnOffer: true };
+  check("voice: the four words, as said in a gym (case, punctuation, a 'please')",
+    V.matchCommand("Next hold?") === "nextHold" && V.matchCommand("next hold please") === "nextHold" && V.matchCommand("AGAIN!") === "again" &&
+    V.matchCommand("show my beta") === "showBeta" && V.matchCommand("why?") === "why", ["Next hold?", "AGAIN!"].map(V.matchCommand));
+  check("voice: chatter does nothing: too long, two commands at once, or no command",
+    V.matchCommand("why'd you go left on that one mate") === null && V.matchCommand("again why") === null && V.matchCommand("nice send") === null &&
+    V.matchCommand("") === null && V.matchCommand("hold") === null && V.matchCommand("show beta") === null);
+  check("voice: only a final transcript acts", V.parseCommand("next hold", false, all) === null && V.parseCommand("next hold", true, all) === "nextHold");
+  check("voice: 'again' only while Again is on screen; 'show my beta' only while its button is, beta hidden",
+    V.parseCommand("again", true, { ...all, againOnScreen: false }) === null && V.parseCommand("again", true, all) === "again" &&
+    V.parseCommand("show my beta", true, { ...all, showBetaOnScreen: false }) === null && V.parseCommand("show my beta", true, { ...all, betaShown: true }) === null);
+  check("voice: 'why' only after a hint has named the move; 'next hold' only while '?' is on screen",
+    V.parseCommand("why", true, { ...all, whyOnOffer: false }) === null && V.parseCommand("why", true, all) === "why" &&
+    V.parseCommand("next hold", true, { ...all, askOnScreen: false }) === null);
+  check("voice: the chip echoes the words heard; the preview label says what stands in",
+    V.chipText("nextHold") === "“next hold”" && V.chipText("again") === "“again”" && V.PREVIEW_VOICE_LABEL === "Preview: typed text stands in for speech" && V.CHIP_SECONDS === 1);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

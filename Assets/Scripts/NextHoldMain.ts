@@ -73,6 +73,12 @@ import {NextHoldOffViewArrow} from "./NextHoldOffViewArrow"
 import {NextHoldPinchRipple, RippleEvent} from "./NextHoldPinchRipple"
 import {GLOW_PROFILE} from "./Wall/ProceduralTextures"
 import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/CameraProvider/WorldCameraFinderProvider"
+import {CHIP_SECONDS, PREVIEW_VOICE_LABEL, VoiceCommand, VoiceContext, chipText, parseCommand} from "./NextHoldVoice"
+import {AsrVoiceSource, InjectedVoiceSource, VoiceSource} from "./NextHoldVoiceSource"
+
+/** session 27: the voice chip, head-locked: this far out along the gaze (cm), this far above it (degrees) */
+export const CHIP_CM = 70
+export const CHIP_UP_DEG = 13
 
 /** how far in front of the wall face the control row and the why-line stand (cm) */
 const PANEL_Z = 10
@@ -384,6 +390,9 @@ export class NextHoldMain extends BaseScriptComponent {
       this.offViewArrow.setKeepClearOf(() => this.rowCorners())
 
       this.ready = true
+      // session 27: voice. The preview has no microphone: typed text stands in (injectVoice); Spectacles use ASR
+      if (!this.voice) this.voice = global.deviceInfoSystem.isEditor() ? new InjectedVoiceSource() : new AsrVoiceSource()
+      this.startVoice()
       this.updateGroundDistance(true)
       // The Lens opens in climb mode with the preset position: the best move shows.
       this.recompute()
@@ -397,6 +406,7 @@ export class NextHoldMain extends BaseScriptComponent {
       this.tickTopped(getTime())
       this.tickRefused(getTime())
       this.tickCue(getTime())
+      this.tickVoiceChip(getTime())
       // the row lays itself out late (after a start or a refresh): once its real size is known, or
       // whenever it changes, place it again, or in Ground it sits too close and covers a ring
       const size = this.controlRow.getSize()
@@ -654,6 +664,67 @@ export class NextHoldMain extends BaseScriptComponent {
       this.controlRow.setAskDots(askDots(this.beta))
       this.controlRow.setAskWord(askWord(this.beta))
     }
+  }
+
+  // ── Session 27: voice (NextHoldVoice decides; each word presses a button that is on screen) ──
+  private voice: VoiceSource | null = null
+  private voiceChipUntil = -1
+  private voiceChipCmd: VoiceCommand | null = null
+  private voiceLog: {text: string; isFinal: boolean; cmd: VoiceCommand | null; time: number}[] = []
+  private voiceError = ""
+
+  private startVoice(): void {
+    if (!this.voice) return
+    this.voice.start((text, isFinal) => this.handleTranscript(text, isFinal), (why) => {
+      this.voiceError = why
+      print("NextHold voice: " + why)
+    })
+  }
+
+  /** what is on offer to say right now, read from what is on screen */
+  voiceContext(): VoiceContext {
+    const climbPage = this.mode === "climb" && !this.controlRow.isHidden() && this.page() === "climb"
+    return {
+      askOnScreen: climbPage,
+      againOnScreen: this.callouts.isAgainVisible(),
+      showBetaOnScreen: climbPage && this.view === "ground",
+      betaShown: this.beta.betaShown,
+      whyOnOffer: !this.beta.betaShown && this.beta.cameOffMove === null && this.beta.hintStep >= 2 && !this.isTopped(),
+    }
+  }
+
+  /** a transcript from the voice source: act on it if it is a short final command on offer now, and echo it */
+  handleTranscript(text: string, isFinal: boolean): void {
+    if (!this.ready) return
+    const cmd = parseCommand(text, isFinal, this.voiceContext())
+    this.voiceLog.push({text, isFinal, cmd, time: getTime()})
+    if (!cmd) return
+    if (cmd === "again") this.pressAgain()
+    else if (cmd === "showBeta") this.pressShowBeta()
+    else this.pressAsk() // "next hold" and "why" are both "?": the next rung (the why is rung 3)
+    this.voiceChipCmd = cmd
+    this.voiceChipUntil = getTime() + CHIP_SECONDS
+    this.tickVoiceChip(getTime())
+  }
+
+  /** the chip follows the head while it shows, and goes after CHIP_SECONDS */
+  private tickVoiceChip(now: number): void {
+    if (this.voiceChipCmd === null) return
+    if (now >= this.voiceChipUntil) {
+      this.voiceChipCmd = null
+      this.callouts.hideVoiceChip()
+      return
+    }
+    const camT = this.cameraTransform()
+    if (!camT) return
+    const eye = camT.getWorldPosition()
+    const rot = camT.getWorldRotation()
+    const fwd = rot.multiplyVec3(vec3.forward()).uniformScale(-1)
+    const up = rot.multiplyVec3(vec3.up())
+    const a = CHIP_UP_DEG * Math.PI / 180
+    const dir = fwd.uniformScale(Math.cos(a)).add(up.uniformScale(Math.sin(a)))
+    const label = this.voice && this.voice.kind === "injected" ? PREVIEW_VOICE_LABEL : ""
+    this.callouts.showVoiceChip(eye.add(dir.uniformScale(CHIP_CM)), rot, chipText(this.voiceChipCmd), label, CHIP_CM / 110)
   }
 
   /** "Show my beta" / "Hide beta" (session 24: a toggle). Showing it marks the go "with beta"; hiding it again
@@ -2028,6 +2099,29 @@ export class NextHoldMain extends BaseScriptComponent {
   getRowLayout(): string { return this.controlRow.getLayout() }
   /** the goes kept for this problem (whatever the height) */
   getGoesKey(): string { return this.goesKeyNow() }
+  // session 27: voice
+  /** tests hand in their own source (the preview's injected one is the default there) */
+  useVoice(src: VoiceSource): void {
+    if (this.voice) this.voice.stop()
+    this.voice = src
+    if (this.ready) this.startVoice()
+  }
+  getVoiceKind(): string { return this.voice ? this.voice.kind : "" }
+  /** the preview's stand-in for speech: false if the source isn't the injected one */
+  injectVoice(text: string, isFinal = true): boolean {
+    if (!(this.voice instanceof InjectedVoiceSource)) return false
+    this.voice.inject(text, isFinal)
+    return true
+  }
+  /** every transcript heard (newest last) and the command it gave, or null */
+  getVoiceLog(): {text: string; isFinal: boolean; cmd: VoiceCommand | null; time: number}[] { return this.voiceLog.slice() }
+  getVoiceError(): string { return this.voiceError }
+  /** the chip on show: its two lines, or null */
+  getVoiceChip(): {heard: string; label: string} | null { return this.callouts.getVoiceChip() }
+  getVoiceChipWorldPosition(): vec3 | null {
+    return this.callouts.getVoiceChip() ? this.callouts.getVoiceChipTransform().getWorldPosition() : null
+  }
+  getVoiceChipScale(): number { return this.callouts.getVoiceChipTransform().getWorldScale().x }
 }
 
 /** gap (cm) between a box (centre c, half sizes hw x hh) and a circle; < 0 when they overlap */
