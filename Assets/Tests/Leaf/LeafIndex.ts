@@ -36,6 +36,7 @@ import {K3KeptScenario} from "./K3KeptScenario"
 import {K4ReopenWriteScenario} from "./K4ReopenScenario"
 import {K5ReopenReadScenario} from "./K5ReopenReadScenario"
 import {V1VoiceScenario} from "./V1VoiceScenario"
+import {X1CaptureScenario} from "./X1CaptureScenario"
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -77,5 +78,7 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "k5-reopen-read", typename: K5ReopenReadScenario.getTypeName()},
     {id: "v1-voice", typename: V1VoiceScenario.getTypeName()},
     {id: "d1-demo-autopilot", typename: D1DemoAutopilotScenario.getTypeName()},
+    // session 27: the screenshot driver for devpost/visual/v7_2, not a test (see X1CaptureScenario.ts)
+    {id: "x1-capture", typename: X1CaptureScenario.getTypeName()},
   ]
 }
