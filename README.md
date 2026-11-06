@@ -11,7 +11,9 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    and TOP, and on the wall you see only where your hands and feet are. Four big buttons while climbing on the mats
    ("Show my beta", pinch again to hide it; "?"; Body; Setup), two on the wall ("?" and Body, a strip at the side of
    your hands, never below them); every button is 11 × 10 cm with a 2.2 cm label, and Setup's − / + are full-size
-   buttons too. "?" gives a hint one step at a time, and its word says what the next pinch gives (Hint, Move, Why;
+   buttons too. On the mats the panel follows your head, 60 cm out and low in view, and only moves once you turn more
+   than 8° or step more than 10 cm; it shrinks and slides so it covers no ring. With beta hidden, START marks your feet
+   only where the setter marked start feet. "?" gives a hint one step at a time, and its word says what the next pinch gives (Hint, Move, Why;
    the dots under it fill as you go): the holds in reach, then the next move, then why that move works, under its
    label ("R hand" / "jug, in reach"). Every step counts as a hint. The glow follows the plan: following it takes
    par moves (the planner's shortest secure route for your height). Step back off the wall after a move and the Lens
@@ -40,12 +42,13 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    store, so nothing kept in the preview changes the take, and the take keeps nothing.
 
 ## Tests
-- LEAF: open the LEAF panel and run all thirty-five scenarios (one per done criterion in `devpost/design-brief.md`, one per review fix, h1–h5 and e1 for beta on request and the tag's outline, g1 for the control count, k1–k3 for the result card, Again, the pinned hint and what is kept, the k4/k5 pair for a kept height on reopen (run k4 then k5), and d1 for the demo autopilot).
-  The raw output of the last full run (35 of 35 pass, session 26, one clean run on one build): `devpost/LEAF_RUN_2026-11-05_s26.txt`, copied out of
+- LEAF: open the LEAF panel and run all thirty-six scenarios (one per done criterion in `devpost/design-brief.md`, one per review fix, h1–h5 and e1 for beta on request and the tag's outline, g1 for the control count, k1–k3 for the result card, Again, the pinned hint and what is kept, the k4/k5 pair for a kept height on reopen (run k4, refresh, then k5), v1 for voice on the preview's typed path, and d1 for the demo autopilot).
+  `x1-capture` is also listed: it is the screenshot driver for `devpost/visual/v7_2/`, not a test.
+  The raw output of the last full run (36 of 36 pass, session 27, one clean run on one build): `devpost/LEAF_RUN_2026-11-06_s27.txt`, copied out of
   the Lens Studio log with `node tests/extract_leaf_run.mjs <log> <first line>`. `node tests/leaf_wait.mjs <id>` waits
   for one scenario's result in the log when the run call times out; `node tests/leaf_status.mjs <first line>` lists
   every scenario's last verdict since then. Run LEAF in the preview (`onDevice: false`).
-- Scoring port, plan, beta and attempt logic: `node tests/scoring.port.test.mjs` (163 checks, including the 1-2-3 search
+- Scoring port, plan, beta and attempt logic: `node tests/scoring.port.test.mjs` (171 checks, including the voice parser, the 1-2-3 search
   against a brute force, following the glow = par at all 11 heights from 150 to 200 cm (`NextHoldPlan.ts`), the hint
   ladder, cue, came-off, goes and pinned-hint rules of `NextHoldBeta.ts`, and the ticks, card lines, best and fail-safe
   store of `NextHoldAttempt.ts`). The store keeps about 70 bytes a record, so the preview's 100 KB store holds about
@@ -62,13 +65,19 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
 - `devpost/design-brief.md`: the approved plan from `plan-lens`.
 - `devpost/BUILD_LOG.md`: every CLAD session, what it did, and the LEAF results.
 - `devpost/DEVPOST.md`, `devpost/VIDEO_PLAN.md`: the write-up and the video plan.
-- `devpost/visual/`: v6 screenshots (3 Nov); v7 in `visual/v7/` (see its INDEX). Neither is the session-26 build:
-  the v7 shots predate the v7.2 cards, labels and wall strip, and haven't been retaken.
+- `devpost/visual/`: v6 screenshots (3 Nov); v7 in `visual/v7/`; the current build (session 27) in `visual/v7_2/`,
+  S01–S12, taken through the real Lens with real pinches (see its INDEX for poses and what was hidden while shooting).
 
 ## What's stood in
 The preview can't see a real wall or track a body, so hold recognition is a setup mode and body position is stood in by
 pinches: pinch a hold and the limb with the best move to it goes there (LH/RH/LF/RF, behind Body, are an override).
 Coming off is stood in by the eye: on the wall (under 80 cm) and then back past 120 cm. The logic is proven in tests and the preview; how it feels on a real wall needs real SPECS.
+
+Voice is four words, each a button already on screen: "next hold" and "why" (both "?"), "show my beta", "again". Only
+short, final phrases count, and only while that button is showing, and a 1 s chip echoes the word. On SPECS it uses the
+device's speech recognition (`AsrModule`), which needs a network connection (the module reports "not connected to the
+internet" otherwise); it hasn't been tried on a device. The preview has no microphone, so there typed text stands in
+for speech and the chip says so.
 
 Green never means "safe". It means "a secure grip for you, from where you are now".
 
