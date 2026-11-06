@@ -264,6 +264,9 @@ export class DemoAutopilot extends BaseScriptComponent {
     }
     const so = cam.getSceneObject()
     this.camT = so.getTransform()
+    // session 28 (v7.3 P1-8): for a clean take pitch the preview camera up 25° before pressing play (README): the preview
+    // draws its "Plane" scene behind the additive Lens from that camera, and below its horizon the floor showed through
+    // the wall as a dark band with grid lines. The autopilot drives the Lens's own camera, so the take is unchanged
     this.tracking = so.getComponent("Component.DeviceTracking") as DeviceTracking
     if (this.tracking) {
       this.trackingWas = this.tracking.enabled

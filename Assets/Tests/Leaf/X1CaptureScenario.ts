@@ -1,4 +1,6 @@
-// Session 27: the screenshot driver for devpost/visual/v7_2 (not a test; it isn't part of the LEAF suite's count).
+// Session 27: the screenshot driver for devpost/visual/v7_2, session 28 for v7_3 (not a test; it isn't part of the LEAF
+// suite's count). Session 28: pitch the preview camera up 25° before each shot (below), and the eye's poses are set
+// absolutely from the wall.
 // Each run sets one shot's state the way a climber would, with real SIK pinches from LEAF's simulated hand on the
 // Lens's own buttons and holds, and the real eye moved to the shot's pose (tracking off), then holds that state for
 // HOLD_S while PreviewPanelTool shoots it. Refresh the preview between shots.
@@ -17,9 +19,9 @@ import {PREVIEW_VOICE_LABEL} from "../../Scripts/NextHoldVoice"
 import {camera, climbByRule, fmtPos, frames, getMain, mustFind, pinch, presetPosition, samePosition} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 
-export const CAPTURE_KEY = "nh.capture.s27b"
-/** the drafts' counters, removed on sight */
-const OLD_KEYS = ["nh.capture.next", "nh.capture.shot", "nh.capture.s27"]
+export const CAPTURE_KEY = "nh.capture.s28"
+/** older counters, removed on sight */
+const OLD_KEYS = ["nh.capture.next", "nh.capture.shot", "nh.capture.s27", "nh.capture.s27b"]
 /** the shot a missing counter starts at */
 const FIRST_SHOT = 1
 export const SHOTS = 12
@@ -46,13 +48,18 @@ export class X1CaptureScenario extends Scenario {
 
     const camT = camera().getSceneObject().getTransform()
     const tracking = camT.getSceneObject().getComponent("Component.DeviceTracking") as DeviceTracking
+    // session 28 (v7.3 P1-8): before each capture the preview camera is pitched up 25° (MovePreviewCamera reset, then
+    // rotate pitch 25): the preview draws its "Plane" scene behind the additive Lens from that camera, and below its
+    // horizon the floor showed through the wall as a dark band with grid lines. Up 25°, only its sky is behind the wall.
+    // The Lens can't read that camera inside a LEAF run (it read 0° with the camera at 25°), so this is the protocol,
+    // not a check: the stills show it
     if (tracking) tracking.enabled = false
-    const p0 = camT.getWorldPosition(), r0 = camT.getWorldRotation()
     const face = mustFind("Hold_lh").getTransform().getWorldPosition()
-    /** the eye `cm` from the wall face, `x` cm across, pitched `pitch` degrees (up +) */
+    /** the eye `cm` from the wall face, `x` cm across (from the preview's reset eye), pitched `pitch` degrees (up +); set
+     *  absolutely (session 28: not from the preview camera's own pose, which now looks up) */
     const pose = async (cm: number, x = 0, pitch = 0) => {
-      camT.setWorldPosition(new vec3(p0.x + x, p0.y, face.z + cm))
-      camT.setWorldRotation(r0.multiply(quat.angleAxis(pitch * Math.PI / 180, vec3.right())))
+      camT.setWorldPosition(new vec3(x, 0, face.z + cm))
+      camT.setWorldRotation(quat.angleAxis(pitch * Math.PI / 180, vec3.right()))
       await frames(4)
     }
     const ask = async (n: number) => { for (let i = 0; i < n; i++) { await pinch("AskButton"); await frames(3) } }
@@ -89,13 +96,18 @@ export class X1CaptureScenario extends Scenario {
       if (!main.isResultVisible() || main.getResultLines()[0] !== "SEND · go 2") errs.push(`card ${main.isResultVisible()}: ${main.getResultLines().join(" | ")}`)
     } else if (shot === 9) { await pose(...MATS); await pinch("SetupButton"); await frames(3); what = "Setup open"; if (main.getPage() !== "settings") errs.push(`page ${main.getPage()}`) }
     else if (shot === 10 || shot === 11) {
+      // session 28 (v7.3 P0-2): from S01's pose, so they match it (the panel low and over nothing)
       const cm = shot === 10 ? 155 : 195
-      await pose(250, 0, 8.8); await height(cm); what = `beta shown at ${cm} cm`
+      await pose(...MATS); await height(cm); what = `beta shown at ${cm} cm`
       if (main.getHeightCm() !== cm || !main.isBetaShown() || main.getPage() !== "climb") errs.push(`height ${main.getHeightCm()}, beta ${main.isBetaShown()}, page ${main.getPage()}`)
+      if (main.getGroundPanelRank() !== 3) errs.push(`the panel's place is rank ${main.getGroundPanelRank()}, want 3 (over nothing)`)
     } else if (shot === 12) {
-      await pose(...MATS)
-      what = "voice chip"
+      // session 28: on the wall at 1.05 m (in under 80 cm first), rung 0 -> 1, as the take does (the presentation judge:
+      // voice belongs on the wall, where the hands are busy, and at rung 1 the chip has no label to cover)
+      await pose(60); await pose(105, 4.5, 2)
+      what = "voice chip, on the wall"
       if (main.getVoiceKind() !== "injected") errs.push(`voice source ${main.getVoiceKind()}`)
+      if (main.getView() !== "wall") errs.push(`view ${main.getView()}`)
     } else errs.push(`no shot ${shot}`)
 
     // let the panel settle on its lazy follow
@@ -112,9 +124,12 @@ export class X1CaptureScenario extends Scenario {
       const until = getTime() + HOLD_S
       while (getTime() < until) {
         if (shot === 12) {
+          // session 28: the chip shows only when a word changed something, so to hold it for a still: back to no hint
+          // (resetBetaForTests, a test hook) and "next hold" again, in the same frame: rung 1 and its chip, every 0.8 s
+          main.resetBetaForTests(false)
           main.injectVoice("next hold")
           const chip = main.getVoiceChip()
-          if (!chip || chip.label !== PREVIEW_VOICE_LABEL) { errs.push(`chip ${JSON.stringify(chip)}`); break }
+          if (!chip || chip.label !== PREVIEW_VOICE_LABEL || main.getHintStep() !== 1) { errs.push(`chip ${JSON.stringify(chip)}, rung ${main.getHintStep()}`); break }
         }
         await sleep(800)
       }
