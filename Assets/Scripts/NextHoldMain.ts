@@ -1270,7 +1270,7 @@ export class NextHoldMain extends BaseScriptComponent {
       // below the glow ran off the bottom of the frame)
       if (this.labelWhy) {
         const p = this.wall.wallToWorld(c.x, c.y, 3)
-        if (this.keepInView(p, hw, hh).distance(p) > 0.5) m = Math.min(m, -0.25)
+        if (this.keepInView(p, hw, hh).distance(p) > 0.5) m = Math.min(m, -100)
       }
       for (const o of this.getProblemHolds()) {
         if (o !== id) m = Math.min(m, boxCircleGap(c, hw, hh, this.holds[o].x, this.holds[o].y, this.ringRadius(o) + line) - LABEL_GLOW_GAP)
@@ -1280,8 +1280,16 @@ export class NextHoldMain extends BaseScriptComponent {
       return m
     }
     const bases = [below, {x: h.x, y: h.y + glow + hh}, {x: h.x + glow + hw, y: h.y}, {x: h.x - glow - hw, y: h.y}]
-    // session 26: rung 3's label also tries each place slid into view
-    const cands = this.labelWhy ? bases.concat(bases.map((c) => this.toWall(this.keepInView(this.wall.wallToWorld(c.x, c.y, 3), hw, hh)))) : bases
+    // session 26: rung 3's label also tries each place slid into view, and from there a little to either side
+    const slid: WallPt[] = []
+    if (this.labelWhy) {
+      for (const c of bases) {
+        for (const dx of [0, -0.5, 0.5, -1, 1, -1.5, 1.5]) {
+          slid.push(this.toWall(this.keepInView(this.wall.wallToWorld(c.x + dx * hw, c.y, 3), hw, hh)))
+        }
+      }
+    }
+    const cands = bases.concat(slid)
     let best = below, bestClear = clearance(below)
     for (const c of cands.slice(1)) {
       if (bestClear >= 0) break
@@ -1458,7 +1466,16 @@ export class NextHoldMain extends BaseScriptComponent {
       .map((id) => ({x: this.holds[id].x, y: this.holds[id].y, r: id === glow ? this.glowRadius(id) : this.ringRadius(id) + this.getRingLineWidth() / 2}))
     // the lowest the strip may sit (as seen): its bottom on the lower hand's hold
     const yMin = low + hh
+    // first a place slid into view that covers nothing; if none (from 70 cm looking up the glow fills most of the
+    // view and the hands are below it: d1), the clearest place level with the hands, in view or not (glance down to
+    // it, as the older rule did), never over the ring if it can help it
+    const clearOf = (p: WallPt) => {
+      let clear = 1e9
+      for (const c of circles) clear = Math.min(clear, boxCircleGap(p, hw, hh, c.x, c.y, c.r))
+      return clear
+    }
     let best: {p: WallPt; clear: number} | null = null
+    let inView: WallPt | null = null
     for (const dx of [0, -0.3, 0.3, -0.6, 0.6, -0.9, 0.9, -1.2, 1.2, -1.5, 1.5]) {
       // seen on the wall, from the eye's line across; then where on the strip's own plane that is, kept in view
       const seen = {x: eye.x + dx * 40, y: yMin}
@@ -1466,10 +1483,22 @@ export class NextHoldMain extends BaseScriptComponent {
       const kv = this.toWall(this.keepInView(this.wall.wallToWorld(q.x, q.y, PANEL_Z), halfW, halfH))
       // into view up, never down below the hands
       const back = {x: eye.x + (kv.x - eye.x) * s, y: Math.max(yMin, eye.y + (kv.y - eye.y) * s)}
-      let clear = 1e9
-      for (const c of circles) clear = Math.min(clear, boxCircleGap(back, hw, hh, c.x, c.y, c.r))
-      if (!best || clear > best.clear + 1e-6) best = {p: back, clear}
-      if (clear >= 1) break
+      if (clearOf(back) >= 1) { inView = back; break }
+      for (const p of [back, seen]) {
+        const clear = clearOf(p)
+        if (!best || clear > best.clear + 1e-6) best = {p, clear}
+      }
+    }
+    if (inView) best = {p: inView, clear: 1}
+    else if (glow) {
+      // no clear place in view: the older On-wall rule, just under the glow as seen, slid sideways into view but never
+      // up onto the ring (glance down to it); and never below the hands
+      const g = this.holds[glow], R = this.glowRadius(glow) + ROW_RING_GAP
+      const seen = {x: g.x, y: Math.max(yMin, g.y - R - hh)}
+      const q = this.unproject(seen, eye, s)
+      const kx = this.toWall(this.keepInView(this.wall.wallToWorld(q.x, q.y, PANEL_Z), halfW, halfH)).x
+      this.controlRow.placeAt(this.wall.wallToWorld(kx, q.y, PANEL_Z), this.wallRot(), k)
+      return true
     }
     const p = this.unproject(best!.p, eye, s)
     this.controlRow.placeAt(this.wall.wallToWorld(p.x, p.y, PANEL_Z), this.wallRot(), k)

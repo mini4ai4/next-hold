@@ -208,6 +208,22 @@ export class H5CameOffScenario extends Scenario {
         }
       }
       }
+      // session 26: from 1.25 m (still Ground) the row is in view beside the problem, so the card must keep off it
+      // (from 2.5 m the row is off the frame's edge and can't be hit)
+      tr.setWorldPosition(new vec3(0, 0, 0)); await frames(4)
+      const near = screenBoxOf("CameOffBlock", camL, true), nearAgain = screenBoxOf("AgainButton", camL, true), nearRow = screenBoxOf("ControlRow", camL)
+      print(`[H5] from 1.25 m: block ${fmtBox(near)}, Again ${fmtBox(nearAgain)}, row ${fmtBox(nearRow)}`)
+      if (!main.isCameOffVisible()) errs.push("from 1.25 m: the card is gone")
+      for (const b of [near, nearAgain]) if (b && nearRow && boxesOverlap(b, nearRow)) errs.push(`from 1.25 m the came-off block (${fmtBox(b)}) overlaps the control row (${fmtBox(nearRow)})`)
+      print(`[H5] from 1.25 m: ${checkSideBySide("CameOffCard", BUTTON_W, "AgainButton", AGAIN_W, AGAIN_GAP, errs, "from 1.25 m")}`)
+      // looking straight ahead the row is past the frame's right edge from both distances; turned toward it, with a
+      // small step back so the card is placed again for this look, row and card share the view: they must not overlap
+      tr.setWorldRotation(quat.angleAxis(-25 * Math.PI / 180, vec3.up())); await frames(2)
+      tr.setWorldPosition(new vec3(0, 0, 6)); await frames(4)
+      const turned = screenBoxOf("CameOffBlock", camL, true), turnedAgain = screenBoxOf("AgainButton", camL, true), turnedRow = screenBoxOf("ControlRow", camL)
+      print(`[H5] 1.3 m, turned 25° right: block ${fmtBox(turned)}, Again ${fmtBox(turnedAgain)}, row ${fmtBox(turnedRow)}`)
+      if (!turnedRow || turnedRow.x1 < 0 || turnedRow.x0 > 1) errs.push(`turned right: the row isn't in view (${fmtBox(turnedRow)}), so this look checks nothing`)
+      for (const b of [turned, turnedAgain]) if (b && turnedRow && boxesOverlap(b, turnedRow)) errs.push(`turned right: the came-off block (${fmtBox(b)}) overlaps the control row (${fmtBox(turnedRow)})`)
     } finally {
       tr.setWorldPosition(p0)
       tr.setWorldRotation(r0)

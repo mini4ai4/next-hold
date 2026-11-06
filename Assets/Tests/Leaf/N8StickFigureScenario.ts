@@ -243,7 +243,15 @@ export class N8StickFigureScenario extends Scenario {
     if (main.getView() !== "wall") errs.push(`setup: view ${main.getView()} after ViewToggle, want wall`)
     const s0 = snap(main)
     check(s0, errs, "on wall, preset")
-    if (checkFade(main, errs, "on wall, preset") === 0) errs.push("on wall, preset: no figure line passes behind the control row; the fade check proves nothing")
+    // session 26 (v7.2): on the wall the climb page is the [?][Body] strip at the side of the hands, so no figure line
+    // passes behind it; the fade is proven on the body page, whose 2 x 2 grid still hangs below the hands
+    const stripBehind = checkFade(main, errs, "on wall, the strip")
+    print(`[B1] on wall, the strip: ${stripBehind} figure lines behind it`)
+    if (main.getRowLayout() !== "strip") errs.push(`on wall: the row's layout is ${main.getRowLayout()}, want the strip`)
+    if (stripBehind !== 0) errs.push(`on wall: ${stripBehind} figure lines pass behind the strip; it should sit beside the body`)
+    await pinch("BodyButton"); await frames(3)
+    if (checkFade(main, errs, "on wall, body page") === 0) errs.push("on wall, body page: no figure line passes behind the control row; the fade check proves nothing")
+    main.pressBody(); await frames(3) // the body page has no close button (as the kit's openPageFor)
 
     // thinner and lower-contrast than the rings (session 15): the figure's line is narrower than the
     // rings' crisp line at 110 cm (and the rings' grows with distance in Ground, the figure's does

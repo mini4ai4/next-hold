@@ -105,13 +105,14 @@ export class T1TopOutScenario extends Scenario {
       if (!main.isTopped() || main.getSuggestion() || mustFind("SuggestGlow").enabled) errs.push("after the fade the climb is not over: a next move shows")
 
       // a hand back off the top hold: climbing again, the glow and TOP come back
+      // session 26: the result card now takes the row's place, so there is no Body to pick a limb from: a plain pinch
+      // on h10 moves the hand on the top (LH, green from there by the rule)
       const pos = main.getPosition() as RefPosition
       const hand: RefLimb = pos.LH === PRESET_TOP ? "LH" : "RH"
-      const free = ["h09", "up", "h10"].filter((id) => !["LH", "RH", "LF", "RF"].some((l) => pos[l] === id))[0]
-      await pinch("Toggle_" + hand)
-      await frames(2)
+      const free = "h10"
       await pinch("Hold_" + free)
       await frames(3)
+      if ((main.getPosition() as RefPosition)[hand] === PRESET_TOP) errs.push(`a pinch on ${free} didn't take ${hand} off the top`)
       print(`[T1] ${hand} back down to ${free}: topped ${main.isTopped()}, glow ${mustFind("SuggestGlow").enabled}, ${PRESET_TOP} tag "${main.getTagText(PRESET_TOP)}"`)
       if (main.isTopped() || !main.getSuggestion() || !mustFind("SuggestGlow").enabled || main.getTagText(PRESET_TOP) !== "TOP") {
         errs.push(`${hand} off the top to ${free}: topped ${main.isTopped()}, glow ${mustFind("SuggestGlow").enabled}, tag "${main.getTagText(PRESET_TOP)}"`)

@@ -117,6 +117,9 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
   private noteText: Text
   private noteItem: FlexItem
   private gridItem: FlexItem
+  private flex: FlexLayout
+  /** the first layout pass has run (after it, a change of cells lays out at once) */
+  private laidOut = false
   private overrideLabel: Text
   private backPlate: BackPlate
   private betaButton: Button
@@ -151,6 +154,7 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
 
     const content = this.obj(this.sceneObject, "Content", new vec3(0, 0, 0.6))
     const flex = content.createComponent(FlexLayout.getTypeName()) as FlexLayout
+    this.flex = flex
     flex.autoDiscoverItemsOnStart = false // items are registered explicitly via addItems
     flex.width = -1
     flex.height = -1
@@ -164,6 +168,7 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
     flex.paddingRight = 1.4
     flex.onLayoutComplete.add((r) => {
       backPlate.size = new vec2(r.containerWidth, r.containerHeight)
+      this.laidOut = true
     })
 
     // the top line: empty unless there is something to say
@@ -401,6 +406,9 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
       this.plannedLine.getSceneObject().enabled = !strip
       this.noteItem.overrideHeight = strip ? 0.01 : 2.2
       this.noteText.text = strip ? "" : NOTE_TEXT
+      // lay out now, in this frame, so Main places the row at its new size (d1: the frame the view switched On wall
+      // the 2 x 2 size was placed in the strip's spot, over the glow)
+      if (this.flex && this.laidOut) this.flex.forceLayout()
     }
   }
 

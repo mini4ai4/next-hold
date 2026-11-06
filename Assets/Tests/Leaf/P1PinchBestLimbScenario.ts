@@ -36,7 +36,10 @@ async function pinchMoves(main: NextHoldMain, ref: ReferenceRule, hold: string, 
   if (f.marker[limb] !== hold) errs.push(`${tag}: Marker_${limb} on ${f.marker[limb]} in the pinch frame, want ${hold}`)
   if (f.over !== null || f.label !== "") errs.push(`${tag}: after the move: override ${f.over}, panel "${f.label}"`)
   // the rings, each for the limb a pinch on it moves now, in that same frame
-  for (const r of ref.perHold(want)) {
+  // (session 26: the glowing hold shows the glow's own move, which a pinch there makes: the kit's ringRule)
+  const rule = ringRule(ref, main, want)
+  for (const id of Object.keys(rule)) {
+    const r = rule[id]
     if (f.colour[r.holdId] !== r.colour) errs.push(`${tag}: pinch-frame ring ${r.holdId} ${f.colour[r.holdId]}, rule ${r.limb} ${r.colour}`)
   }
   const best = ref.glow(want)

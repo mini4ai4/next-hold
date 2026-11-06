@@ -30,7 +30,9 @@ const WALL_ROOT = new vec3(-10.5, -166, -125)
 // session 24 (G): what the climb page shows; the top line is empty by default (nothing renders), "Show my beta"
 // only on the mats
 const CONTROLS = ["ShowBetaButton", "AskButton", "BodyButton", "SetupButton", "PlannedLine", "SafetyNote"]
-const WALL_CONTROLS = ["AskButton", "BodyButton", "SetupButton", "PlannedLine", "SafetyNote"]
+// session 26 (v7.2): on the wall the row is the 1 x 2 strip, "?" and Body; Setup, the planned line and the note are
+// mats reading (g1 checks they're gone there)
+const WALL_CONTROLS = ["AskButton", "BodyButton"]
 
 function visualsUnder(so: SceneObject, out: BaseMeshVisual[]): BaseMeshVisual[] {
   if (!so.isEnabledInHierarchy) return out
@@ -205,6 +207,8 @@ export class N5ControlRowInViewScenario extends Scenario {
     const wallErrs: string[] = []
     for (const c of WALL_CONTROLS) wallErrs.push(...outOfView(c, live, "on wall"))
     wallErrs.push(...outOfView("ControlRow", live, "on wall"))
+    for (const n of ["SetupButton", "ShowBetaButton"]) if (mustFind(n).isEnabledInHierarchy) wallErrs.push(`on wall: ${n} shows (the strip is "?" and Body)`)
+    for (const n of ["PlannedLine", "SafetyNote"]) if (visualsUnder(mustFind(n), []).length) wallErrs.push(`on wall: ${n} renders`)
     // session 18: below the one ring, never over it on screen
     print(`[N5] on wall, preset: ${checkRowClearOfRing(live, wallErrs, "on wall, preset")}`)
     // the row follows the ring: still fully in view, and clear of it, after a hand moves up

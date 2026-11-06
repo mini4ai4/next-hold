@@ -178,16 +178,17 @@ export class N11HeightScenario extends Scenario {
 
     // ── session 20: no override, the height picks the best limb again, in the pinch's own frame ──
     await restorePreset(main)
-    await pinch("Toggle_LF"); await frames(2)
-    await pinch("Hold_h16"); await frames(2)
+    // session 26 (glow = plan): the old position (LF h16, RH h09) now glows LH at both heights; from RH on h11 the
+    // plan's first move is RH to up at 170 cm and LH to up at 165 cm (found by a node search over reachable states)
     await pinch("Toggle_RH"); await frames(2)
-    await pinch("Hold_h09"); await frames(2)
+    await pinch("Hold_h11"); await frames(2)
     const posR = main.getPosition() as RefPosition
     await pinch("HeightDown"); await frames(2)
     const was = main.getSelectedLimb()
     const repick = await pinchCapture("HeightDown", () => ({h: main.getHeightCm(), sel: main.getSelectedLimb(), lit: main.getLitLimb(), sug: main.getSuggestion()}))
-    const best165 = makeReference(165).bestMove(posR)!
-    const best170 = makeReference(170).bestMove(posR)!
+    // session 26: the glow = plan rule (at 165 cm from here the plan's first move is LH to h10, not the greedy RH to up)
+    const best165 = makeReference(165).glow(posR)!
+    const best170 = makeReference(170).glow(posR)!
     print(`[r7] ${fmtPos(posR)}: best at 170 cm ${best170.limb}->${best170.holdId} (Lens ${was}); in the 165 pinch frame ${repick.value ? repick.value.sel : "-"}, rule ${best165.limb}->${best165.holdId}`)
     if (best165.limb === best170.limb) errs.push(`precondition: the best limb is ${best165.limb} at both 165 and 170 cm`)
     if (was !== best170.limb) errs.push(`at 170 cm the limb is ${was}, the best move is ${best170.limb}'s`)

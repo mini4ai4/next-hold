@@ -259,7 +259,10 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
       followsPlan("LH", "h20", "L hand")
       break
     case "s8-card": {
-      // session 26: the go from the start holds (scene 4's RH back on rh after scene 3's step back) topped in par
+      // session 26: the go from the start holds (scene 4's RH back on rh after scene 3's step back) topped in par.
+      // TOPPED's 2.6 s fade runs in real time, 21 timeline seconds at x8, so at x8 the card can't be up yet: it is
+      // read right after the take instead (see run()); at real speed it is up from about 137.9 s
+      if (SPEED > 1) break
       const lines = main.getResultLines().join(" | ")
       const wantLines = "SEND · go 2 | 4 moves · your par 4 | 0 hints · ticked on this go"
       want(lines === wantLines, `the card reads "${lines}", want "${wantLines}"`)
@@ -408,6 +411,18 @@ export class D1DemoAutopilotScenario extends Scenario {
     if (visuals.enabled !== visualsWas) errs.push("SIK's hand visuals not handed back after stop")
     if (pilot.getOverlayAlpha() !== 1) errs.push(`overlay alpha ${pilot.getOverlayAlpha()} after stop`)
     if (Math.abs(alphaOf("Ring_up") - ringAlpha) > 1e-4) errs.push(`Ring_up alpha ${alphaOf("Ring_up")} after stop, was ${ringAlpha}`)
+
+    // session 26, the take's last beat (its s8-card key, deferred at x8): once TOPPED has faded in real time the card
+    // is up, in the row's place, with Again as its own button beside it, and reads the go from the start holds
+    const tCard = getTime()
+    while (!main.isResultVisible() && getTime() - tCard < 5) await frames(1)
+    await frames(2)
+    const cardLines = main.getResultLines().join(" | ")
+    const wantCard = "SEND · go 2 | 4 moves · your par 4 | 0 hints · ticked on this go"
+    print(`[d1] the take's card, ${(getTime() - tCard).toFixed(1)} s after it ended: "${cardLines}", row hidden ${main.isRowHidden()}, Again ${main.isAgainVisible()}`)
+    if (cardLines !== wantCard) errs.push(`the take's card reads "${cardLines}", want "${wantCard}"`)
+    if (!main.isRowHidden() || !main.isAgainVisible()) errs.push(`the take's card: row hidden ${main.isRowHidden()}, Again ${main.isAgainVisible()}`)
+    print(`[d1] the take's card: ${checkSideBySide("ResultCard", 2 * RESULT_HALF_W, "AgainButton", AGAIN_W, AGAIN_GAP, errs, "the take's card")}`)
 
     await restorePreset(main)
     expect(errs.length, "demo autopilot:\n" + errs.join("\n")).toBe(0)
