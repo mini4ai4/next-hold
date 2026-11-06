@@ -21,9 +21,11 @@
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
-import {HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
-import {GROUND_PANEL_CM, GROUND_PANEL_SCALES, NextHoldMain} from "../../Scripts/NextHoldMain"
-import {camera, checkRowClearOfRing, eyeToWallCm, frames, getMain, mustFind, pinch, restorePreset} from "./NextHoldTestKit"
+import {HOLDS, HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
+import {GROUND_PANEL_CM, GROUND_PANEL_MIN_DOWN_DEG, GROUND_PANEL_SCALES, NextHoldMain} from "../../Scripts/NextHoldMain"
+import {
+  ScreenBox, boxesOverlap, camera, checkRowClearOfRing, eyeToWallCm, fmtBox, frames, getMain, mustFind, pinch, renderedOuterRadius, restorePreset, screenBoxOf,
+} from "./NextHoldTestKit"
 
 /** the wall root's preset place (BUILD_LOG session 5); this item must not move it */
 const WALL_ROOT = new vec3(-10.5, -166, -125)
@@ -33,6 +35,18 @@ const CONTROLS = ["ShowBetaButton", "AskButton", "BodyButton", "SetupButton", "P
 // session 26 (v7.2): on the wall the row is the 1 x 2 strip, "?" and Body; Setup, the planned line and the note are
 // mats reading (g1 checks they're gone there)
 const WALL_CONTROLS = ["AskButton", "BodyButton"]
+
+/** session 28: the least rank (see checkGround) the panel's place must reach at each pose; poses not listed: 1 (never over the
+ *  glow's halo or the beta's words). The video's and the stills' mats pose (4.25 m, 37.5 cm right, pitch -2°) and the
+ *  turned poses must cover nothing */
+const POSE_RANK: {[tag: string]: number} = {
+  "ground, preset": 3,
+  "ground, 425 cm, 37.5 cm right, pitch -2°": 3, "ground, 425 cm, 37.5 cm right, pitch -2°, beta hidden": 3,
+  "ground, 425 cm, 50 cm right, pitch -2°": 3, "ground, 425 cm, 50 cm right, pitch -2°, beta hidden": 3,
+  "ground, 250 cm, turned 20° left": 3, "ground, 250 cm, turned 20° right": 3,
+  "ground, 250 cm, turned 20° left, beta hidden": 3, "ground, 250 cm, turned 20° right, beta hidden": 3,
+  "ground, 425 cm": 2, "ground, 250 cm, pitch -10°": 2, "ground, 250 cm, 40 cm left": 2,
+}
 
 function visualsUnder(so: SceneObject, out: BaseMeshVisual[]): BaseMeshVisual[] {
   if (!so.isEnabledInHierarchy) return out
@@ -100,6 +114,14 @@ function checkGround(main: NextHoldMain, eyeCam: Camera, errs: string[], tag: st
   if (!GROUND_PANEL_SCALES.some((s) => Math.abs(s - k) < 1e-3)) errs.push(`${tag}: the panel is drawn x${k.toFixed(3)}, not one of the sizes it may take`)
   const facing = rowT.getWorldRotation().multiplyVec3(vec3.forward()).dot(eyeT.getWorldRotation().multiplyVec3(vec3.forward()))
   if (facing < 0.999) errs.push(`${tag}: the panel doesn't face the eye (${facing.toFixed(4)})`)
+  if (main.getGroundPanelRank() === -1) {
+    // session 28: no place in view clear of the glow and the beta's words: it waits under the view, wholly out of it
+    const b = screenBoxOf("ControlRow", eyeCam)
+    const dn = Math.atan2(-eyeT.getInvertedWorldTransform().multiplyPoint(rowT.getWorldPosition()).y, dist) * 180 / Math.PI
+    if (b && b.y0 < 1) errs.push(`${tag}: the panel waits below the view, but reaches into it (${fmtBox(b)})`)
+    if (dn < 20) errs.push(`${tag}: the panel waits only ${dn.toFixed(1)}° below the gaze`)
+    return `D ${D.toFixed(0)} cm: no place in view clear of the glow and the beta's words: the panel waits ${dn.toFixed(1)}° below the gaze, out of view (${fmtBox(b)})`
+  }
   for (const n of CONTROLS) errs.push(...outOfView(n, eyeCam, tag + ", straight ahead"))
   // seen from the eye, the plate on the wall clears every problem ring's outer edge
   const plate = plateOnWall(main, eyeT.getWorldPosition())
@@ -116,7 +138,51 @@ function checkGround(main: NextHoldMain, eyeCam: Camera, errs: string[], tag: st
     const dx = Math.max(0, px0 - hx, hx - px1), dy = Math.max(0, py0 - hy, hy - py1)
     if (Math.hypot(dx, dy) < r) covered.push(id)
   }
-  if (covered.length) errs.push(`${tag}: the control row covers problem rings ${covered.join(",")}`)
+  // (session 28: what it may cover is now ranked, below; `covered` stays in the printout)
+  // session 28 (v7.3 P0-2), measured as drawn from the real eye: low (its centre at least GROUND_PANEL_MIN_DOWN_DEG below the
+  // gaze), large enough (a button at least 4.4° wide, the planned line at least 0.5° tall), and on screen over no hold of the
+  // wall (in the problem or not) and not over the glow's halo
+  const local = eyeT.getInvertedWorldTransform().multiplyPoint(rowT.getWorldPosition())
+  const down = Math.atan2(-local.y, -local.z) * 180 / Math.PI
+  if (down < GROUND_PANEL_MIN_DOWN_DEG - 0.05) errs.push(`${tag}: the panel's centre is ${down.toFixed(1)}° below the gaze, want at least ${GROUND_PANEL_MIN_DOWN_DEG}° (never at or above the line of sight)`)
+  const tanV = Math.tan(eyeCam.fov / 2), tanH = tanV * eyeCam.aspect
+  const degW = (b: ScreenBox) => (Math.atan((b.x1 - 0.5) * 2 * tanH) - Math.atan((b.x0 - 0.5) * 2 * tanH)) * 180 / Math.PI
+  const degH = (b: ScreenBox) => (Math.atan((0.5 - b.y0) * 2 * tanV) - Math.atan((0.5 - b.y1) * 2 * tanV)) * 180 / Math.PI
+  const ask = screenBoxOf("AskButton", eyeCam, true), planned = screenBoxOf("PlannedLine", eyeCam)
+  if (!ask || degW(ask) < 4.4) errs.push(`${tag}: "?" is ${ask ? degW(ask).toFixed(2) : "?"}° wide as drawn, want at least 4.4°`)
+  if (!planned || degH(planned) < 0.5) errs.push(`${tag}: "${main.getPlannedLine()}" is ${planned ? degH(planned).toFixed(2) : "?"}° tall as drawn, want at least 0.5°`)
+  // what the panel is over, measured on screen by the test, ranked as the Lens ranks it (3 nothing; 2 only holds outside
+  // the problem; 1 problem rings or START/TOP; 0 the glow's halo or the beta's words). The Lens must never claim a better
+  // rank than this, and each pose has a floor (see POSE_RANK)
+  const panel = screenBoxOf("ControlRow", eyeCam)
+  const r0: string[] = [], r1: string[] = [], r2: string[] = []
+  if (panel) {
+    const wallRot = mustFind("ClimbingWall (stand-in)").getTransform().getWorldRotation()
+    const circleOver = (c: vec3, r: number) => {
+      const s = eyeCam.worldSpaceToScreenSpace(c)
+      const e = eyeCam.worldSpaceToScreenSpace(c.add(wallRot.multiplyVec3(new vec3(r, 0, 0))))
+      const rx = Math.abs(e.x - s.x), ry = rx * eyeCam.aspect
+      const dx = Math.max(0, panel.x0 - s.x, s.x - panel.x1) / rx, dy = Math.max(0, panel.y0 - s.y, s.y - panel.y1) / ry
+      return Math.hypot(dx, dy) < 1
+    }
+    const glowSO = mustFind("SuggestGlow")
+    if (glowSO.isEnabledInHierarchy && circleOver(glowSO.getTransform().getWorldPosition(), renderedOuterRadius("SuggestGlow"))) r0.push("the glow's halo")
+    for (const n of ["SuggestLabel", "GhostNumber_2", "GhostNumber_3"]) {
+      const b = mustFind(n).isEnabledInHierarchy && (n !== "SuggestLabel" || main.isLabelVisible()) ? screenBoxOf(n, eyeCam) : null
+      if (b && boxesOverlap(b, panel)) r0.push(n)
+    }
+    for (const h of HOLDS) {
+      const inP = main.isInProblem(h.id)
+      if (circleOver(mustFind("Hold_" + h.id).getTransform().getWorldPosition(), HOLD_SIZE[h.type].ringR)) (inP ? r1 : r2).push(h.id)
+      const t = main.getTagText(h.id) ? screenBoxOf("Tag_" + h.id, eyeCam) : null
+      if (t && boxesOverlap(t, panel)) r1.push(`"${main.getTagText(h.id)}" on ${h.id}`)
+    }
+  }
+  const measured = r0.length ? 0 : r1.length ? 1 : r2.length ? 2 : 3
+  const claimed = main.getGroundPanelRank()
+  if (measured < claimed) errs.push(`${tag}: the Lens ranks the panel's place ${claimed}, but on screen it is over ${r0.concat(r1, r2).join(", ")} (rank ${measured})`)
+  const floor = POSE_RANK[tag] !== undefined ? POSE_RANK[tag] : 1
+  if (measured < floor) errs.push(`${tag}: the panel (${fmtBox(panel)}) is over ${r0.concat(r1, r2).join(", ")}: rank ${measured}, this pose needs ${floor}`)
   // TOP over the top hold, above its ring, sized for the distance
   const top = main.getTopHold()
   if (!top || main.getTagText(top) !== "TOP") errs.push(`${tag}: the top hold ${top} is tagged "${top ? main.getTagText(top) : null}", want "TOP"`)
@@ -128,7 +194,7 @@ function checkGround(main: NextHoldMain, eyeCam: Camera, errs: string[], tag: st
     if (!(ty > hy + HOLD_SIZE[holdById(top)!.type].ringR)) errs.push(`${tag}: TOP sits at ${ty.toFixed(1)} cm, not above ${top}'s ring (hold at ${hy})`)
     if (size < 39 * want - 0.5) errs.push(`${tag}: TOP text size ${size.toFixed(1)} reads smaller than Body at 110 cm from ${D.toFixed(0)} cm (want >= ${(39 * want).toFixed(1)})`)
   }
-  return `D ${D.toFixed(0)} cm: panel ${dist.toFixed(1)} cm from the eye, x${k.toFixed(2)}, ${main.getGroundPanelDownDeg().toFixed(1)}° below the gaze, seen on the wall x ${px0.toFixed(0)}..${px1.toFixed(0)}, y ${py0.toFixed(0)}..${py1.toFixed(0)}; problem x ${x0.toFixed(0)}..${x1.toFixed(0)}`
+  return `D ${D.toFixed(0)} cm: panel ${dist.toFixed(1)} cm from the eye, x${k.toFixed(2)}, rank ${measured} (Lens ${claimed}${r0.concat(r1, r2).length ? ": over " + r0.concat(r1, r2).join(", ") : ""}), ${down.toFixed(1)}° below the gaze, "?" ${ask ? degW(ask).toFixed(1) : "-"}° wide, planned line ${planned ? degH(planned).toFixed(2) : "-"}° tall, seen on the wall x ${px0.toFixed(0)}..${px1.toFixed(0)}, y ${py0.toFixed(0)}..${py1.toFixed(0)}; problem x ${x0.toFixed(0)}..${x1.toFixed(0)}`
 }
 
 /** A camera at `eyeCam`'s eye, turned to look at the row's centre: every control fully in its view. */
@@ -198,6 +264,38 @@ export class N5ControlRowInViewScenario extends Scenario {
           print(`[N5] ground, ${cm} cm: ${checkGround(main, live, errs, `ground, ${cm} cm`)}`)
           if (cm === 250 && main.isWhyVisible() && Math.abs(main.getWhyScale() - 250 / 110) > 0.03) errs.push(`ground, 250 cm: why-line drawn x${main.getWhyScale().toFixed(3)}, want x${(250 / 110).toFixed(3)}`)
         }
+        // session 28 (v7.3 P0-2): not only level: pitched up (S10/S11's pose) and down, turned, and off to the side,
+        // with the glow on (the beta shown) and with the beta hidden; and the S01 pose from 4.25 m
+        const D2 = Math.PI / 180
+        const poses: [string, number, number, number, number][] = [
+          ["250 cm, pitch +8.8°", 0, 125, 8.8, 0], ["250 cm, pitch -10°", 0, 125, -10, 0],
+          ["250 cm, turned 20° left", 0, 125, 0, 20], ["250 cm, turned 20° right", 0, 125, 0, -20],
+          ["250 cm, 40 cm left", -40, 125, 0, 0], ["250 cm, 40 cm right, pitch +8.8°", 40, 125, 8.8, 0],
+          ["425 cm, 37.5 cm right, pitch -2°", 37.5, 300, -2, 0], ["425 cm, 50 cm right, pitch -2°", 50, 300, -2, 0],
+        ]
+        for (const hidden of [false, true]) {
+          if (hidden) { main.resetBetaForTests(false); await frames(2) }
+          for (const [name, x, z, pitch, yaw] of poses) {
+            // a step aside first, so each pose is a fresh placement (from one pose to the next can be under the lazy
+            // follow's 8° / 10 cm, and then the panel rightly stays where it was)
+            camT.setWorldPosition(new vec3(cp.x + x, cp.y + 30, cp.z + z)); await frames(2)
+            camT.setWorldPosition(new vec3(cp.x + x, cp.y, cp.z + z))
+            camT.setWorldRotation(cr.multiply(quat.angleAxis(yaw * D2, vec3.up())).multiply(quat.angleAxis(pitch * D2, vec3.right())))
+            await frames(4)
+            const tag = `ground, ${name}${hidden ? ", beta hidden" : ""}`
+            print(`[N5] ${tag}: ${checkGround(main, live, errs, tag)}`)
+            if (main.getGroundPanelRank() === -1) {
+              // a glance down (15°) brings it up, whole, low in view and off the glow and the beta's words
+              camT.setWorldRotation(camT.getWorldRotation().multiply(quat.angleAxis(-15 * D2, vec3.right())))
+              await frames(4)
+              print(`[N5] ${tag}, then 15° down: ${checkGround(main, live, errs, tag + ", then 15° down")}`)
+              if (main.getGroundPanelRank() < 1) errs.push(`${tag}: a glance down 15° leaves the panel at rank ${main.getGroundPanelRank()}`)
+            }
+          }
+        }
+        main.resetBetaForTests(true)
+        camT.setWorldPosition(new vec3(cp.x, cp.y, cp.z + 300)); camT.setWorldRotation(cr)
+        await frames(4)
         // lazy follow: a small turn leaves the panel where it is; a bigger one brings it along, still whole and clear
         const rowT = main.controlRow.getSceneObject().getTransform()
         const before = rowT.getWorldPosition()

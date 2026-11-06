@@ -101,7 +101,13 @@ export const GROUND_PANEL_CM = 60
 export const GROUND_PANEL_DOWN_DEG = 27.5
 /** the sizes it tries, largest first: 60/110 looks as large as at 110 cm; it shrinks only to find a clear place
  *  (0.26: the 2.2 cm labels still about 0.55° from 60 cm) */
-export const GROUND_PANEL_SCALES = [60 / 110, 0.48, 0.42, 0.37, 0.33, 0.29, 0.26]
+/** session 28 (v7.3 P0-2): the sizes it may take, down to a floor: at 0.43 an 11 cm cell is still ~4.5° wide (part G's
+ *  10 x 10 cm at 110 cm is 5.2°), and the planned line's cap ~0.5° (session 27 went down to 0.26: 2.7°, and 0.28°) */
+export const GROUND_PANEL_SCALES = [60 / 110, 0.49, 0.43]
+/** session 28: its centre never rises above this far below the gaze (degrees): it sat 2–3° above in S10/S11 */
+export const GROUND_PANEL_MIN_DOWN_DEG = 5
+/** session 28: the step between the panel's place ranks (panelPlaceScore) */
+const PANEL_RANK = 10000
 const FOLLOW_TURN_DEG = 8
 const FOLLOW_MOVE_CM = 10
 
@@ -300,6 +306,8 @@ export class NextHoldMain extends BaseScriptComponent {
   private panelAnchor: {eye: vec3; fwd: vec3; size: string} | null = null
   /** session 27: how far below the gaze the Ground panel's centre sits (degrees) */
   private panelDownDeg = 0
+  /** session 28: the rank the mats panel's place reached (panelPlaceScore: 3 covers nothing) */
+  private panelRank = 3
   /** session 26: the label carries rung 3's why (two lines) */
   private labelWhy = false
   private labelNow = ""
@@ -1268,6 +1276,28 @@ export class NextHoldMain extends BaseScriptComponent {
   }
 
   /** how clear (cm, wall) a box centred at w is of the problem's rings, the tags and labels, and `extra` boxes */
+  /**
+   * Session 28 (v7.3 P0-2), the panel on the mats: how good a place (seen on the wall: centre w, half sizes hw x hh) is,
+   * in ranks. From 2.5 m the preview's frame is all wall and its lower part holds the start holds, START and other
+   * holds, so a panel of readable size low in view can't always cover nothing; when it can't, it gives way in this
+   * order: never over the glow's halo, the beta's words (the move's label, the badges) or `extra` (a card); then
+   * over as few problem rings and tags (START, TOP) as it can; then as few other holds. Returns
+   * PANEL_RANK * rank + the clearance (cm) of the first rank it breaks (rank 3, clear of all, + its clearance).
+   */
+  private panelPlaceScore(w: WallPt, hw: number, hh: number, extra: {x: number; y: number; hw: number; hh: number}[]): number {
+    let a = 1e3, b = 1e3, c = 1e3
+    const glow = this.overlay ? this.overlay.glowHoldId : null
+    if (glow && this.holds[glow]) a = Math.min(a, boxCircleGap(w, hw, hh, this.holds[glow].x, this.holds[glow].y, this.glowRadius(glow)))
+    for (const bx of this.visuals.getBetaBoxes().concat(extra)) a = Math.min(a, boxBoxGap(w, hw, hh, bx))
+    const ringLine = this.getRingLineWidth() / 2
+    for (const id of this.getProblemHolds()) b = Math.min(b, boxCircleGap(w, hw, hh, this.holds[id].x, this.holds[id].y, this.ringRadius(id) + ringLine))
+    for (const bx of this.visuals.getTextBoxes()) b = Math.min(b, boxBoxGap(w, hw, hh, bx))
+    for (const id of this.getHoldIds()) if (!this.problem[id]) c = Math.min(c, boxCircleGap(w, hw, hh, this.holds[id].x, this.holds[id].y, this.ringRadius(id)))
+    const rank = a < 0 ? 0 : b < 0 ? 1 : c < 0 ? 2 : 3
+    const gap = rank === 0 ? a : rank === 1 ? b : c
+    return PANEL_RANK * rank + Math.max(-PANEL_RANK / 2 + 1, Math.min(PANEL_RANK / 2 - 1, gap))
+  }
+
   private matClear(w: WallPt, hw: number, hh: number, extra: {x: number; y: number; hw: number; hh: number}[]): number {
     let clear = 1e9
     for (const id of this.getProblemHolds()) clear = Math.min(clear, boxCircleGap(w, hw, hh, this.holds[id].x, this.holds[id].y, this.ringRadius(id) + this.getRingLineWidth() / 2))
@@ -1569,11 +1599,12 @@ export class NextHoldMain extends BaseScriptComponent {
     const a = this.panelAnchor
     if (lazy && a && a.size === sizeKey && eye.distance(a.eye) < FOLLOW_MOVE_CM &&
         Math.acos(Math.max(-1, Math.min(1, fwd.dot(a.fwd)))) * 180 / Math.PI < FOLLOW_TURN_DEG) return
-    const slot = this.groundSlot(size ? size.x / 2 : ROW_HALF_W, size ? size.y / 2 : ROW_HALF_H, this.cardBoxes())
+    const slot = this.groundSlot(size ? size.x / 2 : ROW_HALF_W, size ? size.y / 2 : ROW_HALF_H, this.cardBoxes(), true)
     if (!slot) return
     this.controlRow.placeAt(slot.pos, slot.rot, slot.scale)
     this.panelAnchor = {eye, fwd, size: sizeKey}
     this.panelDownDeg = slot.down
+    this.panelRank = slot.rank
   }
 
   /**
@@ -1582,8 +1613,8 @@ export class NextHoldMain extends BaseScriptComponent {
    * tall, so there it sits at the frame's lower edge), centred, then up and to either side until, seen from the eye
    * on the wall, it covers no ring of the problem, no tag or label and none of `avoid` (else the clearest).
    */
-  private groundSlot(halfW: number, halfH: number, avoid: {x: number; y: number; hw: number; hh: number}[]):
-      {pos: vec3; rot: quat; scale: number; down: number} | null {
+  private groundSlot(halfW: number, halfH: number, avoid: {x: number; y: number; hw: number; hh: number}[], mayWaitBelow = false):
+      {pos: vec3; rot: quat; scale: number; down: number; rank: number} | null {
     const finder = WorldCameraFinderProvider.getInstance()
     const cam = finder ? finder.getComponent() : null
     const camT = this.cameraTransform()
@@ -1594,32 +1625,56 @@ export class NextHoldMain extends BaseScriptComponent {
     const eyeW = toWall.multiplyPoint(camT.getWorldPosition())
     const x0 = this.wall.wallToLocal(0, 0).x
     const world = camT.getWorldTransform()
-    // the largest size, from "as large as at 110 cm" down, with a place in frame clear of the problem (from 2.5 m the
-    // problem fills most of the preview's frame: only the band under the START tags is free)
+    // session 28 (v7.3 P0-2): position first, then size. From the lowest place (as low as the frame allows) up in 2.5 cm
+    // steps, never above GROUND_PANEL_MIN_DOWN_DEG below the gaze; at each height across, and at each place every size
+    // from the largest to the floor; the first place where some size covers nothing wins. Session 27 searched size
+    // first, so from 2.5 m pitched up it took a small size high up, beside the glow (S10/S11). Covers nothing: no
+    // ring, no tag or label, no hold of the wall, not the glow's halo, none of `avoid`. If nowhere is clear, the best
+    // ranked by panelPlaceScore (the lower on a tie).
+    const yMin = D * Math.tan(GROUND_PANEL_MIN_DOWN_DEG * Math.PI / 180)
     let pick: {x: number; y: number; clear: number; s: number} | null = null
-    for (const s of GROUND_PANEL_SCALES) {
-      const b = this.groundSlotAt(s, halfW, halfH, avoid, D, tanV, tanH, toWall, eyeW, x0, world)
-      if (b && (!pick || b.clear > pick.clear + 1e-6)) pick = {...b, s}
-      if (b && b.clear >= 1) { pick = {...b, s}; break }
+    outer:
+    for (let step = 0; step < 12; step++) {
+      for (const fx of [0, -0.35, 0.35, -0.7, 0.7, -1, 1]) {
+        let placed = false
+        for (const s of GROUND_PANEL_SCALES) {
+          const b = this.groundSlotAt(s, step, fx, yMin, halfW, halfH, avoid, D, tanV, tanH, toWall, eyeW, x0, world)
+          if (!b) continue
+          placed = true
+          if (!pick || b.clear > pick.clear + 1e-6) pick = {...b, s}
+          if (b.clear >= 3 * PANEL_RANK + 1) { pick = {...b, s}; break outer }
+        }
+        if (!placed && fx === 0) break outer // no size fits this high: it would be above the line
+      }
     }
     if (!pick) return null
+    const rank = Math.floor((pick.clear + PANEL_RANK / 2) / PANEL_RANK)
+    if (rank === 0 && mayWaitBelow) {
+      // every place in view would cover the glow's halo or the beta's words (from 2.5 m looking up at the problem with the
+      // beta shown): it waits just under the view instead, GROUND_PANEL_DOWN_DEG below the gaze; a glance down brings it
+      // up (the head turns past FOLLOW_TURN_DEG, and from there the low places are clear)
+      const y = D * Math.tan(GROUND_PANEL_DOWN_DEG * Math.PI / 180)
+      return {pos: world.multiplyPoint(new vec3(0, -y, -D)), rot: camT.getWorldRotation(), scale: GROUND_PANEL_SCALES[0],
+        down: GROUND_PANEL_DOWN_DEG, rank: -1}
+    }
     return {pos: world.multiplyPoint(new vec3(pick.x, -pick.y, -D)), rot: camT.getWorldRotation(), scale: pick.s,
-      down: Math.atan2(pick.y, D) * 180 / Math.PI}
+      down: Math.atan2(pick.y, D) * 180 / Math.PI, rank}
   }
 
-  /** one size's search for groundSlot: the clearest (or first clear) centre, in the camera's frame at D */
-  private groundSlotAt(s: number, halfW: number, halfH: number, avoid: {x: number; y: number; hw: number; hh: number}[], D: number,
+  /** one place for groundSlot, at one size: `step` 2.5 cm steps up from the lowest, `fx` across (-1..1 of the room); its
+   *  clearance, or null if it would be above yMin (the line GROUND_PANEL_MIN_DOWN_DEG below the gaze) */
+  private groundSlotAt(s: number, step: number, fx: number, yMin: number, halfW: number, halfH: number,
+      avoid: {x: number; y: number; hw: number; hh: number}[], D: number,
       tanV: number, tanH: number, toWall: mat4, eyeW: vec3, x0: number, world: mat4): {x: number; y: number; clear: number} | null {
     const hw = halfW * s, hh = halfH * s
     const lowest = Math.max(0, D * tanV - hh - 1)
     const yDown = Math.min(D * Math.tan(GROUND_PANEL_DOWN_DEG * Math.PI / 180), lowest)
     const xMax = Math.max(0, D * tanH - hw - 1)
     let best: {x: number; y: number; clear: number} | null = null
-    outer:
-    for (const dy of [0, 0.5, 1, 1.5, 2, 2.5]) {
-      const y = yDown - dy * hh
-      if (y < -lowest) break
-      for (const fx of [0, -0.35, 0.35, -0.7, 0.7, -1, 1]) {
+    {
+      const y = yDown - step * 2.5
+      if (y < yMin) return null
+      {
         const x = fx * xMax
         // the block's corners, seen from the eye on the wall plane
         const pts: WallPt[] = []
@@ -1629,12 +1684,11 @@ export class NextHoldMain extends BaseScriptComponent {
           const t = eyeW.z / (eyeW.z - c.z)
           pts.push({x: eyeW.x + t * (c.x - eyeW.x) - x0, y: eyeW.y + t * (c.y - eyeW.y)})
         }
-        if (pts.length < 4) continue
+        if (pts.length < 4) return null
         const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y)
         const bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys)
-        const clear = this.matClear({x: (bx0 + bx1) / 2, y: (by0 + by1) / 2}, (bx1 - bx0) / 2, (by1 - by0) / 2, avoid)
-        if (!best || clear > best.clear + 1e-6) best = {x, y, clear}
-        if (clear >= 1) break outer
+        const clear = this.panelPlaceScore({x: (bx0 + bx1) / 2, y: (by0 + by1) / 2}, (bx1 - bx0) / 2, (by1 - by0) / 2, avoid)
+        best = {x, y, clear}
       }
     }
     return best
@@ -2096,6 +2150,10 @@ export class NextHoldMain extends BaseScriptComponent {
   isRowHidden(): boolean { return this.controlRow.isHidden() }
   /** session 27: on the mats, how far below the gaze the panel's centre sits (degrees), and how far it is from the eye */
   getGroundPanelDownDeg(): number { return this.panelDownDeg }
+  /** session 28: what the mats panel's place covers, by rank: 3 nothing; 2 only holds outside the problem; 1 problem rings
+   *  or START/TOP too; -1 every place in view would cover the glow's halo, the beta's words or a card, so it waits just
+   *  under the view (GROUND_PANEL_DOWN_DEG below the gaze) for a glance down */
+  getGroundPanelRank(): number { return this.panelRank }
   getGroundPanelCm(): number { return GROUND_PANEL_CM }
   /** the row's cell layout: "grid", "strip" (on the wall) or "settings" */
   getRowLayout(): string { return this.controlRow.getLayout() }

@@ -41,6 +41,8 @@ export const TEXT_PER_CM = 56
 export const LABEL_CAP_CM = 2.2
 export const ASK_CAP_CM = 4
 export const SMALL_CAP_CM = 1.7
+/** session 28: the planned line's cap on the climb page (cm, at its 110 cm size) */
+export const PLANNED_CAP_CM = 1.3
 /** the "●"/"○" glyphs are about 0.6 of an em across, an em about 1.43 caps: the size that draws a 1.2 cm dot */
 export const DOT_CM = 1.2
 const DOT_SIZE = (DOT_CM / 0.6) * (TEXT_PER_CM / 1.43)
@@ -402,7 +404,9 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
       // are mats reading, gone with "Show my beta" and Setup; the settings page shows the height twice the size
       this.gridItem.overrideHeight = strip ? CELL_H : layout === "settings" ? SETTINGS_GRID_H : GRID_H
       this.plannedItem.overrideHeight = strip ? 0.01 : layout === "settings" ? 4.4 : 2.2
-      this.plannedLine.size = TYPE_SCALE.Body.size * (layout === "settings" ? 2 : 1)
+      // session 28 (v7.3 P0-2): on the climb page a 1.3 cm cap (was Body, 0.7 cm), so with the mats panel at its smallest
+      // (x0.43, 60 cm out) "Planned for 155 cm" is still ~0.5° tall; the settings page twice Body as before
+      this.plannedLine.size = layout === "settings" ? TYPE_SCALE.Body.size * 2 : capSize(PLANNED_CAP_CM)
       this.plannedLine.getSceneObject().enabled = !strip
       this.noteItem.overrideHeight = strip ? 0.01 : 2.2
       this.noteText.text = strip ? "" : NOTE_TEXT

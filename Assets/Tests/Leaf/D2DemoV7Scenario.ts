@@ -53,7 +53,11 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
   const d = eyeToWallCm(camera())
   const pos = main.getPosition() as RefPosition
   const inView = (names: string[]) => { const off = notOnScreen(names, camera()); want(!off.length, `not fully in view: ${off.join(", ")}`) }
-  const ground = () => want(main.getView() === "ground" && d > 240 && d < 260, `view ${main.getView()} at ${d.toFixed(0)} cm, want Ground at 2.5 m`)
+  // session 28: the mats beats from S01's pose (4.25 m), where the panel covers nothing (r5 ranks it 3)
+  const ground = () => {
+    want(main.getView() === "ground" && d > 415 && d < 445, `view ${main.getView()} at ${d.toFixed(0)} cm, want Ground at 4.25-4.4 m`)
+    if (!main.isRowHidden()) want(main.getGroundPanelRank() === 3, `the panel's place is rank ${main.getGroundPanelRank()}, want 3 (over nothing)`)
+  }
   const heightAt = (cm: number, hold: string) => {
     want(main.getHeightCm() === cm && main.getPlannedLine() === `Planned for ${cm} cm`, `height ${main.getHeightCm()}, "${main.getPlannedLine()}"`)
     want(badge(main, 2) === `2 · LH on ${hold}`, `badge 2 ${badge(main, 2)}, want 2 · LH on ${hold}`)

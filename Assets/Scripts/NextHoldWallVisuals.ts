@@ -369,6 +369,7 @@ export class NextHoldWallVisuals {
   private dotMeshes: {[k: string]: RenderMesh} = {}
   /** the label's, the tags' and the badges' boxes as last drawn (wall cm) */
   private textBoxes: {x: number; y: number; hw: number; hh: number}[] = []
+  private betaBoxes: {x: number; y: number; hw: number; hh: number}[] = []
   /** figure lines by name: "LH_Upper", "LH_Lower", ..., "Spine", "Shoulders", "Hips" */
   private figure: {[name: string]: {so: SceneObject; rmv: RenderMeshVisual}} = {}
   private head: {so: SceneObject; mat: Material; rmv: RenderMeshVisual}
@@ -621,6 +622,8 @@ export class NextHoldWallVisuals {
     this.applyGhostPath(at, gk, ringW, glowOn ? glowHold! : null, glowClear, label)
     // what a why-line must not cover besides the rings: the label, the tags and the badges
     this.textBoxes = boxes.concat(at.map((a) => ({x: a.x, y: a.y, hw: a.L + a.R, hh: a.R})))
+    // session 28: the beta's own words (the move's label and the badges), without START/TOP
+    this.betaBoxes = (label ? [label] : []).concat(at.map((a) => ({x: a.x, y: a.y, hw: a.L + a.R, hh: a.R})))
 
     this.applyFigure(s)
 
@@ -929,6 +932,11 @@ export class NextHoldWallVisuals {
   /** the suggestion label's, the tags' and the badges' boxes as last drawn (wall cm, centre and half sizes) */
   getTextBoxes(): {x: number; y: number; hw: number; hh: number}[] {
     return this.textBoxes.map((b) => ({...b}))
+  }
+
+  /** session 28: the move's label and the 1-2-3's badges (wall cm), the text the beta is made of */
+  getBetaBoxes(): {x: number; y: number; hw: number; hh: number}[] {
+    return this.betaBoxes.map((b) => ({...b}))
   }
 
   isGlowOn(id: string): boolean {
