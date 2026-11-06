@@ -60,7 +60,7 @@ async function moveAndCheck(main: NextHoldMain, target: string, errs: string[], 
 
   const expectPos: RefPosition = {...before.pos}
   expectPos[mover] = target
-  const best = ref.bestMove(expectPos)
+  const best = ref.glow(expectPos)
   print(`[C2] ${tag}: ${mover} ${fromHold} -> ${target}; now ${fmtPos(a.pos)}; selected ${a.selected}; reference best ${best ? best.limb + "->" + best.holdId : "none"}`)
 
   // the selected limb moved, nothing else did

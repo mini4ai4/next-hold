@@ -67,11 +67,20 @@ export class K3KeptScenario extends Scenario {
     const k155 = main.getBestKey()
     for (let i = 0; i < 4; i++) { await pinch("HeightUp"); await frames(2) }
     if (k175 === k155 || main.getBestKey() !== k175 || k175.indexOf("nh.best.") !== 0) errs.push(`keys: 175 ${k175}, 155 ${k155}, back ${main.getBestKey()}`)
+    // session 26: goes are kept per problem, whatever the height
+    const gk = main.getGoesKey()
+    if (gk.indexOf("nh.goes.") !== 0 || gk === k175) errs.push(`the goes key ${gk}`)
     const s4 = GeneralDataStore.create()
-    s4.putString(k175, "{not json")
+    s4.putString(gk, "{not json")
+    s4.putString(k175, "{not json either")
     main.useStore(s4)
     main.reloadFromStore()
     if (main.getAttempt() !== 1) errs.push(`a garbage record gave go ${main.getAttempt()}, want 1`)
+    const s4b = GeneralDataStore.create()
+    s4b.putString(gk, JSON.stringify({g: 3, b: null}))
+    main.useStore(s4b)
+    main.reloadFromStore()
+    if (main.getAttempt() !== 4) errs.push(`3 goes kept for the problem gave go ${main.getAttempt()}, want 4`)
 
     // ── fail safe: a store at its size takes nothing, throws nothing ──
     const s5 = GeneralDataStore.create()
@@ -86,9 +95,9 @@ export class K3KeptScenario extends Scenario {
     while (g.top && getTime() - g.time < TOPPED_SECONDS + TOPPED_FADE_SECONDS + 0.3) await frames(1)
     await frames(2)
     print(`[K3] a store near its ${max} bytes: card "${main.getResultLines().join(" | ")}", last write "${main.getLastWrite()}", key kept ${s5.has(k175)}`)
-    if (s5.has(k175) || main.getLastWrite().indexOf("skipped") !== 0) errs.push(`the full store: kept ${s5.has(k175)}, "${main.getLastWrite()}"`)
+    if (s5.has(k175) || s5.has(gk) || main.getLastWrite().indexOf("skipped") !== 0) errs.push(`the full store: kept ${s5.has(k175)} ${s5.has(gk)}, "${main.getLastWrite()}"`)
     // (the LEAF reset shows the beta, so this first go is a FLASH)
-    if (!main.isResultVisible() || main.getResultLines()[0] !== "FLASH") errs.push(`the full store: the card "${main.getResultLines().join(" | ")}"`)
+    if (!main.isResultVisible() || main.getResultLines()[0] !== "FLASH · go 1") errs.push(`the full store: the card "${main.getResultLines().join(" | ")}"`)
 
     // ── the real store in the preview: read its cap, write, read back and remove one smoke key ──
     try {

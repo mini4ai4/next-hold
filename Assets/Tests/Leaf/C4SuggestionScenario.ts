@@ -49,7 +49,7 @@ export class C4SuggestionScenario extends Scenario {
 
     // ── suggestion at open: glow + label ──
     const pos0 = main.getPosition() as RefPosition
-    const best0 = ref.bestMove(pos0)!
+    const best0 = ref.glow(pos0)!
     const sug0 = main.getSuggestion()
     if (!sug0 || sug0.holdId !== best0.holdId || sug0.limb !== best0.limb) {
       errs.push(`open: Lens suggests ${sug0 ? sug0.limb + "->" + sug0.holdId : "none"}, reference ${best0.limb}->${best0.holdId}`)
@@ -117,7 +117,7 @@ export class C4SuggestionScenario extends Scenario {
             if (seen[k]) continue
             seen[k] = true
             const steps = node.steps.concat([{limb: l, holdId: r.holdId}])
-            const b = ref.bestMove(pos)
+            const b = ref.glow(pos)
             if (b && !holdInView(b.holdId)) { path = steps; break }
             next.push({pos, steps})
           }
@@ -140,7 +140,7 @@ export class C4SuggestionScenario extends Scenario {
       await frames(3) // the arrow updates one frame after a change
     }
     const pos1 = main.getPosition() as RefPosition
-    const best1 = ref.bestMove(pos1)!
+    const best1 = ref.glow(pos1)!
     const sug1 = main.getSuggestion()
     print(`[C4] after ${moves}: Lens suggests ${sug1 ? sug1.limb + "->" + sug1.holdId : "none"}, reference ${best1.limb}->${best1.holdId}`)
     for (const s of path) if (pos1[s.limb] !== s.holdId && path.filter((o) => o.limb === s.limb).pop() === s) {

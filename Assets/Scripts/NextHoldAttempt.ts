@@ -4,60 +4,93 @@
 // store is passed in: on SPECS it is global.persistentStorageSystem.store; LEAF and the demo autopilot
 // hand in a fresh GeneralDataStore.create(); Node hands in a plain fake with the same methods.
 //
-// A go ends at the top (NextHoldBeta.toppedOut) or at a fall. Topped, the result card reads three lines:
-//   ONSIGHT | FLASH | SEND (attempt N)
-//   6 moves · par for your body 6          (par: the planner's shortest secure route from the start, at your height)
-//   Hints: 1 · Best: SEND in 3, 7 moves     (after an ONSIGHT: "Clean onsight. Pick something harder?")
-// ONSIGHT: the first go on this problem at this height, beta never shown and no hint taken. FLASH: the first
-// go, with beta or hints. SEND: a later go. No timer, no points. "Best" is kept per problem and height.
+// A go ends at the top (NextHoldBeta.toppedOut) or at a fall. Topped, the result card reads three lines
+// (session 26, the climber's and designer's wording):
+//   SEND · go 2                            (ONSIGHT · go 1 | FLASH · go 1 | SEND · go N | REPEAT · go N)
+//   5 moves · your par 4                   (par: the planner's shortest secure route from the start, at your height)
+//   1 hint · ticked: onsight (go 1)        (on the tick itself: "1 hint · ticked on this go"; an ONSIGHT says
+//                                           "Clean onsight. Pick something harder?")
+// ONSIGHT: the first go on this problem, beta never shown and no hint at all (session 26: rung 1 is a hint).
+// FLASH: the first go, with beta or a hint. SEND: the first top on a later go. Session 26: the count stops at the
+// first top: that is the problem's tick, and every later top is a REPEAT. Goes are counted per problem (a new
+// height is the same problem, so it brings no fresh ONSIGHT); the best is kept per problem and height and ranked
+// tick, then go (first tops only), then hints, then moves. A top climbed on from a fall, not from the start, gets
+// no tick (resumedLines). No timer, no points.
 //
 // Kept (each read and write in try/catch, so a bad value or a full store never stops the Lens):
-//   nh.best.<hash>  {"g": goes ended, "b": {"t": tick, "n": go, "m": moves, "h": hints} | null}
-//   nh.height       the climber's height, cm
+//   nh.goes.<hash of the problem>          {"g": goes ended, "b": the tick {"t", "n": go, "m": moves, "h": hints} | null}
+//   nh.best.<hash of problem@height>       {"g": 0, "b": the best top at this height | null}
+//   nh.height                              the climber's height, cm
 // Before each write the store's size is checked against getMaxSizeInBytes() (a store reporting 0 gets our own
-// 10 KB cap); if the store can't be read, or the write would pass 90% of the cap, nothing is written.
+// 10 KB cap); if the store can't be read, or the write would pass 90% of the cap, nothing is written. A record is
+// about 70 bytes, so the preview's 100 KB store holds about 1,300 of them; past that nothing more is kept (there
+// is no eviction).
 
-export type Tick = "ONSIGHT" | "FLASH" | "SEND"
+export type Tick = "ONSIGHT" | "FLASH" | "SEND" | "REPEAT"
 
 export interface Go { tick: Tick; go: number; moves: number; hints: number }
 export interface ProblemRecord { goes: number; best: Go | null }
 
 export const HEIGHT_KEY = "nh.height"
 export const BEST_PREFIX = "nh.best."
+export const GOES_PREFIX = "nh.goes."
 export const STORE_HEADROOM = 0.9
 /** the cap used when a store reports none (measured: the preview's persistent store says 102400 bytes, an
  *  in-memory GeneralDataStore.create() says 0) */
 export const FALLBACK_MAX_BYTES = 10240
 export const ONSIGHT_LINE = "Clean onsight. Pick something harder?"
 
-/** ONSIGHT / FLASH / SEND from what the go recorded (NextHoldBeta: attempt, betaSeenThisGo, hintsThisGo). */
+/** ONSIGHT / FLASH / SEND from what the go recorded (NextHoldBeta: attempt, betaSeenThisGo, hintsThisGo), for the
+ *  problem's first top; a later top is a REPEAT (tickOf). */
 export function tickFor(go: number, betaSeen: boolean, hints: number): Tick {
   if (go > 1) return "SEND"
   return !betaSeen && hints === 0 ? "ONSIGHT" : "FLASH"
 }
 
-const RANK: {[t: string]: number} = {ONSIGHT: 0, FLASH: 1, SEND: 2}
+/** the tick of a top from the start: REPEAT if the problem is already ticked, else tickFor */
+export function tickOf(ticked: Go | null, go: number, betaSeen: boolean, hints: number): Tick {
+  return ticked ? "REPEAT" : tickFor(go, betaSeen, hints)
+}
 
-/** Is `a` better than `b`: the tick first, then fewer moves, fewer hints, an earlier go. */
+const RANK: {[t: string]: number} = {ONSIGHT: 0, FLASH: 1, SEND: 2, REPEAT: 3}
+
+/** Is `a` better than `b` (session 26, the climber's order): the tick first, then the earlier go (first tops only:
+ *  goes-to-send is the number), then fewer hints (clean beats beta'd), and moves only break a tie. */
 export function better(a: Go, b: Go | null): boolean {
   if (!b) return true
   if (RANK[a.tick] !== RANK[b.tick]) return RANK[a.tick] < RANK[b.tick]
-  if (a.moves !== b.moves) return a.moves < b.moves
+  if (a.tick !== "REPEAT" && a.go !== b.go) return a.go < b.go
   if (a.hints !== b.hints) return a.hints < b.hints
-  return a.go < b.go
+  return a.moves < b.moves
 }
 
-export function fmtBest(b: Go): string {
-  return b.tick === "SEND" ? `SEND in ${b.go}, ${b.moves} moves` : `${b.tick}, ${b.moves} moves`
+export function hintsText(n: number): string {
+  return n === 1 ? "1 hint" : `${n} hints`
 }
 
-/** The result card's three lines. `prevBest`: the best before this go (null: none). */
-export function cardLines(g: Go, par: number | null, prevBest: Go | null): string[] {
-  const l1 = g.tick === "SEND" ? `SEND (attempt ${g.go})` : g.tick
-  const l2 = par === null ? `${g.moves} moves · no par for your body` : `${g.moves} moves · par for your body ${par}`
+export function movesText(n: number): string {
+  return n === 1 ? "1 move" : `${n} moves`
+}
+
+/** the card's first line: the tick and the go */
+export function heroLine(g: Go): string {
+  return `${g.tick} · go ${g.go}`
+}
+
+/** The result card's three lines for a top from the start. `ticked`: the problem's tick before this go (null: this
+ *  go is the tick). */
+export function cardLines(g: Go, par: number | null, ticked: Go | null): string[] {
+  const l2 = par === null ? `${movesText(g.moves)} · no par for your body` : `${movesText(g.moves)} · your par ${par}`
   const l3 = g.tick === "ONSIGHT" ? ONSIGHT_LINE
-    : `Hints: ${g.hints} · ` + (better(g, prevBest) ? "New best" : `Best: ${fmtBest(prevBest!)}`)
-  return [l1, l2, l3]
+    : `${hintsText(g.hints)} · ` + (ticked ? `ticked: ${ticked.tick.toLowerCase()} (go ${ticked.go})` : "ticked on this go")
+  return [heroLine(g), l2, l3]
+}
+
+/** Session 26: the card for a top climbed on from a fall (not from the start holds): no tick, no best. */
+export const RESUMED_HERO = "TOPPED · not from the start"
+export const RESUMED_LINE = "A tick needs a go from the start"
+export function resumedLines(hints: number): string[] {
+  return [RESUMED_HERO, RESUMED_LINE, `${hintsText(hints)} · Again to go from the start`]
 }
 
 /** 32-bit FNV-1a, as 8 hex digits */
@@ -70,9 +103,14 @@ export function fnv1a(s: string): string {
   return ("0000000" + h.toString(16)).slice(-8)
 }
 
-/** the store key for a problem (NextHoldBeta.problemKey: holds, starts, top) at a height */
+/** the store key for a problem's best (NextHoldBeta.problemKey: holds, starts, top) at a height */
 export function bestKey(problem: string, heightCm: number): string {
   return BEST_PREFIX + fnv1a(problem + "@" + Math.round(heightCm))
+}
+
+/** Session 26: the store key for a problem's goes and tick, whatever the height */
+export function goesKey(problem: string): string {
+  return GOES_PREFIX + fnv1a(problem)
 }
 
 /** a stored height, snapped to 5 cm in 150-200; null if it isn't one */

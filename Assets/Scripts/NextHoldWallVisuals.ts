@@ -40,6 +40,9 @@ export const STYLE_OF: Record<RingColour, RingStyle> = {green: "solid", yellow: 
 /** session 21, a refused pinch: the hold's ring swells to (1 + RING_PULSE_GROW) x and back, once, in this long */
 export const RING_PULSE_SECONDS = 0.45
 const RING_PULSE_GROW = 0.3
+/** session 26: the came-off hold's outline: one swell every 1.2 s, up to 1.25 x */
+export const OUTLINE_PULSE_SECONDS = 1.2
+const OUTLINE_PULSE_GROW = 0.25
 
 /** dashed: this many dashes round a ring, half of the way round being gap (30 deg each): from 2.5 m the
  *  gap on the smallest ring is wider than the line */
@@ -379,6 +382,8 @@ export class NextHoldWallVisuals {
   /** the hold whose ring is pulsing, and when it started */
   private pulseHold: string | null = null
   private pulseStart = -1
+  private outlinePulse: string | null = null
+  private outlinePulseStart = -1
 
   constructor(
     private wallRoot: SceneObject,
@@ -822,7 +827,25 @@ export class NextHoldWallVisuals {
     return this.pulseHold ? {hold: this.pulseHold, scale: this.rings[this.pulseHold].so.getTransform().getLocalScale().x} : null
   }
 
+  /** Session 26: while the came-off card is up, the outline of the hold the climber came off from swells and
+   *  settles, again and again (neutral: no grip colour); null stops it. */
+  setOutlinePulse(id: string | null): void {
+    if (id === this.outlinePulse) return
+    if (this.outlinePulse && this.outlines[this.outlinePulse]) this.outlines[this.outlinePulse].so.getTransform().setLocalScale(vec3.one())
+    this.outlinePulse = id && this.outlines[id] ? id : null
+    this.outlinePulseStart = getTime()
+  }
+
+  /** the outline pulsing now and its scale, or null */
+  getOutlinePulse(): {hold: string; scale: number} | null {
+    return this.outlinePulse ? {hold: this.outlinePulse, scale: this.outlines[this.outlinePulse].so.getTransform().getLocalScale().x} : null
+  }
+
   private tickPulse(time: number): void {
+    if (this.outlinePulse) {
+      const u = ((time - this.outlinePulseStart) / OUTLINE_PULSE_SECONDS) % 1
+      this.outlines[this.outlinePulse].so.getTransform().setLocalScale(vec3.one().uniformScale(1 + OUTLINE_PULSE_GROW * (0.5 - 0.5 * Math.cos(2 * Math.PI * u))))
+    }
     if (!this.pulseHold) return
     const u = (time - this.pulseStart) / RING_PULSE_SECONDS
     if (u >= 1) { this.stopPulse(); return }

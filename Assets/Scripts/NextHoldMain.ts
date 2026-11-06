@@ -54,18 +54,20 @@ import {
   Evaluation, HoldTypes, Holds, LEG_REACH, LIMBS, Limb, Position, ScoreResult, bestMove, bestPerHold, centreOfMass,
   evaluate, hipOf, pinchMove, routeToTop, sequence, shoulderOf,
 } from "./NextHoldScoring"
-import {Go, KVStore, NextHoldSave, bestKey, better, cardLines, tickFor} from "./NextHoldAttempt"
+import {Go, KVStore, NextHoldSave, bestKey, better, cardLines, goesKey, resumedLines, tickOf} from "./NextHoldAttempt"
+import {Plan, moveWhy, plan as planFrom} from "./NextHoldPlan"
 import {
   DESIGN_VIEW_CM, FigureBody, NextHoldWallVisuals, OverlayState, RingColour, TOPPED_TEXT, WallPt, minReadSize, readBoost, ringLineWidth,
 } from "./NextHoldWallVisuals"
 import {NextHoldControlRowUI, RowPage} from "./NextHoldControlRowUI"
 import {NextHoldTypePickerUI} from "./NextHoldTypePickerUI"
 import {
-  AGAIN_GAP, AGAIN_H, AGAIN_W, CARD_HALF_H, CARD_HALF_W, NextHoldCalloutUI, RESULT_HALF_H, RESULT_HALF_W, WHY_HALF_H, whyHalfWidth,
+  AGAIN_GAP, AGAIN_H, AGAIN_W, CARD_BUTTONS_Y, CARD_BUTTON_X, CARD_HALF_H, CARD_HALF_W, NextHoldCalloutUI, RESULT_HALF_H, RESULT_HALF_W,
+  WHY_HALF_H, whyHalfWidth,
 } from "./NextHoldCalloutUI"
 import {
-  BetaState, CUE_TEXT, HintStep, again as betaAgain, arrivedOnWall, ask, askDots, cameOffLine, cueShown, hideBeta, inReach,
-  initialBeta, moved, newAttempt, positionKey, problemKey, reveal, showBeta, steppedBack, takeHint, toppedOut,
+  BetaState, CUE_TEXT, HintStep, again as betaAgain, arrivedOnWall, ask, askDots, askWord, cameOffHintLabel, cameOffLine, cueShown,
+  heightChanged, hideBeta, inReach, initialBeta, moved, newAttempt, positionKey, problemKey, reveal, showBeta, steppedBack, takeHint, toppedOut,
 } from "./NextHoldBeta"
 import {NextHoldOffViewArrow} from "./NextHoldOffViewArrow"
 import {NextHoldPinchRipple, RippleEvent} from "./NextHoldPinchRipple"
@@ -271,12 +273,21 @@ export class NextHoldMain extends BaseScriptComponent {
   /** session 24 (B, C): the store door, the position this go's count started from, the last top's card */
   private save: NextHoldSave = new NextHoldSave(null)
   private startPos: Position = {LH: null, RH: null, LF: null, RF: null}
-  private result: {go: Go; par: number | null; lines: string[]; key: string} | null = null
+  private result: {go: Go; par: number | null; lines: string[]; key: string; resumed: boolean} | null = null
   /** the height read from the store at open (null: none kept) */
   private storedHeight: number | null = null
   /** a go ended (a fall or the top): "Again" stays on the mats, with or without its card (a hint taken on the
    *  came-off card takes the card down, not Again), until a move, Again itself, or the eye back on the wall */
   private againOffered = false
+  /** session 26: the glow is the shortest route's first move (the greedy best would cost a move) */
+  private planned = false
+  /** session 26: the label carries rung 3's why (two lines) */
+  private labelWhy = false
+  private labelNow = ""
+  /** session 26: the hold the last move went to (the came-off card pulses it: where the climber came off) */
+  private lastMoveHold: string | null = null
+  /** session 26: where the came-off block stood (wall cm, its centre and scale), so Again alone keeps its slot */
+  private blockAt: {x: number; y: number; k: number} | null = null
   /** the control row outline last pushed to the stick figure */
   private lastMask: WallPt[] | null = null
   /** the control row's laid-out size it was last placed with ("" = not laid out yet) */
@@ -408,10 +419,9 @@ export class NextHoldMain extends BaseScriptComponent {
       const was = this.beta
       this.beta = steppedBack(was, this.isTopped())
       if (this.beta !== was) {
-        // session 24: every fall is a go, beta shown or not (only the card needs it hidden); it is kept
-        const key = this.bestKeyNow()
-        const rec = this.save.readRecord(key)
-        this.save.writeRecord(key, {goes: Math.max(rec.goes, was.attempt), best: rec.best})
+        // session 24: every fall from a go is a go, beta shown or not (only the card needs it hidden); it is kept.
+        // Session 26: per problem, and a fall while climbing on from an earlier one ends no go
+        this.keepGoEnded(was)
         this.againOffered = true
         this.askArmed = false
         this.controlRow.setAskArmed(false)
@@ -464,9 +474,12 @@ export class NextHoldMain extends BaseScriptComponent {
     }
     if (this.isOccupied(id)) return // the reference doesn't score occupied holds
     // session 20: hands stay on the holds, no limb has to be chosen first: the best limb for this
-    // hold moves, unless a toggle picked one. Session 21: only if that move is green or yellow.
+    // hold moves, unless a toggle picked one. Session 21: only if that move is green or yellow. Session 26: a pinch
+    // on the glow's hold (the plan's next move) moves the glow's limb, which the plan may pick over the best limb
+    // for that hold (at 200 cm the top-out glow is LH, the best limb for h20 RH)
+    const glow = !this.override && this.evaluation.suggestion && this.evaluation.suggestion.holdId === id ? this.evaluation.suggestion.limb : null
     const move = pinchMove({holds: this.scoredHolds(), holdTypes: this.holdTypes, position: this.position,
-      reach: this.reach(), top: this.getTopHold(), holdId: id, override: this.override})
+      reach: this.reach(), top: this.getTopHold(), holdId: id, override: this.override || glow})
     if (!move.moves) {
       this.refusePinch(id)
       return
@@ -493,7 +506,9 @@ export class NextHoldMain extends BaseScriptComponent {
     const wasTopped = this.isTopped()
     this.position[limb] = id
     this.override = null
-    this.beta = moved(this.beta, getTime(), positionKey(this.position))
+    this.lastMoveHold = id
+    // session 26: back on the start holds after a fall or a top, a fresh go from the start begins here
+    this.beta = moved(this.beta, getTime(), positionKey(this.position), positionKey(this.startPos))
     // a move takes the last top's card down (a hand off the top climbs on), and Again with it
     this.result = null
     this.againOffered = false
@@ -508,42 +523,62 @@ export class NextHoldMain extends BaseScriptComponent {
     }
     this.callouts.hideWhy()
     this.recompute()
-    // a pinned hint on its third rung shows its why-line on arrival, as the rung did
-    if (this.beta.hintStep === 3) this.showGlowWhy()
   }
 
-  /** Session 24: the go topped out. Its tick from what the beta module recorded, par from where this go's count
-   *  started, the best kept for this problem and height; the card waits for the mats. Then the go ends. */
+  /**
+   * Session 24: the go topped out; the card waits for the mats. Session 26: from the start, its tick (the problem's
+   * first top: ONSIGHT / FLASH / SEND; any later top a REPEAT) from what the beta module recorded, par from where
+   * this go's count started; the go is counted and the tick kept per problem, the best per problem and height.
+   * Climbed on from a fall, not from the start: no tick, no best, nothing kept, and the card says so.
+   */
   private finishGo(): void {
     const b = this.beta
-    const go: Go = {tick: tickFor(b.attempt, b.betaSeenThisGo, b.hintsThisGo), go: b.attempt, moves: b.moves, hints: b.hintsThisGo}
     const par = this.getPar()
     const key = this.bestKeyNow()
-    const rec = this.save.readRecord(key)
-    this.save.writeRecord(key, {goes: Math.max(rec.goes, b.attempt), best: better(go, rec.best) ? go : rec.best})
-    this.result = {go, par, lines: cardLines(go, par, rec.best), key}
+    if (!b.fromStart) {
+      const go: Go = {tick: "SEND", go: b.attempt, moves: b.moves, hints: b.hintsThisGo}
+      this.result = {go, par, lines: resumedLines(b.hintsThisGo), key, resumed: true}
+    } else {
+      const gk = this.goesKeyNow()
+      const prob = this.save.readRecord(gk)
+      const go: Go = {tick: tickOf(prob.best, b.attempt, b.betaSeenThisGo, b.hintsThisGo), go: b.attempt, moves: b.moves, hints: b.hintsThisGo}
+      this.save.writeRecord(gk, {goes: Math.max(prob.goes, b.attempt), best: prob.best || go})
+      const rec = this.save.readRecord(key)
+      this.save.writeRecord(key, {goes: 0, best: better(go, rec.best) ? go : rec.best})
+      this.result = {go, par, lines: cardLines(go, par, prob.best), key, resumed: false}
+    }
     this.againOffered = true
     print(`[NextHold] topped: ${this.result.lines.join(" | ")} (${this.save.lastWrite})`)
     this.beta = toppedOut(b)
   }
 
-  /** the next go's number on this problem at this height: one more than the goes kept */
+  /** Session 26: a go just ended (a fall, Again or a height change mid-go): count it for the problem. `was` is the
+   *  state before; nothing is written unless the go's number moved on. */
+  private keepGoEnded(was: BetaState): void {
+    if (this.beta.attempt <= was.attempt) return
+    const gk = this.goesKeyNow(), rec = this.save.readRecord(gk)
+    this.save.writeRecord(gk, {goes: Math.max(rec.goes, was.attempt), best: rec.best})
+  }
+
+  /** the next go's number on this problem (session 26: whatever the height): one more than the goes kept */
   private nextGoNumber(): number {
-    return this.save.readRecord(this.bestKeyNow()).goes + 1
+    return this.save.readRecord(this.goesKeyNow()).goes + 1
   }
 
   private bestKeyNow(): string {
     return bestKey(this.currentProblemKey(), this.heightCm)
   }
 
-  /** rung 3 (session 24): the next move's why-line, at once */
-  private showGlowWhy(): void {
-    const g = this.overlay ? this.overlay.glowHoldId : null
-    const w = g ? this.whyText(g) : null
-    if (g && w) {
-      this.refusedUntil = -1
-      this.showWhyFor(g, w)
-    }
+  private goesKeyNow(): string {
+    return goesKey(this.currentProblemKey())
+  }
+
+  /** rung 3 (session 26): why the next move works, under its label ("R hand" over "jug, in reach") */
+  private labelText(s: {limb: Limb; holdId: string}, withWhy: boolean): string {
+    const word = LIMB_LABEL[s.limb]
+    if (!withWhy) return word
+    const r = this.evaluation.suggestion
+    return r ? word + "\n" + moveWhy(r, this.holdTypes[r.holdId], this.planned, this.getTopHold()) : word
   }
 
   /** What "?" says about a hold: its ring's score, or, under a drawn step tag (which shows no grip colour,
@@ -579,7 +614,7 @@ export class NextHoldMain extends BaseScriptComponent {
    *  it as the overlays come in, since the label from the Lens's start has faded by then. */
   showLabelAgain(): void {
     const s = this.getSuggestion()
-    if (s && this.overlay && this.overlay.glowHoldId === s.holdId) this.callouts.showSuggestion(this.labelPos(s.holdId), this.wallRot(), s.label)
+    if (s && this.overlay && this.overlay.glowHoldId === s.holdId) this.callouts.showSuggestion(this.labelPos(s.holdId), this.wallRot(), this.labelNow || s.label)
   }
 
   /** Beta shown: arms for the next pinch on a ring, as ever. Beta hidden: the next step of the hint
@@ -597,10 +632,12 @@ export class NextHoldMain extends BaseScriptComponent {
     this.beta = next.state
     this.askArmed = next.armed
     this.controlRow.setAskArmed(this.askArmed)
-    if (next.state.hintStep !== was.hintStep || next.state.cameOffMove !== was.cameOffMove) this.recompute()
-    else this.controlRow.setAskDots(askDots(this.beta))
-    // session 24: rung 3 is the move's why-line, shown with this pinch (no pinch on a ring after it)
-    if (next.why) this.showGlowWhy()
+    // session 26: rung 3's why shows under the move's label, drawn by recompute (no plate, no pinch on a ring)
+    if (next.state.hintStep !== was.hintStep || next.state.cameOffMove !== was.cameOffMove || next.why) this.recompute()
+    else {
+      this.controlRow.setAskDots(askDots(this.beta))
+      this.controlRow.setAskWord(askWord(this.beta))
+    }
   }
 
   /** "Show my beta" / "Hide beta" (session 24: a toggle). Showing it marks the go "with beta"; hiding it again
@@ -655,11 +692,7 @@ export class NextHoldMain extends BaseScriptComponent {
    *  under way counts as ended; beta goes back to the default; a pinned hint waits at its own position. */
   resetAttempt(): void {
     if (!this.ready) return
-    const live = this.beta.moves > this.beta.fellAtMoves
-    if (live) {
-      const key = this.bestKeyNow(), rec = this.save.readRecord(key)
-      this.save.writeRecord(key, {goes: Math.max(rec.goes, this.beta.attempt), best: rec.best})
-    }
+    const was = this.beta
     this.position = {...this.startPos}
     this.override = null
     this.result = null
@@ -671,7 +704,10 @@ export class NextHoldMain extends BaseScriptComponent {
     this.askArmed = false
     this.controlRow.setAskArmed(false)
     this.callouts.hideWhy()
-    this.beta = betaAgain(this.beta, this.betaDefault, getTime(), positionKey(this.position))
+    this.beta = betaAgain(was, this.betaDefault, getTime(), positionKey(this.position))
+    // a go from the start still under way ended here (session 26: per problem)
+    this.keepGoEnded(was)
+    this.lastMoveHold = null
     this.recompute()
   }
 
@@ -803,6 +839,12 @@ export class NextHoldMain extends BaseScriptComponent {
     this.controlRow.setHeight(this.heightCm)
     // session 24 (C): kept for later opens (nothing happens if the store can't take it)
     this.save.writeHeight(this.heightCm)
+    // session 26 (engineer bug 2): a height change starts a new go: one under way ends (counted for the problem),
+    // and the next go's number is read again, so a go never carries over into another body's record
+    const was = this.beta
+    this.beta = heightChanged(was)
+    this.keepGoEnded(was)
+    this.beta = {...this.beta, attempt: this.nextGoNumber()}
     this.callouts.hideWhy()
     this.recompute()
   }
@@ -899,16 +941,23 @@ export class NextHoldMain extends BaseScriptComponent {
     // the problem's top hold pulls the suggestion upward (ranking only, never the colour)
     const goalTop = this.getTopHold()
     const moveArgs = {holds, holdTypes: this.holdTypes, position: this.position, reach, top: goalTop}
+    // session 26 (glow = plan, NextHoldPlan): the greedy best while it lies on a shortest route, else the shortest
+    // route's first move; an override is the climber's own choice and keeps its limb's best hold, as before
+    let p: Plan | null = null
     if (this.override) this.selected = this.override
     else {
-      const best = bestMove(moveArgs)
-      if (best) this.selected = best.limb
+      p = planFrom(moveArgs)
+      if (p.glow) this.selected = p.glow.limb
     }
+    this.planned = !!p && p.planned
     this.evaluation = evaluate({...moveArgs, limb: this.selected})
+    if (p && p.planned && p.glow) this.evaluation = {...this.evaluation, suggestion: p.glow}
     // session 20: each ring shows what a pinch on it would do: the override's move if there is one,
-    // else the best limb's for that hold, so a ring never looks red when a pinch on it makes a good move
+    // else the best limb's for that hold, so a ring never looks red when a pinch on it makes a good move.
+    // Session 26: the glow's hold shows the glow's move, which is what a pinch on it makes
     this.byHold = {}
     for (const r of this.override ? this.evaluation.results : bestPerHold(moveArgs)) this.byHold[r.holdId] = r
+    if (p && p.glow) this.byHold[p.glow.holdId] = p.glow
     this.controlRow.setOverride(this.override)
 
     const climb = this.mode === "climb"
@@ -951,8 +1000,11 @@ export class NextHoldMain extends BaseScriptComponent {
     const sug = climb && !topped && show.glow ? this.evaluation.suggestion : null
     // look-ahead from the same position, in the same frame as the rings
     this.preview = climb && sug && show.steps
-      ? sequence({holds, holdTypes: this.holdTypes, position: this.position, reach, top: goalTop, limb: this.selected})
+      ? (p ? p.steps : sequence({holds, holdTypes: this.holdTypes, position: this.position, reach, top: goalTop, limb: this.selected}))
       : []
+    // session 26: the label's words (rung 3 adds why the move works), known before anything is placed around it
+    this.labelWhy = !!sug && show.why
+    this.labelNow = sug ? this.labelText(sug, this.labelWhy) : ""
     // session 24 (the A+E judges' fix 1): a hold under a step tag says nothing about gripping it from here (the
     // plan reaches it after step 1): no grip colour, the neutral outline the tag pins onto (NextHoldWallVisuals)
     for (let n = 2; n <= 3; n++) {
@@ -982,13 +1034,16 @@ export class NextHoldMain extends BaseScriptComponent {
     this.controlRow.setView(this.view)
     this.controlRow.setBetaShown(this.beta.betaShown)
     this.controlRow.setAskDots(climb ? askDots(this.beta) : "")
+    this.controlRow.setAskWord(askWord(this.beta))
     this.applyPage()
     this.updateFigureMask(true)
 
     if (sug) {
       const h = this.holds[sug.holdId]
       const r = this.ringRadius(sug.holdId)
-      this.callouts.showSuggestion(this.labelPos(sug.holdId), this.wallRot(), LIMB_LABEL[sug.limb])
+      // session 26: rung 3 is the move's why under its label, which then stays (it is read, not glanced at)
+      this.callouts.showSuggestion(this.labelPos(sug.holdId), this.wallRot(), this.labelNow)
+      this.callouts.setLabelSticky(this.view !== "ground" || this.labelWhy)
       this.offViewArrow.setTarget(this.wall.wallToWorld(h.x, h.y, 0), sug.limb + ":" + sug.holdId, r)
     } else {
       this.callouts.hideSuggestion()
@@ -1002,8 +1057,8 @@ export class NextHoldMain extends BaseScriptComponent {
     if (!s) return
     const ground = this.view === "ground"
     this.callouts.setLabelMinSize(ground ? minReadSize(this.groundCm) * readBoost(this.groundCm) : 0)
-    // On wall the label is the only word: it stays there; in Ground it fades
-    this.callouts.setLabelSticky(!ground)
+    // On wall the label is the only word: it stays there; in Ground it fades (session 26: not while it says why)
+    this.callouts.setLabelSticky(!ground || this.labelWhy)
     const glowScale = this.glowScale()
     const labelBox = s.glowHoldId ? this.labelBox(s.glowHoldId) : null
     if (ground) {
@@ -1033,49 +1088,81 @@ export class NextHoldMain extends BaseScriptComponent {
   }
 
   /**
-   * The cards read from the mats (session 23: came off; session 24: the result after a top), with "Again" by
-   * them. Only in Ground while climbing; the result once "TOPPED" has faded. The card goes where it covers
-   * nothing (as session 23 placed it); Again then takes the first clear place next to it, under it first.
-   * (One card-over-Again block was too tall to fit clear from 2.5 m: h5 found it over four rings.)
+   * The cards read from the mats, with "Again" in them. Only in Ground while climbing; the result once "TOPPED" has
+   * faded. Session 26: each card and its Again are one block, so Again can never drift away from its card (s24's
+   * walk-back put it 0.65 of a frame above the card):
+   * - came off: the headline "Came off at move N" over [Hint · move N] [Again], low in view, clear of the problem
+   *   and of the control row; the hold the climber last reached pulses meanwhile (where they came off);
+   * - the result: the card and Again side by side; while it is up it takes the control row's place (the row hides);
+   * - Again alone (the card's hint taken, or a fall with beta shown): in the came-off block's slot, or clear of all.
    */
   private placeMatCards(): void {
     const ground = this.view === "ground" && this.mode === "climb"
     const cameOff = ground && this.beta.cameOffMove !== null
     const result = ground && !cameOff && !!this.result && !this.toppedShown
-    // Again alone: a fall's card answered (the hint taken), or a fall with beta shown (no card)
-    const again = ground && (cameOff || result || (this.againOffered && !this.result))
-    if (!cameOff) this.callouts.hideCameOff()
+    const againAlone = ground && !cameOff && !result && this.againOffered && !this.result
+    this.controlRow.setHidden(result)
+    if (!cameOff) {
+      this.callouts.hideCameOff()
+      this.visuals.setOutlinePulse(null)
+    }
     if (!result) this.callouts.hideResult()
-    if (!again) {
+    if (!this.againOffered) this.blockAt = null
+    if (!cameOff && !result && !againAlone) {
       this.callouts.hideAgain()
       return
     }
-    const k = this.panelScale()
-    const aw = (AGAIN_W / 2) * k, ah = (AGAIN_H / 2) * k
-    if (!cameOff && !result) {
-      this.callouts.showAgain(this.placeMatBlock(aw, ah, []), this.wallRot(), k)
+    const k = this.panelScale(), rot = this.wallRot()
+    if (cameOff) {
+      const m = this.beta.cameOffMove!
+      const p = this.placeMatBlock(CARD_HALF_W * k, CARD_HALF_H * k, this.rowBoxes())
+      const c = this.toWall(p)
+      this.blockAt = {x: c.x, y: c.y, k}
+      this.callouts.showCameOff(p, rot, cameOffLine(m), cameOffHintLabel(m), k)
+      this.callouts.showAgain(this.againSlot(this.blockAt), rot, k)
+      this.visuals.setOutlinePulse(this.lastMoveHold)
       return
     }
-    const cw = (result ? RESULT_HALF_W : CARD_HALF_W) * k, ch = (result ? RESULT_HALF_H : CARD_HALF_H) * k
-    const p = this.placeMatBlock(cw, ch, [])
-    if (cameOff) this.callouts.showCameOff(p, this.wallRot(), cameOffLine(this.beta.cameOffMove!), k)
-    else this.callouts.showResult(p, this.wallRot(), this.result!.lines, k)
-    const c = this.toWall(p), g = AGAIN_GAP * k
-    const card = {x: c.x, y: c.y, hw: cw, hh: ch}
-    let best: {p: vec3; clear: number} | null = null
-    for (const q of [{x: c.x, y: c.y - ch - g - ah}, {x: c.x + cw + g + aw, y: c.y}, {x: c.x - cw - g - aw, y: c.y}, {x: c.x, y: c.y + ch + g + ah}]) {
-      const pq = this.keepInView(this.wall.wallToWorld(q.x, q.y, PANEL_Z), aw + 2 * k, ah + 2 * k)
-      const clear = this.matClear(this.toWall(pq), aw, ah, [card])
-      if (!best || clear > best.clear + 1e-6) best = {p: pq, clear}
-      if (clear >= 2) break
+    if (result) {
+      const cw = RESULT_HALF_W * k, aw = (AGAIN_W / 2) * k, g = AGAIN_GAP * k
+      const hw = cw + g / 2 + aw, hh = RESULT_HALF_H * k
+      const c = this.toWall(this.placeResultBlock(hw, hh))
+      this.callouts.showResult(this.wall.wallToWorld(c.x - hw + cw, c.y, PANEL_Z), rot, this.result!.lines, k)
+      this.callouts.showAgain(this.wall.wallToWorld(c.x + hw - aw, c.y, PANEL_Z), rot, k)
+      return
     }
-    // nothing clear next to the card: the first clear place in view, the card counted as taken
-    let p2 = best!.p
-    if (best!.clear < 2) {
-      const p3 = this.placeMatBlock(aw, ah, [card])
-      if (this.matClear(this.toWall(p3), aw, ah, [card]) > best!.clear) p2 = p3
-    }
-    this.callouts.showAgain(p2, this.wallRot(), k)
+    const b = this.blockAt
+    this.callouts.showAgain(b && Math.abs(b.k - k) < 1e-3 ? this.againSlot(b)
+      : this.placeMatBlock((AGAIN_W / 2) * k, (AGAIN_H / 2) * k, this.rowBoxes()), rot, k)
+  }
+
+  /** Again's place in the came-off block centred at b */
+  private againSlot(b: {x: number; y: number; k: number}): vec3 {
+    return this.wall.wallToWorld(b.x + CARD_BUTTON_X * b.k, b.y + CARD_BUTTONS_Y * b.k, PANEL_Z + 0.5 * b.k)
+  }
+
+  /** Session 26: the result block in the control row's place (beside the problem, level with its start), slid into
+   *  view; if that covers the problem, the first clear place in view instead. */
+  private placeResultBlock(hw: number, hh: number): vec3 {
+    const box = this.problemBox()
+    const starts = this.getStartHolds()
+    const y = starts.length ? starts.reduce((s, id) => s + this.holds[id].y, 0) / starts.length : 150
+    const eyeX = this.eyeWallX()
+    const right = eyeX === null || box.x1 - eyeX <= eyeX - box.x0
+    const x = right ? box.x1 + ROW_SIDE_GAP + hw : box.x0 - ROW_SIDE_GAP - hw
+    const k = this.panelScale()
+    const p = this.keepInView(this.wall.wallToWorld(x, y, PANEL_Z), hw + 2 * k, hh + 2 * k)
+    return this.matClear(this.toWall(p), hw, hh, []) >= 2 ? p : this.placeMatBlock(hw, hh, [])
+  }
+
+  /** the control row as the eye sees it on the wall, as a box, while it shows (cards keep clear of it) */
+  private rowBoxes(): {x: number; y: number; hw: number; hh: number}[] {
+    if (this.controlRow.isHidden()) return []
+    const row = this.rowOutlineOnWall()
+    if (!row) return []
+    const xs = row.map((p) => p.x), ys = row.map((p) => p.y)
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys)
+    return [{x: (x0 + x1) / 2, y: (y0 + y1) / 2, hw: (x1 - x0) / 2, hh: (y1 - y0) / 2}]
   }
 
   /** how clear (cm, wall) a box centred at w is of the problem's rings, the tags and labels, and `extra` boxes */
@@ -1146,7 +1233,7 @@ export class NextHoldMain extends BaseScriptComponent {
 
   /** Centred just below the suggested ring's line, between the hold and the climber's eye line;
    *  a larger label (Ground) hangs a little lower. Inside the glow's target ring in both views. */
-  private labelPos(id: string): vec3 {
+  private labelPos(id: string, _text?: string): vec3 {
     const c = this.labelCentre(id)
     return this.wall.wallToWorld(c.x, c.y, 3)
   }
@@ -1156,25 +1243,47 @@ export class NextHoldMain extends BaseScriptComponent {
    * drawn larger from the mats it can't fit there, so it moves out past the glow, below it, or above
    * or beside it when another ring is in the way. Never over a ring or the glow from 2.5 m (l1).
    */
+  /** session 26: half the label's box at its 110 cm size for the words it shows: "R hand" is 9 x 3.2 cm; rung 3 adds
+   *  a second line ("jug, in reach"), about 0.75 cm a character either side of the middle */
+  private labelHalf(): {hw: number; hh: number} {
+    const lines = (this.labelNow || "R hand").split("\n")
+    const longest = Math.max(...lines.map((l) => l.length))
+    return {hw: Math.max(LABEL_HALF_W, longest * 0.75 + 0.3), hh: LABEL_HALF_H * lines.length}
+  }
+
   private labelCentre(id: string): WallPt {
     const h = this.holds[id]
     const k = this.callouts.getLabelScale()
-    const hw = LABEL_HALF_W * k, hh = LABEL_HALF_H * k
+    const half = this.labelHalf()
+    const hw = half.hw * k, hh = half.hh * k
     const inside = this.ringRadius(id) + this.getRingLineWidth() / 2 + LABEL_GAP * k
     const glow = this.glowRadius(id) + LABEL_GLOW_GAP
-    const t = Math.min(1, Math.max(0, (k - 1) / (LABEL_OUT_SCALE - 1)))
+    // session 26: with rung 3's second line it never fits inside the ring: out past the glow, clear of every
+    // other hold's ring or outline, as from the mats
+    const t = this.labelWhy ? 1 : Math.min(1, Math.max(0, (k - 1) / (LABEL_OUT_SCALE - 1)))
     const below = {x: h.x, y: h.y - (inside + (glow + hh - inside) * t)}
     if (t < 1) return below
     const line = this.getRingLineWidth() / 2
     const clearance = (c: WallPt) => {
       let m = Math.min(c.x - hw, 240 - c.x - hw)
+      // session 26: rung 3's two lines are read, so a place in view wins over one the frame cuts (h3: from 70 cm
+      // below the glow ran off the bottom of the frame)
+      if (this.labelWhy) {
+        const p = this.wall.wallToWorld(c.x, c.y, 3)
+        if (this.keepInView(p, hw, hh).distance(p) > 0.5) m = Math.min(m, -0.25)
+      }
       for (const o of this.getProblemHolds()) {
         if (o !== id) m = Math.min(m, boxCircleGap(c, hw, hh, this.holds[o].x, this.holds[o].y, this.ringRadius(o) + line) - LABEL_GLOW_GAP)
       }
+      // a place slid into view must still keep off its own glow
+      if (this.labelWhy) m = Math.min(m, boxCircleGap(c, hw, hh, h.x, h.y, this.glowRadius(id)) - LABEL_GLOW_GAP)
       return m
     }
+    const bases = [below, {x: h.x, y: h.y + glow + hh}, {x: h.x + glow + hw, y: h.y}, {x: h.x - glow - hw, y: h.y}]
+    // session 26: rung 3's label also tries each place slid into view
+    const cands = this.labelWhy ? bases.concat(bases.map((c) => this.toWall(this.keepInView(this.wall.wallToWorld(c.x, c.y, 3), hw, hh)))) : bases
     let best = below, bestClear = clearance(below)
-    for (const c of [{x: h.x, y: h.y + glow + hh}, {x: h.x + glow + hw, y: h.y}, {x: h.x - glow - hw, y: h.y}]) {
+    for (const c of cands.slice(1)) {
       if (bestClear >= 0) break
       const m = clearance(c)
       if (m > bestClear) { best = c; bestClear = m }
@@ -1192,7 +1301,8 @@ export class NextHoldMain extends BaseScriptComponent {
   private labelBox(id: string): {x: number; y: number; hw: number; hh: number} {
     const c = this.labelCentre(id)
     const k = this.callouts.getLabelScale()
-    return {x: c.x, y: c.y, hw: LABEL_HALF_W * k, hh: LABEL_HALF_H * k}
+    const half = this.labelHalf()
+    return {x: c.x, y: c.y, hw: half.hw * k, hh: half.hh * k}
   }
 
   /** The eye's distance (cm) from the wall plane, along the wall's normal; null without a camera. */
@@ -1286,6 +1396,7 @@ export class NextHoldMain extends BaseScriptComponent {
       this.controlRow.placeAt(this.wall.wallToWorld(x, Math.max(halfH + 2, p.y), 10), this.wallRot(), k)
       return
     }
+    if (this.mode === "climb" && this.page() === "climb" && this.placeStrip(halfW, halfH, k)) return
     const ring = this.overlay && this.mode === "climb" ? this.overlay.glowHoldId : null
     if (!ring) {
       // no suggested ring (setup): below the hands, kept in view, as before
@@ -1327,6 +1438,42 @@ export class NextHoldMain extends BaseScriptComponent {
     const x = below ? kv.x : p.x
     const y = Math.max(halfH + 2, below ? Math.min(p.y, kv.y) : kv.y)
     this.controlRow.placeAt(this.wall.wallToWorld(x, y, PANEL_Z), this.wallRot(), k)
+  }
+
+  /**
+   * Session 26, On wall while climbing: the 1 x 2 strip [?][Body] goes at the side of the hands, never below them
+   * (that is where the feet go): its bottom edge level with the lower hand's hold, or higher to come into view, and
+   * across to the first place, as the eye sees it, that covers no hold of the problem, no marker and not the glow
+   * (the clearest if none is clear). False without a hand on the wall (then the older rule places it).
+   */
+  private placeStrip(halfW: number, halfH: number, k: number): boolean {
+    const hands = HAND_LIMBS.map((l) => this.position[l]).filter((id) => id != null && this.holds[id]) as string[]
+    const eye = this.eyeOnWall()
+    if (!hands.length || !eye) return false
+    const s = this.seenScale(eye, PANEL_Z)
+    const hw = halfW * s, hh = halfH * s
+    const low = Math.min(...hands.map((id) => this.holds[id].y))
+    const glow = this.overlay ? this.overlay.glowHoldId : null
+    const circles = this.getHoldIds().filter((id) => this.problem[id] || this.isOccupied(id))
+      .map((id) => ({x: this.holds[id].x, y: this.holds[id].y, r: id === glow ? this.glowRadius(id) : this.ringRadius(id) + this.getRingLineWidth() / 2}))
+    // the lowest the strip may sit (as seen): its bottom on the lower hand's hold
+    const yMin = low + hh
+    let best: {p: WallPt; clear: number} | null = null
+    for (const dx of [0, -0.3, 0.3, -0.6, 0.6, -0.9, 0.9, -1.2, 1.2, -1.5, 1.5]) {
+      // seen on the wall, from the eye's line across; then where on the strip's own plane that is, kept in view
+      const seen = {x: eye.x + dx * 40, y: yMin}
+      const q = this.unproject(seen, eye, s)
+      const kv = this.toWall(this.keepInView(this.wall.wallToWorld(q.x, q.y, PANEL_Z), halfW, halfH))
+      // into view up, never down below the hands
+      const back = {x: eye.x + (kv.x - eye.x) * s, y: Math.max(yMin, eye.y + (kv.y - eye.y) * s)}
+      let clear = 1e9
+      for (const c of circles) clear = Math.min(clear, boxCircleGap(back, hw, hh, c.x, c.y, c.r))
+      if (!best || clear > best.clear + 1e-6) best = {p: back, clear}
+      if (clear >= 1) break
+    }
+    const p = this.unproject(best!.p, eye, s)
+    this.controlRow.placeAt(this.wall.wallToWorld(p.x, p.y, PANEL_Z), this.wallRot(), k)
+    return true
   }
 
   /** the suggested ring's outer edge with its glow (wall cm): the "one ring" On wall */
@@ -1393,7 +1540,8 @@ export class NextHoldMain extends BaseScriptComponent {
     const hw = halfW * s, hh = halfH * s
     const own = this.shownRingRadius(id)
     const d = own + WHY_RING_GAP
-    const others = this.getHoldIds().filter((o) => o !== id && this.isRingVisible(o))
+    // session 26 (shot 06): the neutral outlines too, not only the coloured rings
+    const others = this.getHoldIds().filter((o) => o !== id && (this.isRingVisible(o) || this.isOutlineVisible(o)))
       .map((o) => ({x: this.holds[o].x, y: this.holds[o].y, r: this.shownRingRadius(o)}))
     const texts = this.visuals.getTextBoxes()
     // and the control row, as the eye sees it on the wall
@@ -1673,7 +1821,7 @@ export class NextHoldMain extends BaseScriptComponent {
   getResultLines(): string[] { return this.callouts.getResultLines() }
   isAgainVisible(): boolean { return this.callouts.isAgainVisible() }
   /** the last top's result (kept until a move, Again or setup), whether or not its card is on show */
-  getLastResult(): {go: Go; par: number | null; lines: string[]; key: string} | null { return this.result }
+  getLastResult(): {go: Go; par: number | null; lines: string[]; key: string; resumed: boolean} | null { return this.result }
   /** par for your body: the planner's shortest secure route to the top from this go's start position, at this height */
   getPar(): number | null {
     const top = this.getTopHold()
@@ -1687,7 +1835,21 @@ export class NextHoldMain extends BaseScriptComponent {
   getStoreMaxBytes(): number { return this.save.maxBytes() }
   getHintsThisGo(): number { return this.beta.hintsThisGo }
   isBetaSeenThisGo(): boolean { return this.beta.betaSeenThisGo }
-  getPinnedHint(): {at: string; step: number} | null { return this.beta.pin ? {...this.beta.pin} : null }
+  getPinnedHint(): {at: string; step: number} | null { return this.beta.pin ? {at: this.beta.pin.at, step: this.beta.pin.step} : null }
+  // session 26
+  /** the glow is the shortest route's first move (the greedy best would have cost a move) */
+  isGlowPlanned(): boolean { return this.planned }
+  /** this go began at the start holds (false after a fall or a top until back on them) */
+  isFromStart(): boolean { return this.beta.fromStart }
+  getAskWord(): string { return this.controlRow.getAskWord() }
+  getCameOffHintText(): string { return this.callouts.getCameOffHintText() }
+  /** the hold whose outline pulses while the came-off card is up, and its scale now */
+  getOutlinePulse(): {hold: string; scale: number} | null { return this.visuals ? this.visuals.getOutlinePulse() : null }
+  isRowHidden(): boolean { return this.controlRow.isHidden() }
+  /** the row's cell layout: "grid", "strip" (on the wall) or "settings" */
+  getRowLayout(): string { return this.controlRow.getLayout() }
+  /** the goes kept for this problem (whatever the height) */
+  getGoesKey(): string { return this.goesKeyNow() }
 }
 
 /** gap (cm) between a box (centre c, half sizes hw x hh) and a circle; < 0 when they overlap */

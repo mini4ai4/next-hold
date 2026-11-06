@@ -30,11 +30,11 @@ function checkFull(main: NextHoldMain, errs: string[], tag: string): void {
   for (const r of ref.perHold(pos)) {
     if (renderedRingColour(r.holdId, main) !== r.colour) errs.push(`${tag}: Ring_${r.holdId} renders ${renderedRingColour(r.holdId, main)}, rule ${r.colour}`)
   }
-  const best = ref.bestMove(pos)!
+  const best = ref.glow(pos)!
   if (!main.isRingGlowing(best.holdId) || !mustFind("SuggestGlow").enabled) errs.push(`${tag}: the glow isn't on ${best.holdId}`)
   if (!main.isLabelVisible()) errs.push(`${tag}: no label`)
   if (main.getLitLimb() !== best.limb) errs.push(`${tag}: lit ${main.getLitLimb()}, the best limb is ${best.limb}`)
-  const want = ref.sequence(pos, main.getSelectedLimb() as RefLimb)
+  const want = main.getLimbOverride() ? ref.sequence(pos, main.getSelectedLimb() as RefLimb) : ref.plan(pos).steps
   const got = main.getPreview()
   if (got.map((m) => m.limb + m.holdId).join() !== want.map((m) => m.limb + m.holdId).join()) errs.push(`${tag}: 1-2-3 ${got.map((m) => m.limb + "->" + m.holdId).join(" ")}, the search says ${want.map((m) => m.limb + "->" + m.holdId).join(" ")}`)
   for (let n = 2; n <= want.length; n++) if (main.getGhostHold(n) !== want[n - 1].holdId) errs.push(`${tag}: badge ${n} on ${main.getGhostHold(n)}, want ${want[n - 1].holdId}`)

@@ -28,7 +28,7 @@ function checkOpenState(main: NextHoldMain, tag: string): string[] {
   if (!samePosition(lensPos, pos)) errs.push(`${tag}: position ${fmtPos(lensPos)} != preset ${fmtPos(pos)}`)
   if (main.getMode() !== "climb") errs.push(`${tag}: mode ${main.getMode()} != climb`)
 
-  const best = ref.bestMove(pos)
+  const best = ref.glow(pos)
   if (!best) { errs.push(`${tag}: reference has no best move`); return errs }
   const sel = main.getSelectedLimb()
   if (sel !== best.limb) errs.push(`${tag}: selected limb ${sel} != reference bestMove limb ${best.limb}`)

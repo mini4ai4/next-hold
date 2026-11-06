@@ -12,7 +12,11 @@ import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {HOLD_SIZE, holdById, PRESET_TOP} from "../../Scripts/Wall/WallLayout"
-import {camera, checkNothingRevealed, fmtBox, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, renderedRingColour, restorePreset, samePosition, screenBoxOf} from "./NextHoldTestKit"
+import {AGAIN_GAP, AGAIN_W, BUTTON_W} from "../../Scripts/NextHoldCalloutUI"
+import {
+  boxesOverlap, camera, checkNothingRevealed, checkSideBySide, fmtBox, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture,
+  renderedRingColour, restorePreset, samePosition, screenBoxOf,
+} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 
 @component
@@ -62,8 +66,8 @@ export class H5CameOffScenario extends Scenario {
       await at(125)
       const line = main.getCameOffText()
       print(`[H5] stepped back past 120 cm after two moves: "${line}", view ${main.getView()}, attempt ${attempt0} -> ${main.getAttempt()}, ${fmtPos(main.getPosition() as RefPosition)}`)
-      if (line !== "Came off at move 3. Hint for that move?") errs.push(`the card reads "${line}"`)
-      if (!mustFind("CameOffCard").enabled) errs.push("the card's object isn't enabled")
+      if (line !== "Came off at move 3" || main.getCameOffHintText() !== "Hint ·\nmove 3") errs.push(`the card reads "${line}" / "${main.getCameOffHintText()}"`)
+      if (!mustFind("CameOffCard").isEnabledInHierarchy) errs.push("the card's hint button isn't enabled")
       if ((mustFind("CameOffText").getComponent("Component.Text") as Text).text !== line) errs.push("the card's text isn't what it says")
       if (main.getView() !== "ground") errs.push(`the view is ${main.getView()}`)
       if (main.getAttempt() !== attempt0 + 1) errs.push(`the attempt didn't end: ${attempt0} -> ${main.getAttempt()}`)
@@ -88,11 +92,11 @@ export class H5CameOffScenario extends Scenario {
       }
       await frames(2)
       for (const r of inReach) if (renderedRingColour(r.holdId, main) !== r.colour) errs.push(`Ring_${r.holdId} renders ${renderedRingColour(r.holdId, main)}, the rule at that position says ${r.colour}`)
-      if (mustFind("CameOffCard").enabled) errs.push("the card stays after its pinch")
+      if (mustFind("CameOffCard").isEnabledInHierarchy) errs.push("the card stays after its pinch")
       // and the ladder goes on from there, the hint for that move: the glow on the plan's next move
       await pinch("AskButton"); await frames(2)
       const sug = main.getSuggestion()!
-      const best = ref.bestMove(pos2)!
+      const best = ref.glow(pos2)!
       print(`[H5] second rung: glow on ${sug.holdId}, "${main.getLabelText()}" (rule ${best.limb}->${best.holdId})`)
       if (main.getHintStep() !== 2 || !main.isRingGlowing(best.holdId) || main.getLabelText() !== sug.label) errs.push(`second rung: step ${main.getHintStep()}, glow on ${best.holdId} ${main.isRingGlowing(best.holdId)}`)
 
@@ -105,7 +109,7 @@ export class H5CameOffScenario extends Scenario {
       await pinch("Hold_" + best.holdId); await frames(2)
       await at(250)
       print(`[H5] one move on, stepped back: "${main.getCameOffText()}"`)
-      if (main.getCameOffText() !== "Came off at move 4. Hint for that move?") errs.push(`next fall: "${main.getCameOffText()}"`)
+      if (main.getCameOffText() !== "Came off at move 4") errs.push(`next fall: "${main.getCameOffText()}"`)
 
       // ── "?" with the card up does what the card does ──
       await pinch("AskButton"); await frames(2)
@@ -179,9 +183,15 @@ export class H5CameOffScenario extends Scenario {
       await frames(2)
       for (const z of [-55, 0, 60, 125]) { tr.setWorldPosition(new vec3(0, 0, z)); await frames(3) }
       if (!main.isCameOffVisible()) errs.push("the real eye: no card after stepping back")
-      // session 24: and "Again" under it; both in view, neither over a ring-to-be, START or TOP
-      if (!main.isAgainVisible()) errs.push("the real eye: no Again under the card")
-      for (const name of ["CameOffCard", "AgainButton"]) {
+      // session 24: and "Again" with it; both in view, neither over a ring-to-be, START or TOP. Session 26 (s24's log
+      // had Again at y 0.14-0.29 and the card at 0.79-0.94, and passed): Again is the card's own right-hand button,
+      // level with [Hint · move 3] and 3 cm (x the card's scale) from it; the block is clear of the control row
+      if (!main.isAgainVisible()) errs.push("the real eye: no Again with the card")
+      print(`[H5] from 2.5 m: ${checkSideBySide("CameOffCard", BUTTON_W, "AgainButton", AGAIN_W, AGAIN_GAP, errs, "from 2.5 m")}`)
+      const blockBox = screenBoxOf("CameOffBlock", camL, true), rowBox = screenBoxOf("ControlRow", camL)
+      print(`[H5] from 2.5 m: block ${fmtBox(blockBox)}, row ${fmtBox(rowBox)}`)
+      if (blockBox && rowBox && boxesOverlap(blockBox, rowBox)) errs.push(`from 2.5 m the came-off block (${fmtBox(blockBox)}) overlaps the control row (${fmtBox(rowBox)})`)
+      for (const name of ["CameOffBlock", "AgainButton"]) {
       const box = screenBoxOf(name, camL, true)
       print(`[H5] from 2.5 m, level: ${name} ${fmtBox(box)}`)
       if (!box || box.x0 < 0 || box.x1 > 1 || box.y0 < 0 || box.y1 > 1) errs.push(`from 2.5 m ${name} isn't fully in view: ${fmtBox(box)}`)

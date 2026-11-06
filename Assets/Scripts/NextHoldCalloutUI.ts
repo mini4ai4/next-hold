@@ -51,15 +51,31 @@ const WHY_MIN_W = 12
 const WHY_PAD_X = 1.4
 /** half the why plate's height: the 3 cm text line and 1 cm padding above and below */
 export const WHY_HALF_H = 2.5
-/** session 23, half the came-off card at its 110 cm size (cm): two lines of the panel's headline text */
-export const CARD_HALF_W = 16
-export const CARD_HALF_H = 5
-/** session 24: half the result card, and the Again button under a card (cm, at the 110 cm size; G: >= 10 cm, 3 cm gap) */
-export const RESULT_HALF_W = 16
-export const RESULT_HALF_H = 7.5
-export const AGAIN_W = 14
-export const AGAIN_H = 10
+/** session 26: Text.size per cm of cap height (as NextHoldControlRowUI.TEXT_PER_CM) */
+const TEXT_PER_CM = 56
+/** session 26: the came-off block at its 110 cm size (cm): the headline over two 11 x 10 cm buttons, [Hint · move N]
+ *  and [Again], 3 cm apart, on one plate; half sizes, and where the buttons' centres sit from the block's centre */
+export const BUTTON_W = 11
+export const BUTTON_H = 10
 export const AGAIN_GAP = 3
+export const CARD_HALF_W = (2 * BUTTON_W + AGAIN_GAP) / 2 + 1
+/** 0.5 cm padding, a 3 cm headline row, 0.5 cm, the 10 cm buttons, 0.5 cm (h5: at 17 cm it found no clear place
+ *  from 2.5 m and touched the START tags) */
+export const CARD_HALF_H = 7.25
+export const CARD_HEAD_Y = 5.25
+export const CARD_BUTTONS_Y = -1.75
+export const CARD_BUTTON_X = (BUTTON_W + AGAIN_GAP) / 2
+/** the result card (cm, at the 110 cm size); Again stands AGAIN_GAP to its right as its own button */
+export const RESULT_HALF_W = 18
+export const RESULT_HALF_H = 7.5
+export const AGAIN_W = BUTTON_W
+export const AGAIN_H = BUTTON_H
+/** cap heights (cm): the result's body lines at least 0.5° from 2.5 m (1 cm at the card's 110 cm size), its first
+ *  line three times that; the came-off headline; button labels as on the row */
+export const RESULT_BODY_CAP = 1.0
+export const RESULT_HERO_CAP = 3.0
+export const CARD_HEAD_CAP = 1.8
+export const BUTTON_CAP = 2.2
 
 /** the why-line text's width (cm, at its 110 cm size): as wide as its words, at most WHY_W (longer lines shrink) */
 function whyTextWidth(text: string): number {
@@ -116,8 +132,10 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
   private whyWanted = false
   private whyReady = false
   private whyHoldId: string | null = null
+  private blockRoot: SceneObject
   private cardRoot: SceneObject
   private cardText: Text
+  private hintText: Text
   private cardWanted = false
   private cardReady = false
   private _onCameOffPressed = new Event<void>()
@@ -198,38 +216,42 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
       this.whyRoot.enabled = this.whyWanted
     })
 
-    // ── CameOffCard (session 23): one big target, a pinch anywhere on it opens the hint ──
-    this.cardRoot = this.obj(this.sceneObject, "CameOffCard")
+    // ── CameOffBlock (session 26): the headline "Came off at move 3" on a plate, over two buttons side by side:
+    // [Hint · move 3] (CameOffCard, a pinch opens the hint) and the AgainButton, which Main places in its slot ──
+    this.blockRoot = this.obj(this.sceneObject, "CameOffBlock")
+    const blockPlate = this.blockRoot.createComponent(BackPlate.getTypeName()) as BackPlate
+    blockPlate.size = new vec2(2 * CARD_HALF_W, 2 * CARD_HALF_H)
+    const headSO = this.obj(this.blockRoot, "CameOffText", new vec3(0, CARD_HEAD_Y, 0.8))
+    this.cardText = this.bigText(headSO, "", 2 * CARD_HALF_W - 2, CARD_HEAD_CAP)
+    this.cardRoot = this.obj(this.blockRoot, "CameOffCard", new vec3(-CARD_BUTTON_X, CARD_BUTTONS_Y, 0.5))
     const card = this.cardRoot.createComponent(Button.getTypeName()) as Button
     card.setVariant({theme: "SnapOS3", shape: "Rectangle", style: "Prism"})
-    card.size = new vec3(2 * CARD_HALF_W, 2 * CARD_HALF_H, 1)
+    card.size = new vec3(BUTTON_W, BUTTON_H, 1)
     card.setIsToggleable(false)
     card.onTriggerUp.add(() => this._onCameOffPressed.invoke())
-    const cardTextSO = this.obj(this.cardRoot, "CameOffText", new vec3(0, 0, 1.6))
-    this.cardText = cardTextSO.createComponent("Component.Text") as Text
-    this.cardText.depthTest = true
-    applyTextRole(this.cardText, "Headline2")
-    this.cardText.horizontalAlignment = HorizontalAlignment.Center
-    this.cardText.verticalAlignment = VerticalAlignment.Center
-    this.cardText.horizontalOverflow = HorizontalOverflow.Wrap
-    this.cardText.verticalOverflow = VerticalOverflow.Overflow
-    this.cardText.layoutRect = Rect.create(-CARD_HALF_W + 1, CARD_HALF_W - 1, -CARD_HALF_H + 0.5, CARD_HALF_H - 0.5)
-    // start hidden, but only after the button has initialised
-    card.onInitialized.add(() => {
+    this.hintText = this.bigText(this.obj(this.cardRoot, "CameOffHintText", new vec3(0, 0, 1.6)), "", BUTTON_W - 1, BUTTON_CAP)
+    // start hidden, but only after the button and the plate have initialised
+    let cardInit = 0
+    const cardReady = () => {
+      if (++cardInit < 2) return
       this.cardReady = true
-      this.cardRoot.enabled = this.cardWanted
-    })
+      this.blockRoot.enabled = this.cardWanted
+    }
+    card.onInitialized.add(cardReady)
+    blockPlate.onInitialized.add(cardReady)
 
-    // ── ResultCard (session 24): a plate with three lines, read from the mats; not a button ──
+    // ── ResultCard (session 24): a plate with three lines, read from the mats; not a button. Session 26: the
+    // first line three times the others, the others at least 0.5° from 2.5 m ──
     this.resultRoot = this.obj(this.sceneObject, "ResultCard")
     const plate = this.resultRoot.createComponent(BackPlate.getTypeName()) as BackPlate
     plate.size = new vec2(2 * RESULT_HALF_W, 2 * RESULT_HALF_H)
-    const roles: TextRole[] = ["HeadlineXL", "Body", "Body"]
-    const ys = [3.9, -0.4, -4.2]
+    const caps = [RESULT_HERO_CAP, RESULT_BODY_CAP, RESULT_BODY_CAP]
+    const ys = [3.4, -2.0, -4.9]
     for (let i = 0; i < 3; i++) {
       const t = this.obj(this.resultRoot, "ResultLine_" + (i + 1), new vec3(0, ys[i], 0.8)).createComponent("Component.Text") as Text
       t.depthTest = true
-      applyTextRole(t, roles[i])
+      t.size = caps[i] * TEXT_PER_CM
+      ;(t as Text & {weight?: number}).weight = i === 0 ? 700 : 500
       t.horizontalAlignment = HorizontalAlignment.Center
       t.verticalAlignment = VerticalAlignment.Center
       t.horizontalOverflow = HorizontalOverflow.Shrink
@@ -249,12 +271,7 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     again.size = new vec3(AGAIN_W, AGAIN_H, 1)
     again.setIsToggleable(false)
     again.onTriggerUp.add(() => this._onAgainPressed.invoke())
-    const againText = this.obj(this.againRoot, "AgainText", new vec3(0, 0, 1.6)).createComponent("Component.Text") as Text
-    againText.text = "Again"
-    againText.depthTest = true
-    applyTextRole(againText, "Headline1")
-    againText.horizontalAlignment = HorizontalAlignment.Center
-    againText.verticalAlignment = VerticalAlignment.Center
+    this.bigText(this.obj(this.againRoot, "AgainText", new vec3(0, 0, 1.6)), "Again", AGAIN_W - 1, BUTTON_CAP)
     again.onInitialized.add(() => {
       this.againReady = true
       this.againRoot.enabled = this.againWanted
@@ -263,23 +280,37 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     this.createEvent("UpdateEvent").bind(() => this.tickLabel())
   }
 
-  /** Show the came-off card at worldPos; scale 1 = its 110 cm size. */
-  showCameOff(worldPos: vec3, worldRot: quat, text: string, scale = 1): void {
-    const tr = this.cardRoot.getTransform()
-    tr.setWorldPosition(worldPos)
-    tr.setWorldRotation(worldRot)
-    tr.setWorldScale(vec3.one().uniformScale(scale))
-    this.cardText.text = text
+  /** a one- or two-line text at `capCm` cap height, shrunk to `widthCm` if it is wider */
+  private bigText(so: SceneObject, text: string, widthCm: number, capCm: number): Text {
+    const t = so.createComponent("Component.Text") as Text
+    t.text = text
+    t.depthTest = true
+    t.size = capCm * TEXT_PER_CM
+    ;(t as Text & {weight?: number}).weight = 700
+    t.horizontalAlignment = HorizontalAlignment.Center
+    t.verticalAlignment = VerticalAlignment.Center
+    t.horizontalOverflow = HorizontalOverflow.Shrink
+    t.verticalOverflow = VerticalOverflow.Overflow
+    t.layoutRect = Rect.create(-widthCm / 2, widthCm / 2, -1.6, 1.6)
+    return t
+  }
+
+  /** Show the came-off block centred at worldPos (headline over [hint] [Again's slot]); scale 1 = its 110 cm size. */
+  showCameOff(worldPos: vec3, worldRot: quat, headline: string, hintLabel: string, scale = 1): void {
+    this.place(this.blockRoot, worldPos, worldRot, scale)
+    this.cardText.text = headline
+    this.hintText.text = hintLabel
     this.cardWanted = true
-    if (this.cardReady) this.cardRoot.enabled = true
+    if (this.cardReady) this.blockRoot.enabled = true
   }
 
   hideCameOff(): void {
     this.cardWanted = false
-    if (this.cardReady) this.cardRoot.enabled = false
+    if (this.cardReady) this.blockRoot.enabled = false
   }
 
   isCameOffVisible(): boolean { return this.cardWanted }
+  getCameOffHintText(): string { return this.cardWanted && this.hintText ? this.hintText.text : "" }
 
   /** Session 24: the result card's three lines at worldPos; scale 1 = its 110 cm size. */
   showResult(worldPos: vec3, worldRot: quat, lines: string[], scale = 1): void {

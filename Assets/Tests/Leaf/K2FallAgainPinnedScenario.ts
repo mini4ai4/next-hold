@@ -44,19 +44,26 @@ export class K2FallAgainPinnedScenario extends Scenario {
       const fallPos = main.getPosition() as RefPosition
       await at(250)
       print(`[K2] fell at ${fmtPos(fallPos)}: "${main.getCameOffText()}", Again ${main.isAgainVisible()}, go ${main.getAttempt()}`)
-      if (main.getCameOffText() !== "Came off at move 3. Hint for that move?" || !main.isAgainVisible() || main.getAttempt() !== 2) errs.push(`the fall: "${main.getCameOffText()}", Again ${main.isAgainVisible()}, go ${main.getAttempt()}`)
+      if (main.getCameOffText() !== "Came off at move 3" || main.getCameOffHintText() !== "Hint ·\nmove 3" || !main.isAgainVisible() || main.getAttempt() !== 2) errs.push(`the fall: "${main.getCameOffText()}" / "${main.getCameOffHintText()}", Again ${main.isAgainVisible()}, go ${main.getAttempt()}`)
+      // session 26: the hold the climber came off from (the last one reached, h09) pulses while the card is up
+      const pulse = main.getOutlinePulse()
+      if (!pulse || pulse.hold !== fallPos.LH) errs.push(`while the card is up the pulse is on ${pulse ? pulse.hold : "nothing"}, want ${fallPos.LH}`)
 
-      // ── the card's hint, pinned; Again stays ──
+      // ── the card's hint, pinned; Again stays where it was, in the block's slot ──
+      const againAt = mustFind("AgainButton").getTransform().getWorldPosition()
       await pinch("CameOffCard"); await frames(2)
       const pin = main.getPinnedHint()
-      print(`[K2] the card's hint: step ${main.getHintStep()}, pinned ${JSON.stringify(pin)}, card ${main.isCameOffVisible()}, Again ${main.isAgainVisible()}`)
+      print(`[K2] the card's hint: step ${main.getHintStep()}, pinned ${JSON.stringify(pin)}, card ${main.isCameOffVisible()}, Again ${main.isAgainVisible()}, hints ${main.getHintsThisGo()}`)
       if (main.getHintStep() !== 1 || !pin || pin.step !== 1) errs.push(`the card's hint: step ${main.getHintStep()}, pin ${JSON.stringify(pin)}`)
+      if (main.getHintsThisGo() !== 1) errs.push(`the card's hint (rung 1) is a hint for go 2: ${main.getHintsThisGo()}, want 1`)
       if (main.isCameOffVisible() || !main.isAgainVisible() || !mustFind("AgainButton").enabled) errs.push(`after the hint: card ${main.isCameOffVisible()}, Again ${main.isAgainVisible()}`)
+      if (mustFind("AgainButton").getTransform().getWorldPosition().distance(againAt) > 0.5) errs.push("Again moved when the card's hint was taken")
+      if (main.getOutlinePulse()) errs.push(`the pulse stays after the card: ${JSON.stringify(main.getOutlinePulse())}`)
 
-      // ── Again: the start holds, in its own frame ──
-      const ag = await pinchCapture("AgainButton", () => ({pos: main.getPosition() as RefPosition, card: main.isCameOffVisible(), step: main.getHintStep(), go: main.getAttempt(), moves: main.getMovesMade()}))
+      // ── Again: the start holds, in its own frame; session 26: the hint taken after the fall is go 2's, kept ──
+      const ag = await pinchCapture("AgainButton", () => ({pos: main.getPosition() as RefPosition, card: main.isCameOffVisible(), step: main.getHintStep(), go: main.getAttempt(), moves: main.getMovesMade(), hints: main.getHintsThisGo()}))
       print(`[K2] Again: ${JSON.stringify(ag.value)}`)
-      if (!ag.value || !samePosition(ag.value.pos, start) || ag.value.card || ag.value.step !== 0 || ag.value.go !== 2 || ag.value.moves !== 0) errs.push(`Again's frame: ${JSON.stringify(ag.value)}, want the start ${fmtPos(start)}, no card, no hint, go 2, 0 moves`)
+      if (!ag.value || !samePosition(ag.value.pos, start) || ag.value.card || ag.value.step !== 0 || ag.value.go !== 2 || ag.value.moves !== 0 || ag.value.hints !== 1) errs.push(`Again's frame: ${JSON.stringify(ag.value)}, want the start ${fmtPos(start)}, no card, no hint, go 2, 0 moves, 1 hint kept`)
       await frames(2)
       if (main.isAgainVisible()) errs.push("Again stays after its pinch")
       if (!main.getPinnedHint()) errs.push("Again dropped the pinned hint")
@@ -78,6 +85,8 @@ export class K2FallAgainPinnedScenario extends Scenario {
       const sug = main.getSuggestion()
       const pin2 = main.getPinnedHint()
       if (main.getHintStep() !== 2 || !sug || !main.isRingGlowing(sug.holdId) || !pin2 || pin2.step !== 2) errs.push(`rung 2 at the pin: step ${main.getHintStep()}, pin ${JSON.stringify(pin2)}`)
+      // the pinned rung 1 showing again wasn't counted twice; rung 2 is one more
+      if (main.getHintsThisGo() !== 2) errs.push(`rung 2 at the pin: hints this go ${main.getHintsThisGo()}, want 2`)
       // move 3, the glowing one: the pin is used up
       if (sug) { await pinch("Hold_" + sug.holdId); await frames(2) }
       print(`[K2] move 3 (${sug ? sug.limb + "->" + sug.holdId : "-"}) made: step ${main.getHintStep()}, pin ${JSON.stringify(main.getPinnedHint())}`)

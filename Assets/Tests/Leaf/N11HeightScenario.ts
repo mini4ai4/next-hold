@@ -55,9 +55,9 @@ function readSequence(main: NextHoldMain, heightCm: number, pos0: RefPosition, e
   if (!samePosition(main.getPosition() as RefPosition, pos0)) errs.push(`${tag}: not at the preset start (${fmtPos(main.getPosition() as RefPosition)})`)
   const shown = main.getPreview()
   const seq = shown.map((m) => m.limb + "->" + m.holdId).join(" ")
-  const want = makeReference(heightCm).sequence(pos0, main.getSelectedLimb() as RefLimb)
+  const want = makeReference(heightCm).plan(pos0).steps
   const wantSeq = want.map((m) => m.limb + "->" + m.holdId).join(" ")
-  const route = makeReference(heightCm).route(pos0, main.getSelectedLimb() as RefLimb)
+  const route = makeReference(heightCm).route(pos0, null, true)
   const colours = checkStepColours(main, pos0, main.getSelectedLimb(), errs, tag, heightCm)
   print(`[r7] ${tag}: 1-2-3 ${shown.map((m) => `${m.limb}->${m.holdId} (${m.colour} ${m.score.toFixed(2)})`).join(", ")}; ` +
     `rule ${wantSeq}; route to the top ${route ? route.length + " moves" : "none"}; ${colours}`)
@@ -89,18 +89,19 @@ export class N11HeightScenario extends Scenario {
     if (mustFind("HeightDown").isEnabledInHierarchy || mustFind("HeightUp").isEnabledInHierarchy) errs.push("the height control shows while climbing")
     if (main.getPlannedLine() !== "Planned for 175 cm" || !mustFind("PlannedLine").isEnabledInHierarchy) errs.push(`the planned line reads "${main.getPlannedLine()}"`)
     await openPageFor("HeightDown")
-    if (!mustFind("HeightDown").isEnabledInHierarchy || !mustFind("HeightUp").isEnabledInHierarchy || !mustFind("HeightLabel").isEnabledInHierarchy) errs.push("the height control is not shown in Setup")
-    if (main.getHeightCm() !== BRIEF_HEIGHT || main.getHeightLabel() !== "175 cm") errs.push(`at open: height ${main.getHeightCm()}, panel "${main.getHeightLabel()}"`)
-    // session 15: "−" and "+" on one line, buttons and glyphs alike (in the row's own plane); session 24: the
-    // label above them, centred between them
+    if (!mustFind("HeightDown").isEnabledInHierarchy || !mustFind("HeightUp").isEnabledInHierarchy || !mustFind("PlannedLine").isEnabledInHierarchy) errs.push("the height control is not shown in Setup")
+    if (main.getHeightCm() !== BRIEF_HEIGHT || main.getHeightLabel() !== "175 cm" || main.getPlannedLine() !== "Planned for 175 cm") errs.push(`at open: height ${main.getHeightCm()}, panel "${main.getHeightLabel()}", "${main.getPlannedLine()}"`)
+    // session 15: "−" and "+" on one line, buttons and glyphs alike (in the grid's own plane); session 26: full
+    // 11 x 10 cm cells, side by side, 3 cm apart; the one height readout ("Planned for N cm") under them
     {
-      const row = mustFind("HeightRow").getTransform().getInvertedWorldTransform()
-      const at = (n: string) => row.multiplyPoint(mustFind(n).getTransform().getWorldPosition())
-      const glyph = (n: string) => row.multiplyPoint(mustFind(n).getChild(0).getTransform().getWorldPosition())
-      const d = at("HeightDown"), u = at("HeightUp"), l = at("HeightLabel")
-      print(`[r7] height: − at ${d.x.toFixed(2)},${d.y.toFixed(2)}, + at ${u.x.toFixed(2)},${u.y.toFixed(2)}, label at ${l.x.toFixed(2)},${l.y.toFixed(2)}`)
+      const grid = mustFind("ButtonGrid").getTransform().getInvertedWorldTransform()
+      const at = (n: string) => grid.multiplyPoint(mustFind(n).getTransform().getWorldPosition())
+      const glyph = (n: string) => grid.multiplyPoint(mustFind(n).getChild(0).getTransform().getWorldPosition())
+      const d = at("HeightDown"), u = at("HeightUp"), l = at("PlannedLine")
+      print(`[r7] height: − at ${d.x.toFixed(2)},${d.y.toFixed(2)}, + at ${u.x.toFixed(2)},${u.y.toFixed(2)}, the readout at ${l.x.toFixed(2)},${l.y.toFixed(2)}`)
       if (Math.abs(d.y - u.y) > 0.05 || Math.abs(glyph("HeightDown").y - glyph("HeightUp").y) > 0.05) errs.push(`− and + are not on one line: y ${d.y}, ${u.y}`)
-      if (!(l.y > d.y + 2.5) || Math.abs(l.x - (d.x + u.x) / 2) > 0.05) errs.push(`the label isn't centred above − and +: ${l.x}, ${l.y}`)
+      if (Math.abs((u.x - d.x) - 14) > 0.05) errs.push(`− and + centres are ${(u.x - d.x).toFixed(2)} cm apart, want 14 (11 cm cells, 3 cm gap)`)
+      if (!(l.y < d.y)) errs.push(`the height readout isn't under − and +: ${l.y} vs ${d.y}`)
     }
     if (Math.abs(main.getReach() - 77) > 1e-9) errs.push(`reach ${main.getReach()} at 175 cm, want 77`)
     const selected = main.getSelectedLimb()

@@ -34,7 +34,7 @@ export const SCENES: DemoScene[] = [
   {n: 5, start: 90, title: "175 again; RH to up, LH to h09; LF; ? on h11"},
   {n: 6, start: 105, title: "look away: arrow and chime; look back"},
   {n: 7, start: 117, title: "setup: mark a hold, Crimp, Start, Done, Remove"},
-  {n: 8, start: 130, title: "follow the plan to TOP: LF to lh, RF to rh, LH to TOP; TOPPED"},
+  {n: 8, start: 130, title: "follow the plan to TOP: LF to lh, LH to TOP; TOPPED; the card"},
 ]
 export const END = 141
 
@@ -173,11 +173,12 @@ export const ACTIONS: DemoAction[] = [
   {t: 127.6, do: "pressRemove"},
   {t: 129.3, do: "pressMode"},
   // 8 (session 19): follow the plan to the end, each pinch on the hold glowing at its turn: LF to
-  // lh (scene 5's override, used up here), then RF to rh, then LH to the top hold h20 (the "2 · LH"
-  // the plan showed): "TOPPED"
+  // lh (scene 5's override, used up here), then LH to the top hold h20 (the "2 · LH" the plan showed):
+  // "TOPPED". Session 26 (glow = plan): from there the plan's next move is the top-out itself (the old greedy
+  // glow spent a move on RF to rh first), so that pinch is gone: 4 moves from the start, par 4; the card then
+  // has the take's last ~3 s
   {t: 133, do: "pressHold", arg: "lh"},
-  {t: 135.3, do: "pressHold", arg: "rh"},
-  {t: 137.6, do: "pressHold", arg: "h20"},
+  {t: 135.3, do: "pressHold", arg: "h20"},
 ]
 
 /** the key states LEAF d1 checks, each just before the next thing happens */
@@ -203,9 +204,9 @@ export const CHECKS: DemoCheck[] = [
   {t: 127.3, key: "s7-reopened"},
   {t: 129, key: "s7-removed"},
   {t: 132.8, key: "s8-plan"},
-  {t: 135.1, key: "s8-rf"},
-  {t: 137.4, key: "s8-lh"},
-  {t: 138.2, key: "s8-topped"},
+  {t: 135.1, key: "s8-lh"},
+  {t: 136.5, key: "s8-topped"},
+  {t: 139.5, key: "s8-card"},
   {t: END, key: "end"},
 ]
 

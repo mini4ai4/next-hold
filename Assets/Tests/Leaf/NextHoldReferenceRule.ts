@@ -185,13 +185,45 @@ export class ReferenceRule {
     return [first].concat(this.plies(after, steps - 1, left).moves)
   }
 
-  /** The glow and the whole cheapest secure route to the top after it (see sequence); null if none. */
-  route(p: RefPosition, limb: RefLimb | null = null): RefResult[] | null {
+  /**
+   * Session 26, the glow follows the plan: the test's own statement of the rule. The shortest secure route from
+   * here (no move forced first); the greedy best (bestMove) plus the route after it; the glow is the greedy best
+   * unless that path is longer than the shortest, then the shortest route's first move. Returns the glow, the
+   * 1-2-3 shown with it, and whether the plan overrode the greedy best.
+   */
+  plan(p: RefPosition): {glow: RefResult | null; steps: RefResult[]; planned: boolean} {
+    const greedy = this.bestMove(p)
+    if (!greedy) return {glow: null, steps: [], planned: false}
+    const shortest = this.route(p, null, true)
+    const viaGreedy = this.route(p)
+    if (shortest && shortest.length && (!viaGreedy || viaGreedy.length > shortest.length)) {
+      return {glow: shortest[0], steps: shortest.slice(0, 3), planned: true}
+    }
+    return {glow: greedy, steps: this.sequence(p, greedy.limb), planned: false}
+  }
+
+  /** the move the glow shows from p (session 26: see plan) */
+  glow(p: RefPosition): RefResult | null {
+    return this.plan(p).glow
+  }
+
+  /** The glow and the whole cheapest secure route to the top after it (see sequence); null if none. Session 26:
+   *  `free`: no move forced first, the cheapest secure route from p itself (par). */
+  route(p: RefPosition, limb: RefLimb | null = null, free = false): RefResult[] | null {
+    const topOut = (m: RefResult) => this.top != null && m.holdId === this.top && (m.limb === "LH" || m.limb === "RH")
+    if (free) return this.top == null ? null : this.search(p, {LH: [], RH: [], LF: [], RF: []}, [])
     const first = limb ? this.evaluate(limb, p).suggestion : this.bestMove(p)
     if (!first) return null
-    const topOut = (m: RefResult) => this.top != null && m.holdId === this.top && (m.limb === "LH" || m.limb === "RH")
     if (topOut(first)) return [first]
     if (this.top == null) return null
+    const left0: {[l: string]: string[]} = {LH: [], RH: [], LF: [], RF: []}
+    if (p[first.limb] != null) left0[first.limb].push(p[first.limb] as string)
+    return this.search({...p, [first.limb]: first.holdId}, left0, [first])
+  }
+
+  /** the cheapest secure route to a hand on the top from `start` (never a limb back on a hold it left), after `pre` */
+  private search(start: RefPosition, left0: {[l: string]: string[]}, pre: RefResult[]): RefResult[] | null {
+    const topOut = (m: RefResult) => this.top != null && m.holdId === this.top && (m.limb === "LH" || m.limb === "RH")
     const keyOf = (q: RefPosition) => REF_LIMBS.map((l) => String(q[l])).join("|")
     const listOf = (ms: RefResult[]) => ms.map((m) => m.limb + ">" + m.holdId)
     const before = (a: {cost: number; moves: RefResult[]}, b: {cost: number; moves: RefResult[]}) => {
@@ -200,15 +232,13 @@ export class ReferenceRule {
       for (let i = 0; i < x.length && i < y.length; i++) if (x[i] !== y[i]) return x[i] < y[i]
       return x.length < y.length
     }
-    const left0: {[l: string]: string[]} = {LH: [], RH: [], LF: [], RF: []}
-    if (p[first.limb] != null) left0[first.limb].push(p[first.limb] as string)
     // open list kept sorted, cheapest first
     let open: {cost: number; moves: RefResult[]; pos: RefPosition; left: {[l: string]: string[]}}[] =
-      [{cost: 0, moves: [], pos: {...p, [first.limb]: first.holdId}, left: left0}]
+      [{cost: 0, moves: [], pos: {...start}, left: left0}]
     const seen: {[k: string]: boolean} = {}
     while (open.length) {
       const cur = open.shift()!
-      if (cur.moves.length && topOut(cur.moves[cur.moves.length - 1])) return [first].concat(cur.moves)
+      if (cur.moves.length && topOut(cur.moves[cur.moves.length - 1])) return pre.concat(cur.moves)
       const k = keyOf(cur.pos)
       if (seen[k]) continue
       seen[k] = true

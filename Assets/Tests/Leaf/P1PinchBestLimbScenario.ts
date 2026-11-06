@@ -39,7 +39,7 @@ async function pinchMoves(main: NextHoldMain, ref: ReferenceRule, hold: string, 
   for (const r of ref.perHold(want)) {
     if (f.colour[r.holdId] !== r.colour) errs.push(`${tag}: pinch-frame ring ${r.holdId} ${f.colour[r.holdId]}, rule ${r.limb} ${r.colour}`)
   }
-  const best = ref.bestMove(want)
+  const best = ref.glow(want)
   if (best && f.sel !== best.limb) errs.push(`${tag}: pinch-frame limb ${f.sel}, the best move is ${best.limb}'s`)
   await frames(3)
 }

@@ -12,6 +12,8 @@ import {HEIGHT_KEY} from "../../Scripts/NextHoldAttempt"
 import {frames, getMain, pinch, restorePreset} from "./NextHoldTestKit"
 
 export const MARKER = "nh.test.reopen"
+/** session 26: what the real store held before k4 wrote to it (its keys and the kept height), for k5 to restore */
+export const SNAPSHOT = "nh.test.before"
 
 @component
 export class K4ReopenWriteScenario extends Scenario {
@@ -21,6 +23,11 @@ export class K4ReopenWriteScenario extends Scenario {
     await restorePreset(main)
     const errs: string[] = []
     const real = global.persistentStorageSystem.store
+    // session 26 (engineer): note what the real store held before, so k5 puts it back as it was (it used to delete
+    // the kept height outright and then expect an empty store)
+    const before = {keys: real.getAllKeys().filter((k) => k !== MARKER && k !== SNAPSHOT), height: real.has(HEIGHT_KEY) ? real.getInt(HEIGHT_KEY) : null}
+    real.putString(SNAPSHOT, JSON.stringify(before))
+    print(`[K4] the real store before: ${JSON.stringify(before)}`)
     main.useStore(real)
     await pinch("HeightDown"); await frames(2)
     await pinch("HeightDown"); await frames(2)

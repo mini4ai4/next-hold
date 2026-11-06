@@ -28,11 +28,7 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
-    groundLabel: false
-    markLabel: false
-    markingLabel: false
-    noteLine: false
-    onWallLabel: false
+    {}
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -42,21 +38,10 @@
   Attachments:
     []
   DefaultScriptInputs:
-    - noteLine: Bouldering/top-rope aid. Not a spotter.
-      markLabel: Marknholds
-      markingLabel: Climb
-      groundLabel: Ground
-      onWallLabel: On wall
+    -
+      {}
   ScriptTypes:
     -
       {}
   InputLines:
     - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">NextHoldControlRowUI – the row: climb, body and setup pages</span>"}'
-    - '// @ui {"widget":"separator"}'
-    - '// @ui {"widget":"group_start", "label":"Settings"}'
-    - "// @input string noteLine = \"Bouldering/top-rope aid. Not a spotter.\" {\"hint\":\"Not-a-spotter note shown under the row, one short line (session 24). Never use the word 'safe'.\"}"
-    - '// @input string markLabel = "Mark holds" {"hint":"Mode switch label while climbing: pinch to mark the problem (session 24)"}'
-    - '// @input string markingLabel = "Climb" {"hint":"Mode switch label while marking: pinch to climb again (session 24)"}'
-    - '// @input string groundLabel = "Ground" {"hint":"View switch label while every ring and the ghosts show (standing back at the base)"}'
-    - '// @input string onWallLabel = "On wall" {"hint":"View switch label while only the suggested hold shows (on the wall)"}'
-    - '// @ui {"widget":"group_end"}'

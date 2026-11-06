@@ -61,9 +61,12 @@ export async function openPageFor(name: string): Promise<void> {
   const want = BODY_PAGE.indexOf(name) >= 0 ? "body" : SETTINGS_PAGE.indexOf(name) >= 0 ? "settings" : CLIMB_PAGE.indexOf(name) >= 0 ? "climb" : null
   if (!want || main.getPage() === want) return
   if (main.getPage() === "body") { main.pressBody(); await frames(2) }
-  if (main.getPage() === "settings" && want !== "settings") { await rawPinch("SetupButton"); await frames(2) }
+  // session 26: on the wall Setup isn't on screen (the 1 x 2 strip is "?" and Body), so there the settings page is
+  // brought up, or closed, with the action API, like the body page's close
+  const setupShown = mustFind("SetupButton").isEnabledInHierarchy
+  if (main.getPage() === "settings" && want !== "settings") { if (setupShown) await rawPinch("SetupButton"); else main.pressSetup(); await frames(2) }
   if (want === "body" && main.getPage() !== "body") { await rawPinch("BodyButton"); await frames(2) }
-  if (want === "settings" && main.getPage() !== "settings") { await rawPinch("SetupButton"); await frames(2) }
+  if (want === "settings" && main.getPage() !== "settings") { if (setupShown) await rawPinch("SetupButton"); else main.pressSetup(); await frames(2) }
   if (main.getPage() !== want) throw new Error(`could not bring up the ${want} page for ${name} (page ${main.getPage()})`)
 }
 
@@ -137,6 +140,11 @@ export function ringRule(ref: ReferenceRule, main: NextHoldMain, pos: RefPositio
   const list = over ? ref.evaluate(over as RefLimb, pos).results : ref.perHold(pos)
   const out: {[id: string]: RefResult} = {}
   for (const r of list) out[r.holdId] = r
+  // session 26: the glow's hold shows the glow's own move (glow = plan: a pinch there moves the glow's limb)
+  if (!over) {
+    const g = ref.glow(pos)
+    if (g) out[g.holdId] = g
+  }
   return out
 }
 
@@ -616,6 +624,14 @@ export function isHued(c: vec4): boolean {
   return mx > 0 && Math.min(c.x, c.y, c.z) / mx < 0.6
 }
 
+/** Session 26: the 1-2-3 the test expects from `pos`: an override's own (its limb's best hold, then the route);
+ *  otherwise the plan's (the glow follows the plan, NextHoldReferenceRule.plan) */
+export function expectedSteps(main: NextHoldMain, pos: RefPosition, heightCm = BRIEF_HEIGHT): RefResult[] {
+  const ref = makeReference(heightCm)
+  const o = main.getLimbOverride()
+  return o ? ref.sequence(pos, o as RefLimb) : ref.plan(pos).steps
+}
+
 /**
  * Every score ring must be green, yellow or red. Every step after the glow must be a move you can make:
  * green or yellow at its turn, by the test's own search at `heightCm`. Session 23: each badge's outline
@@ -623,7 +639,7 @@ export function isHued(c: vec4): boolean {
  */
 export function checkStepColours(main: NextHoldMain, pos: RefPosition, selected: string, errs: string[], tag: string,
                                  heightCm = BRIEF_HEIGHT): string {
-  const want = makeReference(heightCm).sequence(pos, selected as RefLimb)
+  const want = expectedSteps(main, pos, heightCm)
   const out: string[] = []
   for (const h of HOLDS) {
     const so = mustFind("Ring_" + h.id)
@@ -1062,7 +1078,8 @@ export async function climbByRule(main: NextHoldMain, errs: string[], tag: strin
   const moves: string[] = []
   for (let i = 0; i < max; i++) {
     const pos = main.getPosition() as RefPosition
-    const m = ref.bestMove(pos)
+    // session 26: the test's own glow (glow = plan), whether or not the Lens is showing it
+    const m = ref.glow(pos)
     if (!m) { errs.push(`${tag}: the rule has no move from ${fmtPos(pos)}`); break }
     const got = await pinchCapture("Hold_" + m.holdId, () => ({pos: main.getPosition() as RefPosition, topped: main.isTopped(),
       result: !!main.getLastResult(), card: main.isResultVisible(), again: main.isAgainVisible()}))
@@ -1075,10 +1092,30 @@ export async function climbByRule(main: NextHoldMain, errs: string[], tag: strin
   return {moves, top: null, time: -1}
 }
 
-/** the par the test expects: its own route search from `start` at `heightCm` (glow + route) */
+/** the par the test expects: its own shortest secure route from `start` at `heightCm` (session 26: no move forced first) */
 export function parFor(start: RefPosition, heightCm: number): number | null {
-  const r = makeReference(heightCm).route(start)
+  const r = makeReference(heightCm).route(start, null, true)
   return r ? r.length : null
+}
+
+/**
+ * Session 26: two buttons stand side by side in one row, as one block: `right` level with `left` (centres within
+ * 1 cm, as the eye's wall plane measures) and the gap between their edges `gap` x their scale (within 1 cm). The
+ * widths are the buttons' own at their 110 cm size. Returns a summary; pushes an error otherwise.
+ */
+export function checkSideBySide(left: string, leftW: number, right: string, rightW: number, gap: number, errs: string[], tag: string): string {
+  const wall = mustFind("ClimbingWall (stand-in)").getTransform()
+  const across = wall.getWorldTransform().multiplyDirection(new vec3(1, 0, 0)).normalize()
+  const up = wall.getWorldTransform().multiplyDirection(new vec3(0, 1, 0)).normalize()
+  const a = mustFind(left).getTransform(), b = mustFind(right).getTransform()
+  const d = b.getWorldPosition().sub(a.getWorldPosition())
+  const k = b.getWorldScale().x
+  const dx = d.dot(across), dy = d.dot(up)
+  const edgeGap = dx - ((leftW + rightW) / 2) * k
+  if (Math.abs(dy) > 1) errs.push(`${tag}: ${right} sits ${dy.toFixed(1)} cm ${dy > 0 ? "above" : "below"} ${left}, want the same row`)
+  if (dx <= 0) errs.push(`${tag}: ${right} is left of ${left}`)
+  if (Math.abs(edgeGap - gap * k) > 1) errs.push(`${tag}: ${right} is ${edgeGap.toFixed(1)} cm from ${left}, want ${(gap * k).toFixed(1)} (${gap} cm x ${k.toFixed(2)})`)
+  return `${right} ${dx.toFixed(1)} across, ${dy.toFixed(1)} up from ${left}: edge gap ${edgeGap.toFixed(1)} cm (want ${(gap * k).toFixed(1)})`
 }
 
 export function fail(list: string[], msg: string): void {

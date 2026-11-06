@@ -28,12 +28,13 @@ import {RefPosition} from "./NextHoldReferenceRule"
 interface GhostSnap {
   pos: RefPosition
   selected: string
+  override: string | null
   steps: (string | null)[]
   rendered: {[id: string]: string | null}
 }
 
 function snap(main: NextHoldMain, holds: string[]): GhostSnap {
-  const s: GhostSnap = {pos: main.getPosition() as RefPosition, selected: main.getSelectedLimb(), steps: [], rendered: {}}
+  const s: GhostSnap = {pos: main.getPosition() as RefPosition, selected: main.getSelectedLimb(), override: main.getLimbOverride(), steps: [], rendered: {}}
   for (let n = 1; n <= 3; n++) s.steps.push(main.getGhostHold(n))
   for (const id of holds) s.rendered[id] = renderedRingColour(id, main)
   return s
@@ -41,7 +42,8 @@ function snap(main: NextHoldMain, holds: string[]): GhostSnap {
 
 function checkGhosts(main: NextHoldMain, s: GhostSnap, errs: string[], tag: string): string[] {
   const ref = makeReference()
-  const want = ref.sequence(s.pos, s.selected as any)
+  // session 26: an override keeps its limb's best hold; otherwise the glow follows the plan
+  const want = s.override ? ref.sequence(s.pos, s.override as any) : ref.plan(s.pos).steps
   const ids = want.map((m) => m.holdId)
   print(`[N3] ${tag}: ${fmtPos(s.pos)}, selected ${s.selected}; look-ahead ${want.map((m, i) => `${i + 1}. ${m.limb}->${m.holdId}`).join("  ")}; ` +
     `shown ${s.steps.join(",")}`)

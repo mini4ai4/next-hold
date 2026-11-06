@@ -14,7 +14,7 @@ import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {TOPPED_FADE_SECONDS, TOPPED_SECONDS} from "../../Scripts/NextHoldMain"
 import {ORDER_RIPPLE} from "../../Scripts/NextHoldPinchRipple"
 import {PRESET_TOP} from "../../Scripts/Wall/WallLayout"
-import {classifyColour, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, restorePreset} from "./NextHoldTestKit"
+import {classifyColour, fmtPos, frames, getMain, makeReference, mustFind, parFor, pinch, pinchCapture, presetPosition, restorePreset} from "./NextHoldTestKit"
 import {RefLimb, RefPosition} from "./NextHoldReferenceRule"
 
 function tagAlpha(): number {
@@ -41,9 +41,9 @@ export class T1TopOutScenario extends Scenario {
     let sampler: Promise<void> | null = null
     for (let i = 0; i < 8 && !top; i++) {
       const pos = main.getPosition() as RefPosition
-      const sel = main.getSelectedLimb() as RefLimb
       const sug = main.getSuggestion()
-      const plan = ref.sequence(pos, sel)
+      // session 26: the test's own glow = plan rule (the greedy best unless it costs a move)
+      const plan = ref.plan(pos).steps
       if (!sug || !plan[0] || sug.limb !== plan[0].limb || sug.holdId !== plan[0].holdId) {
         errs.push(`step ${i + 1} from ${fmtPos(pos)}: glow ${sug ? sug.limb + "->" + sug.holdId : "none"}, the test's plan ${plan[0] ? plan[0].limb + "->" + plan[0].holdId : "none"}`)
         break
@@ -72,7 +72,10 @@ export class T1TopOutScenario extends Scenario {
         await frames(3)
       }
     }
-    print(`[T1] followed the plan: ${moves.join(", ")}${top ? " -> TOPPED" : ""}`)
+    // session 26: following the glow takes exactly par for your body (it took one more at 175 cm before)
+    const par = parFor(presetPosition(), 175)
+    print(`[T1] followed the plan: ${moves.join(", ")}${top ? " -> TOPPED" : ""}; ${moves.length} moves, par ${par} (the Lens says ${main.getPar()})`)
+    if (moves.length !== par || main.getPar() !== par) errs.push(`following the glow took ${moves.length} moves; par is ${par} by the test, ${main.getPar()} by the Lens`)
     if (!top) errs.push(`no hand reached ${PRESET_TOP} following the plan in 8 moves`)
     else {
       // in the pinch frame

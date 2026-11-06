@@ -228,7 +228,7 @@ export class N6ViewModesScenario extends Scenario {
             if (seen[k]) continue
             seen[k] = true
             const steps = node.steps.concat([{limb: l, holdId: r.holdId}])
-            const b = ref.bestMove(pos)
+            const b = ref.glow(pos)
             if (b && !holdInView(b.holdId)) { path = steps; break }
             next.push({pos, steps})
           }

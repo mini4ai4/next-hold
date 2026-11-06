@@ -25,8 +25,9 @@ import {DemoAutopilot} from "../../Scripts/Demo/DemoAutopilot"
 import {ACTIONS, CHECKS, DemoAction, HIDE_WHILE_PLAYING, SCENES} from "../../Scripts/Demo/DemoTimeline"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {HOLDS} from "../../Scripts/Wall/WallLayout"
+import {AGAIN_GAP, AGAIN_W, RESULT_HALF_W} from "../../Scripts/NextHoldCalloutUI"
 import {
-  activeRingBox, camera, checkArrowPointsAt, checkRowClearOfRing, checkWhyAgrees, eyeToWallCm, fmtBox, frames, getMain,
+  activeRingBox, camera, checkArrowPointsAt, checkRowClearOfRing, checkSideBySide, checkWhyAgrees, eyeToWallCm, fmtBox, frames, getMain,
   makeReference, mustFind, notOnScreen, restorePreset, screenBoxOf,
 } from "./NextHoldTestKit"
 import {RefLimb, RefPosition} from "./NextHoldReferenceRule"
@@ -98,7 +99,7 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
   /** session 18, scene 4: the −/+ row and badge 2 in the shot while the height changes; session 19:
    *  and the whole glow of "up" (move 1) */
   const heightInShot = () => {
-    const off = notOnScreen(["HeightDown", "HeightLabel", "HeightUp", "GhostNumber_2"], camera())
+    const off = notOnScreen(["HeightDown", "PlannedLine", "HeightUp", "GhostNumber_2"], camera())
     want(!off.length, `not fully in view: ${off.join(", ")}`)
     print(`[d1] ${key}: row ${fmtBox(screenBoxOf("HeightDown", camera()))} .. ${fmtBox(screenBoxOf("HeightUp", camera()))}, ` +
       `badge 2 ${fmtBox(screenBoxOf("GhostNumber_2", camera()))}`)
@@ -116,7 +117,7 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
     const sug = main.getSuggestion()
     want(!!sug && sug.limb === limb && sug.holdId === hold, `glow ${sug ? sug.limb + " on " + sug.holdId : "none"}, want ${limb} on ${hold}`)
     const ref = makeReference(main.getHeightCm())
-    const plan = ref.sequence(pos as RefPosition, main.getSelectedLimb() as RefLimb)
+    const plan = main.getLimbOverride() ? ref.sequence(pos as RefPosition, main.getSelectedLimb() as RefLimb) : ref.plan(pos as RefPosition).steps
     want(!!plan[0] && plan[0].limb === limb && plan[0].holdId === hold,
       `the test's plan starts ${plan[0] ? plan[0].limb + " on " + plan[0].holdId : "nowhere"}, want ${limb} on ${hold}`)
     want(main.getLabelText() === label, `label "${main.getLabelText()}", want "${label}"`)
@@ -252,14 +253,20 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
       badge2("h20", "2 · LH")
       want(main.getTagText("h20") === "TOP", `h20 tag "${main.getTagText("h20")}", want TOP`)
       break
-    case "s8-rf":
-      want(pos.LF === "lh", `LF on ${pos.LF}, want lh`)
-      followsPlan("RF", "rh", "R foot")
-      break
     case "s8-lh":
-      want(pos.RF === "rh", `RF on ${pos.RF}, want rh`)
+      // session 26 (glow = plan): from LF on lh the plan's next move is the top-out, not RF to rh first
+      want(pos.LF === "lh" && pos.RF === "rf", `LF on ${pos.LF}, RF on ${pos.RF}, want lh and rf`)
       followsPlan("LH", "h20", "L hand")
       break
+    case "s8-card": {
+      // session 26: the go from the start holds (scene 4's RH back on rh after scene 3's step back) topped in par
+      const lines = main.getResultLines().join(" | ")
+      const wantLines = "SEND · go 2 | 4 moves · your par 4 | 0 hints · ticked on this go"
+      want(lines === wantLines, `the card reads "${lines}", want "${wantLines}"`)
+      want(main.isRowHidden() && main.isAgainVisible(), `row hidden ${main.isRowHidden()}, Again ${main.isAgainVisible()}`)
+      checkSideBySide("ResultCard", 2 * RESULT_HALF_W, "AgainButton", AGAIN_W, AGAIN_GAP, e, "the card's Again")
+      break
+    }
     case "s8-topped": {
       // a hand on TOP: "TOPPED" in green over it, in the shot, and no next move
       want(pos.LH === "h20" && main.isTopped(), `LH on ${pos.LH}, topped ${main.isTopped()}`)
@@ -340,7 +347,7 @@ export class D1DemoAutopilotScenario extends Scenario {
           lastHeight = h
           // scene 4 is the height beat; scene 5 sets 175 again while the eye walks back to 2.5 m
           const tl = pilot.getTimelineTime()
-          const off = tl >= SCENES[4].start && tl < SCENES[5].start ? notOnScreen(["HeightDown", "HeightLabel", "HeightUp"], camera()) : []
+          const off = tl >= SCENES[4].start && tl < SCENES[5].start ? notOnScreen(["HeightDown", "PlannedLine", "HeightUp"], camera()) : []
           if (tl >= SCENES[4].start && tl < SCENES[5].start) heightInScene4 += steps
           if (off.length) frameErr(`height changed to "${h}" at t=${pilot.getTimelineTime().toFixed(1)} with not in view: ${off.join(", ")}`)
         }
