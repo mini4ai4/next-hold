@@ -7,9 +7,12 @@ unless the name says otherwise.
 
 ## How they were taken
 
-Every state was reached through the real Lens, with no capture script calling NextHoldMain to set it. One LEAF
-scenario, `x1-capture` (`Assets/Tests/Leaf/X1CaptureScenario.ts`, committed), ran once per shot, each time on a freshly
-refreshed preview:
+No state was set by calling NextHoldMain's state methods. Each was reached with real SIK pinch events from LEAF's
+simulated hand, aimed at each button or hold by name, and real eye moves. The script uses two test hooks: `useStore` (a
+fresh in-memory store, every shot) and, for S12 only, `injectVoice` (the typed voice path). (Session 28: this paragraph
+used to say "with no capture script calling NextHoldMain", which those two hooks contradicted.) One LEAF scenario,
+`x1-capture` (`Assets/Tests/Leaf/X1CaptureScenario.ts`, committed in 9430b0f), ran once per shot, each time on a
+freshly refreshed preview:
 - It moves the real eye to the shot's pose, with device tracking off.
 - It reaches the state with real SIK pinches from LEAF's simulated hand on the Lens's own buttons and holds:
   "?", Show my beta, Setup, −/+, Again, and the holds.
@@ -22,7 +25,7 @@ Disclosures, all of them:
 - **Hidden during the hold.** LEAF's status banner ("RUNS: …" / "PASSED") and the preview's two simulated hand
   models are switched off. The banner is drawn by LEAF's own camera over the top of the frame. The hands stay where
   they pinched, over the panel. Neither is part of the Lens.
-- **S12.** The preview has no microphone. Its voice input is typed text handed to the Lens's injected voice source,
+- **S12.** AsrModule doesn't run in the preview (Snap: only on Spectacles). Its voice input is typed text handed to the Lens's injected voice source,
   and the chip says so on every frame. The chip lasts 1 s, less than a tool round trip, so for this shot the
   scenario says "next hold" every 0.8 s while it holds. That is why the panel shows rung 3.
 - **Mats shots** (01, 02, 04–06, 09, 12) are from 4.25 m, 37.5 cm right of the problem, pitch −2°: all ten holds,
@@ -33,7 +36,11 @@ Disclosures, all of them:
 
 The head-follow panel (session 27) is drawn where the Lens put it: 60 cm out, at the lower edge of the frame (the
 preview frame is ±18.3° tall, so 25–30° below the gaze would be out of view). From 4.25 m that is the lower right,
-over no ring; LEAF r5 checks this.
+over no ring; LEAF r5 checks this. Except S10/S11 (session 28 correction): there the low place would have covered
+rings, so it shrank and slid up beside the glow, its centre about 3° above the gaze; its lower-left corner touches the
+glow's outer halo in S10, and its top-left corner covers a hold outside the problem in both. Session 28 keeps it low
+(see `../v7_3/`). Every v7_2 frame also shows the preview's floor through the wall as a dark band from y ≈ 1315
+down (the preview camera was level; see `../v7_3/INDEX.md`).
 
 | File | Pose | What it shows |
 |---|---|---|
