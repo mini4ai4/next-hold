@@ -32,8 +32,8 @@ export class N4WhyWordingScenario extends Scenario {
     const limb = main.getSelectedLimb()
     if (limb !== "RH") errs.push(`precondition: preset selects ${limb}, want RH`)
 
-    // session 18: "?" explains the score the ring shows. Session 23: h09 carries "2 · LH" at the preset
-    // and keeps its own ring: the move a pinch on it makes, LH's ("PINCH HOLD"). The LONG REACH wording is checked last, on a hold with no tag, for another limb (at the preset
+    // session 18: "?" explains the score the ring shows. Session 24: h09 carries "2 · LH" at the preset, so it
+    // says "STEP 2" (never OUT OF REACH on a step). The LONG REACH wording is checked last, on a hold with no tag, for another limb (at the preset
     // every long reach for RH is under a tag)
     const h09 = expectedWhy(main, "h09")
     const cases: {hold: string; want: string; limb?: string}[] = [
@@ -42,7 +42,8 @@ export class N4WhyWordingScenario extends Scenario {
       {hold: "h20", want: "JUG HOLD · OUT OF REACH"},
       {hold: "", want: "", limb: "LONG REACH"},
     ]
-    if (!h09 || h09.from !== "best limb LH" || h09.why !== "PINCH HOLD") errs.push(`precondition: h09's ring shows ${h09 ? h09.from + ' "' + h09.why + '"' : "nothing"}, want LH's "PINCH HOLD"`)
+    // session 24 (the judges' fix 1): h09 wears the neutral outline under its tag, and "?" names the step
+    if (!h09 || h09.from !== "step tag 2" || h09.why !== "STEP 2") errs.push(`precondition: h09 explains ${h09 ? h09.from + ' "' + h09.why + '"' : "nothing"}, want step tag 2 "STEP 2"`)
     for (const c of cases) {
       if (c.limb) {
         // select each other limb with a real pinch until one has an untagged LONG REACH hold
@@ -66,7 +67,7 @@ export class N4WhyWordingScenario extends Scenario {
       print(`[N4] ? then ${c.hold}: why line "${shown}"`)
       if (!mustFind("WhyLine").enabled) errs.push(`${c.hold}: why line not shown`)
       if (shown !== c.want) errs.push(`${c.hold}: why line "${shown}", want "${c.want}"`)
-      if (!WHY_FORM.test(shown)) errs.push(`${c.hold}: "${shown}" is not "<TYPE> HOLD · ..." in capitals`)
+      if (!WHY_FORM.test(shown) && !(c.hold === "h09" && /^STEP [23]$/.test(shown))) errs.push(`${c.hold}: "${shown}" is not "<TYPE> HOLD · ..." in capitals`)
       if (/[a-z]/.test(shown)) errs.push(`${c.hold}: "${shown}" has lowercase letters`)
     }
 

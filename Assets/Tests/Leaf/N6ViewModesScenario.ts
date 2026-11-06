@@ -22,7 +22,7 @@ import {HOLDS, HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {
   AT_110, GROUND_FAR_CM, camera, checkGroundSizes, eyeToWallCm, fmtPos, frames, getMain, groundSizesFor, makeReference, mustFind,
-  pinch, pinchCapture, renderedLineWidth, renderedRingColour, restorePreset, textSize,
+  pinch, pinchCapture, renderedLineWidth, renderedRingColour, restorePreset, tagOn, textSize,
 } from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 
@@ -35,6 +35,7 @@ interface ViewSnap {
   pos: string
   suggestion: string
   ringOn: {[id: string]: boolean}
+  tagged: {[id: string]: boolean}
   rendered: {[id: string]: string | null}
   state: {[id: string]: string | null}
   dim: {[id: string]: boolean}
@@ -47,10 +48,11 @@ function snap(main: NextHoldMain): ViewSnap {
   const s: ViewSnap = {
     view: main.getView(), label: main.getViewLabel(), pos: fmtPos(main.getPosition() as RefPosition),
     suggestion: (() => { const g = main.getSuggestion(); return g ? g.limb + "->" + g.holdId : "none" })(),
-    ringOn: {}, rendered: {}, state: {}, dim: {}, ghosts: [], ghostObjs: [], glow: mustFind("SuggestGlow").enabled,
+    ringOn: {}, tagged: {}, rendered: {}, state: {}, dim: {}, ghosts: [], ghostObjs: [], glow: mustFind("SuggestGlow").enabled,
   }
   for (const h of HOLDS) {
     s.ringOn[h.id] = mustFind("Ring_" + h.id).enabled
+    s.tagged[h.id] = tagOn(h.id, main) !== null
     s.rendered[h.id] = renderedRingColour(h.id, main)
     s.state[h.id] = main.getHoldColour(h.id)
     s.dim[h.id] = main.isHoldDim(h.id)
@@ -73,7 +75,9 @@ function checkGround(main: NextHoldMain, s: ViewSnap, errs: string[], tag: strin
   for (const h of HOLDS) {
     const inProblem = main.isInProblem(h.id)
     const free = inProblem && occupied.indexOf(h.id) < 0
-    if (free && !s.ringOn[h.id]) errs.push(`${tag}: free problem hold ${h.id} has no ring`)
+    // session 24: a free hold under a step tag wears the neutral outline (s.rendered checks it), no grip ring
+    if (free && !s.ringOn[h.id] && !s.tagged[h.id]) errs.push(`${tag}: free problem hold ${h.id} has no ring`)
+    if (free && s.ringOn[h.id] && s.tagged[h.id]) errs.push(`${tag}: free problem hold ${h.id} under a step tag shows a grip ring`)
     if (free && s.rendered[h.id] !== s.state[h.id]) errs.push(`${tag}: Ring_${h.id} renders ${s.rendered[h.id]}, state ${s.state[h.id]}`)
     if (!free && s.ringOn[h.id]) errs.push(`${tag}: ${h.id} (${inProblem ? "occupied" : "outside the problem"}) shows a ring`)
     if (inProblem === s.dim[h.id]) errs.push(`${tag}: ${h.id} dim=${s.dim[h.id]} but in problem=${inProblem}`)

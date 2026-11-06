@@ -35,7 +35,8 @@ const WALL_CONTROLS = ["AskButton", "BodyButton", "SetupButton", "PlannedLine", 
 function visualsUnder(so: SceneObject, out: BaseMeshVisual[]): BaseMeshVisual[] {
   if (!so.isEnabledInHierarchy) return out
   for (const t of ["Component.RenderMeshVisual", "Component.Text"]) {
-    for (const c of so.getComponents(t as any) as BaseMeshVisual[]) if (c.enabled) out.push(c)
+    // session 24: skip an empty text (the top line, empty by default): it draws nothing, its box is unbounded
+    for (const c of so.getComponents(t as any) as BaseMeshVisual[]) if (c.enabled && !(t === "Component.Text" && !(c as any).text)) out.push(c)
   }
   for (let i = 0; i < so.getChildrenCount(); i++) visualsUnder(so.getChild(i), out)
   return out

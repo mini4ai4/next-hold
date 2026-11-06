@@ -550,7 +550,9 @@ export class NextHoldMain extends BaseScriptComponent {
    *  session 24), the step it is in the plan. Never "OUT OF REACH" for a hold the plan takes. */
   private whyText(id: string): string | null {
     const n = this.tagStep(id)
-    if (n !== null) return `${(this.holdTypes[id] || "").toUpperCase()} HOLD · STEP ${n}`
+    // one short line (G), as the refusal's "STEP 1 FIRST": "PINCH HOLD · STEP 2" was twice the old line's width,
+    // and from 125 cm slid into view over the glowing hold next to it (c5)
+    if (n !== null) return `STEP ${n}`
     const r = this.shownScore(id)
     return r ? r.why : null
   }

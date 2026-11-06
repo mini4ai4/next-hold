@@ -4,7 +4,7 @@
 // "2 · LH" sat on h10's red, broken ring and "?" there said "JUG HOLD · OUT OF REACH": the plan pointing at a
 // hold that the ring and the why-line both called out of reach. Now a hold under a drawn step tag says nothing
 // about gripping it from here: no Ring_<id>, only the neutral outline (the one an occupied hold and the hidden
-// read use), and "?" on it names the step ("JUG HOLD · STEP 2"), never "OUT OF REACH". A refused pinch there
+// read use), and "?" on it names the step ("STEP 2"), never "OUT OF REACH". A refused pinch there
 // still says "STEP 1 FIRST". The glowing hold (step 1) keeps its own colour.
 // Input path: real SIK pinches on HeightUp (behind Setup), AskButton and Hold_<id>; rings read as drawn.
 
@@ -64,7 +64,7 @@ export class E1TagOwnBadgeScenario extends Scenario {
     await pinch("AskButton"); await frames(2)
     await pinch("Hold_h10"); await frames(2)
     print(`[E1] ? on h10: "${main.getWhyText()}"`)
-    if (main.getWhyText() !== "JUG HOLD · STEP 2") errs.push(`? on h10 reads "${main.getWhyText()}", want "JUG HOLD · STEP 2"`)
+    if (main.getWhyText() !== "STEP 2") errs.push(`? on h10 reads "${main.getWhyText()}", want "STEP 2"`)
     if (main.getWhyText().indexOf("OUT OF REACH") >= 0) errs.push("the why-line on a step says OUT OF REACH")
     // a pinch on it is refused (red for every limb from here) and says so as a step
     const pos0 = main.getPosition() as RefPosition

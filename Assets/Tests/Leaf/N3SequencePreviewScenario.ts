@@ -3,8 +3,8 @@
 // secure route to the top, searched over every limb and hold. Steps 2 and 3 show as
 // small badges pinned on their own hold's ring, naming the limb: "2 · LH", "3 · LF".
 // They update in the same frame as the main rings. Session 23: each badge is its own
-// colour, the ring under it keeps its own grip colour (also forced: a tag on a hold
-// whose ring is red), and a step onto a hold a limb is on now gets the neutral outline.
+// colour, and a step onto a hold a limb is on now gets the neutral outline. Session 24: so does any hold
+// under a tag: no grip colour there (also forced: a tag on a hold whose ring is red).
 // Attribution (strict review 29.10): on screen the ring nearest each badge is its
 // own hold's, by at least 2 cm, and its text names the limb that moves in that
 // step. Every badge stays readable: no glow ring and no other badge covers it,
@@ -145,17 +145,18 @@ export class N3SequencePreviewScenario extends Scenario {
       else if (Math.max(...r) - Math.min(...r) > 0.3 || Math.min(...r) < edge) errs.push(`${tag}: GhostPath_2 is not an arc around Hold_${third}: dots ${Math.min(...r).toFixed(2)}-${Math.max(...r).toFixed(2)} cm from it (ring edge ${edge.toFixed(2)})`)
       print(`[N3] ${tag}: badges ${gap.toFixed(1)} cm apart, arc of ${dots.length} dots; ${checkBadgeAttribution(camera(), main, want, errs, tag)}; ${checkGhostNumbersClear(camera(), errs, tag, main)}`)
 
-      // the judge's picture: a "2 · LH" on a hold whose ring, from here, is red. Session 23: the ring stays
-      // red, and the tag is neither green nor red: its own badge colour
+      // the judge's picture: a "2 · LH" on a hold whose ring, from here, is red. Session 24 (the A+E judges'
+      // fix 1): Main gives a hold under a step tag no grip colour, so the overlay gets it without one, as Main
+      // hands it; drawn: no red ring, the neutral outline, the tag its own badge colour
       const red = problem.filter((id) => id !== sug.holdId && mustFind("Ring_" + id).enabled && main.getHoldColour(id) === "red")[0]
-      if (!red) errs.push("precondition: no red ring at the preset to put a green tag on")
+      if (!red) errs.push("precondition: no red ring at the preset to put a tag on")
       else {
         want = [{limb: sug.limb, holdId: sug.holdId}, {limb: "LH", holdId: red}]
-        vis.apply({...vis.state, ghosts: [{hold: sug.holdId, limb: sug.limb}, {hold: red, limb: "LH"}]})
+        vis.apply({...vis.state, rings: {...vis.state.rings, [red]: null}, ghosts: [{hold: sug.holdId, limb: sug.limb}, {hold: red, limb: "LH"}]})
         tag = `tag on ${red} (score red)`
-        const c = classifyColour((mustFind("Ring_" + red).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4, main)
-        if (c !== "red") errs.push(`${tag}: Ring_${red} renders ${c} under the tag, its own score is red`)
-        print(`[N3] ${tag}: Ring_${red} renders ${c}; ${checkBadgeAttribution(camera(), main, want, errs, tag)}`)
+        if (mustFind("Ring_" + red).enabled) errs.push(`${tag}: Ring_${red} shows under the tag`)
+        if (!mustFind("GhostHoldRing_2").enabled) errs.push(`${tag}: no neutral outline under the tag`)
+        print(`[N3] ${tag}: Ring_${red} shown ${mustFind("Ring_" + red).enabled}, outline ${mustFind("GhostHoldRing_2").enabled}; ${checkBadgeAttribution(camera(), main, want, errs, tag)}`)
       }
 
       // step 2 on the glowing hold (two limbs onto it in a row): badge 2 sits on the glow's outer ring

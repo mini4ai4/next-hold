@@ -17,7 +17,7 @@ import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {RIPPLE_GROW, RIPPLE_SECONDS} from "../../Scripts/NextHoldPinchRipple"
 import {
   fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, planeDistanceToHold,
-  renderedRingColour, restorePreset,
+  renderedRingColour, restorePreset, tagOn,
 } from "./NextHoldTestKit"
 import {REF_LIMBS, RefPosition} from "./NextHoldReferenceRule"
 
@@ -43,7 +43,8 @@ function snap(main: NextHoldMain): Snap {
   for (const h of HOLDS) {
     s.colour[h.id] = main.getHoldColour(h.id)
     s.rendered[h.id] = renderedRingColour(h.id, main)
-    s.ringOn[h.id] = mustFind("Ring_" + h.id).enabled
+    // session 24: a hold under a step tag wears the neutral outline (renderedRingColour checks it): counted as its ring
+    s.ringOn[h.id] = mustFind("Ring_" + h.id).enabled || (tagOn(h.id, main) !== null && s.rendered[h.id] !== null)
   }
   return s
 }

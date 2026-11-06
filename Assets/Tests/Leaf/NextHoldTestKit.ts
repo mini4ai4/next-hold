@@ -769,7 +769,9 @@ export interface ScreenBox { x0: number; x1: number; y0: number; y1: number }
 function visualsUnder(so: SceneObject, out: BaseMeshVisual[]): BaseMeshVisual[] {
   if (!so.isEnabledInHierarchy) return out
   for (const t of ["Component.RenderMeshVisual", "Component.Text"]) {
-    for (const c of so.getComponents(t as any) as BaseMeshVisual[]) if (c.enabled) out.push(c)
+    // session 24: an empty text (the row's top line, empty by default) draws nothing and reports an
+    // unbounded box: it would make the whole row read as "behind the camera" and skip the check
+    for (const c of so.getComponents(t as any) as BaseMeshVisual[]) if (c.enabled && !(t === "Component.Text" && !(c as any).text)) out.push(c)
   }
   for (let i = 0; i < so.getChildrenCount(); i++) visualsUnder(so.getChild(i), out)
   return out
@@ -856,8 +858,7 @@ export function expectedWhy(main: NextHoldMain, id: string): {why: string; colou
   // hold's own score (renderedRingColour checks the neutral outline there)
   const n = tagOn(id, main)
   if (r && n !== null && main.getView() === "ground") {
-    const type = (presetTypes()[id] || "").toUpperCase()
-    return {why: `${type} HOLD · STEP ${n}`, colour: r.colour as RefColour, from: `step tag ${n}`}
+    return {why: `STEP ${n}`, colour: r.colour as RefColour, from: `step tag ${n}`}
   }
   return r ? {why: r.why, colour: r.colour as RefColour, from: `${main.getLimbOverride() ? "override" : "best limb"} ${r.limb}`} : null
 }

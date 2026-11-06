@@ -9,7 +9,7 @@ import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {
-  camera, checkWhyAgrees, expectedWhy, fmtPos, frames, getMain, makeReference, mustFind, pinch, restorePreset, samePosition,
+  camera, checkWhyAgrees, expectedWhy, fmtPos, frames, getMain, makeReference, mustFind, pinch, restorePreset, samePosition, tagOn,
 } from "./NextHoldTestKit"
 import {REF_LIMBS, RefPosition} from "./NextHoldReferenceRule"
 
@@ -51,7 +51,9 @@ export class C5AskWhyScenario extends Scenario {
     const rings = ref.perHold(pos0)
     // (it must be in view from where the test stands: off view the line slides in beside another ring)
     const inView = rings.filter((r) => camera().isSphereVisible(mustFind("Hold_" + r.holdId).getTransform().getWorldPosition(), 12))
-    const target = inView.filter((r) => r.why.indexOf("LONG REACH") >= 0)[0] || inView.filter((r) => !main.isRingGlowing(r.holdId) && main.getGhostHold(2) !== r.holdId && main.getGhostHold(3) !== r.holdId)[0] || inView[0]
+    // (session 24: not a hold under a step tag, which has no grip ring; that case is checked at the end)
+    const untagged = inView.filter((r) => tagOn(r.holdId, main) === null)
+    const target = untagged.filter((r) => r.why.indexOf("LONG REACH") >= 0)[0] || untagged.filter((r) => !main.isRingGlowing(r.holdId))[0] || untagged[0]
     if (!mustFind("Ring_" + target.holdId).enabled) errs.push(`setup: ${target.holdId} has no ring`)
     const markers0: {[l: string]: string | null} = {}
     for (const l of REF_LIMBS) markers0[l] = main.getMarkerHold(l as any)
@@ -84,7 +86,7 @@ export class C5AskWhyScenario extends Scenario {
     if (main.isWhyVisible()) errs.push("why line still shown after a move")
 
     // a hold under a step tag: at the preset "2 · LH" sits on h09. Session 24 (the judges' fix 1): it wears the
-    // neutral outline, and "?" on it names the step ("PINCH HOLD · STEP 2"), placed against that outline
+    // neutral outline, and "?" on it names the step ("STEP 2"), placed against that outline
     await restorePreset(main)
     await frames(3)
     const tagged = [2, 3].map((n) => main.getGhostHold(n)).filter((id) => id && !main.isRingGlowing(id) && main.getHoldColour(id) !== null)[0]
@@ -96,7 +98,7 @@ export class C5AskWhyScenario extends Scenario {
       await pinch("Hold_" + tagged)
       await frames(3)
       print(`[C5] tagged ${tagged} (${wantT ? wantT.from : "-"}): ${checkWhyAgrees(camera(), main, errs, "tagged " + tagged)}`)
-      if (!wantT || wantT.from.indexOf("step tag") !== 0 || !/ HOLD · STEP [23]$/.test(main.getWhyText())) errs.push(`tagged ${tagged}: "${main.getWhyText()}" (${wantT ? wantT.from : "nothing"}), want the step named`)
+      if (!wantT || wantT.from.indexOf("step tag") !== 0 || !/^STEP [23]$/.test(main.getWhyText())) errs.push(`tagged ${tagged}: "${main.getWhyText()}" (${wantT ? wantT.from : "nothing"}), want the step named`)
       if (main.isRingVisible(tagged)) errs.push(`tagged ${tagged}: its grip ring shows`)
     }
     await restorePreset(main)

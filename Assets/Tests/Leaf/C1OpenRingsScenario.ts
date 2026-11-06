@@ -16,7 +16,7 @@ import {HOLDS} from "../../Scripts/Wall/WallLayout"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {
   BRIEF_REACH, checkRingStyles, countByName, fmtPos, getMain, isPresetProblem, makeReference, mustFind, planeDistanceToHold,
-  presetPosition, presetProblem, renderedRingColour, restorePreset, samePosition, sceneHoldCoords,
+  presetPosition, presetProblem, renderedRingColour, restorePreset, samePosition, sceneHoldCoords, tagOn,
 } from "./NextHoldTestKit"
 import {REF_LIMBS, RefPosition} from "./NextHoldReferenceRule"
 
@@ -70,7 +70,10 @@ function checkOpenState(main: NextHoldMain, tag: string): string[] {
       markerOnly++
     } else {
       const want = byId[id].colour
-      if (!ringOn) errs.push(`${tag}: free hold ${id} has no ring (want ${want})`)
+      // session 24: a free hold under a step tag wears the neutral outline instead (renderedRingColour checks it)
+      const tagged = tagOn(id, main) !== null
+      if (!ringOn && !tagged) errs.push(`${tag}: free hold ${id} has no ring (want ${want})`)
+      if (ringOn && tagged) errs.push(`${tag}: free hold ${id} under a step tag shows a grip ring`)
       if (rendered !== want) errs.push(`${tag}: Ring_${id} renders ${rendered}, reference ${want} (score ${byId[id].score.toFixed(3)})`)
       if (state !== want) errs.push(`${tag}: getHoldColour(${id}) = ${state}, reference ${want}`)
       const ringD = planeDistanceToHold(mustFind("Ring_" + id), id)
