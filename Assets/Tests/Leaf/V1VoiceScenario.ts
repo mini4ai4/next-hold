@@ -16,7 +16,8 @@ import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {boxesOverlap, camera, fmtBox, fmtPos, frames, getMain, mustFind, pinch, presetPosition, renderedOuterRadius, restorePreset, samePosition, screenBoxOf} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
-import {PREVIEW_VOICE_LABEL} from "../../Scripts/NextHoldVoice"
+import {PREVIEW_VOICE_LABEL, VOICE_PAUSED} from "../../Scripts/NextHoldVoice"
+import {InjectedVoiceSource, VoiceSource} from "../../Scripts/NextHoldVoiceSource"
 import {HOLDS, HOLD_SIZE} from "../../Scripts/Wall/WallLayout"
 
 /** Session 28 (v7.3 P1-4): the chip as drawn, from the real eye: attached to `button` (its box beside the button's, not
@@ -100,6 +101,26 @@ export class V1VoiceScenario extends Scenario {
       await noOp("next hold why", "two commands at once")
       await noOp("why", "no hint has named a move yet")
       await noOp("again", "no Again on screen")
+      // session 28 (v7.3 P1-5): a negation with a typographic apostrophe, and "why’d" with one, are chatter
+      await noOp("don’t show my beta", "a negation, curly apostrophe")
+      await noOp("that's not the next hold", "a negation")
+
+      // ── session 28: recognition stops on an error: "voice paused" and why, beside "?", for 2 s; then typing again ──
+      {
+        let fail: ((why: string) => void) | null = null
+        const failing: VoiceSource = {kind: "asr", start: (_t, e) => { fail = e }, stop: () => {}}
+        main.useVoice(failing)
+        if (fail) (fail as (why: string) => void)("no network")
+        await frames(2)
+        const pc = main.getVoiceChip()
+        print(`[V1] recognition error: chip ${JSON.stringify(pc)} on ${main.getVoiceChipButton()}, error "${main.getVoiceError()}"`)
+        if (!pc || pc.heard !== VOICE_PAUSED || pc.label !== "no network" || main.getVoiceChipButton() !== "AskButton") errs.push(`a recognition error: chip ${JSON.stringify(pc)} on "${main.getVoiceChipButton()}", want "${VOICE_PAUSED}" / "no network" by "?"`)
+        else checkChip(main, "AskButton", errs, "voice paused")
+        main.useVoice(new InjectedVoiceSource())
+        const until = getTime() + 3
+        while (main.getVoiceChip() && getTime() < until) await frames(1)
+        if (main.getVoiceChip()) errs.push("the \"voice paused\" chip stayed past 2 s")
+      }
 
       // ── "next hold": rung 1, as "?" ──
       const t0 = getTime()

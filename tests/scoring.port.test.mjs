@@ -791,7 +791,8 @@ const N = await import("../Assets/Scripts/NextHoldPlan.ts");
 // ---- 9. session 27: voice commands, scoped (Assets/Scripts/NextHoldVoice.ts) ---------------------------------
 const V = await import("../Assets/Scripts/NextHoldVoice.ts");
 {
-  const all = { askOnScreen: true, againOnScreen: true, showBetaOnScreen: true, betaShown: false, whyOnOffer: true };
+  // session 28: "why" is on offer when "?" reads Why (askWord), not by a separate flag
+  const all = { askOnScreen: true, againOnScreen: true, showBetaOnScreen: true, betaShown: false, askWord: "Why" };
   check("voice: the four words, as said in a gym (case, punctuation, a 'please')",
     V.matchCommand("Next hold?") === "nextHold" && V.matchCommand("next hold please") === "nextHold" && V.matchCommand("AGAIN!") === "again" &&
     V.matchCommand("show my beta") === "showBeta" && V.matchCommand("why?") === "why", ["Next hold?", "AGAIN!"].map(V.matchCommand));
@@ -802,11 +803,56 @@ const V = await import("../Assets/Scripts/NextHoldVoice.ts");
   check("voice: 'again' only while Again is on screen; 'show my beta' only while its button is, beta hidden",
     V.parseCommand("again", true, { ...all, againOnScreen: false }) === null && V.parseCommand("again", true, all) === "again" &&
     V.parseCommand("show my beta", true, { ...all, showBetaOnScreen: false }) === null && V.parseCommand("show my beta", true, { ...all, betaShown: true }) === null);
-  check("voice: 'why' only after a hint has named the move; 'next hold' only while '?' is on screen",
-    V.parseCommand("why", true, { ...all, whyOnOffer: false }) === null && V.parseCommand("why", true, all) === "why" &&
+  check("voice: 'why' exactly when '?' reads Why (session 28: also with the beta shown); 'next hold' only while '?' is on screen",
+    V.parseCommand("why", true, { ...all, askWord: "Move" }) === null && V.parseCommand("why", true, { ...all, askWord: "Hint" }) === null &&
+    V.parseCommand("why", true, all) === "why" && V.parseCommand("why", true, { ...all, betaShown: true }) === "why" &&
     V.parseCommand("next hold", true, { ...all, askOnScreen: false }) === null);
   check("voice: the chip echoes the words heard; the preview label says what stands in",
     V.chipText("nextHold") === "“next hold”" && V.chipText("again") === "“again”" && V.PREVIEW_VOICE_LABEL === "Preview: typed text stands in for speech" && V.CHIP_SECONDS === 1);
+  // session 28 (v7.3 P1-5): the engineer's probe strings, word for word
+  const probe = ["why’d you go left", "don't show my beta", "that's not the next hold", "go again", "again again", "that was a nice why", "don’t show my beta", "no, next hold"];
+  check("voice: chatter the probe found firing does nothing (curly apostrophe, negation, a command under half of what was said)",
+    V.matchCommand(probe[0]) === null && V.matchCommand(probe[1]) === null && V.matchCommand(probe[2]) === null && V.matchCommand(probe[5]) === null &&
+    V.matchCommand(probe[6]) === null && V.matchCommand(probe[7]) === null, probe.map(V.matchCommand));
+  check("voice: short commands with a word around them still work ('go again', 'next hold please', 'show my beta please')",
+    V.matchCommand(probe[3]) === "again" && V.matchCommand("next hold please") === "nextHold" && V.matchCommand("show my beta please") === "showBeta" &&
+    V.matchCommand("Why?") === "why");
+}
+
+// ---- 9b. session 28: the ASR source's restarts, with a fake AsrModule and a fake clock (NextHoldVoiceSource.ts) -----
+const VS = await import("../Assets/Scripts/NextHoldVoiceSource.ts");
+{
+  const NO_NET = "NoInternet", AUTH = "Unauthenticated";
+  const calls = [], queue = [];
+  let opts = null;
+  const api = {
+    createOptions: () => { const u = [], e = []; opts = { silenceUntilTerminationMs: 750, onTranscriptionUpdateEvent: { add: (f) => u.push(f) }, onTranscriptionErrorEvent: { add: (f) => e.push(f) }, u, e }; return opts; },
+    startTranscribing: () => calls.push("start"), stopTranscribing: () => calls.push("stop"), noInternet: NO_NET, unauthenticated: AUTH,
+  };
+  const schedule = (fn, s) => queue.push({ fn, s });
+  const run = () => { const q = queue.splice(0); q.forEach((x) => x.fn()); return q.map((x) => x.s); };
+  const heard = [], errors = [];
+  const src = new VS.AsrVoiceSource(api, schedule);
+  src.start((t, f) => heard.push(t + (f ? "." : "…")), (w) => errors.push(w));
+  const s0 = calls.join();
+  opts.u.forEach((f) => f({ text: "next", isFinal: false }));
+  opts.u.forEach((f) => f({ text: "next hold", isFinal: true }));
+  const afterFinal = calls.join(), waits0 = queue.map((x) => x.s);
+  const r0 = run(), afterRun = calls.join();
+  check("ASR (fake module): listens at start; a partial passes on; a final passes on, ends the session, and listens again on the next frame (not inside the callback)",
+    s0 === "start" && heard.join() === "next…,next hold." && afterFinal === "start,stop" && waits0.join() === "0" && r0.join() === "0" && afterRun === "start,stop,start",
+    { s0, heard, afterFinal, waits0, afterRun });
+  const waits = [];
+  for (let i = 0; i < 8; i++) { opts.e.forEach((f) => f(i === 0 ? NO_NET : AUTH)); waits.push(...run()); }
+  check("ASR (fake module): after an error it says why and tries again after 1, 2, 4, 8, 16, then every 30 s",
+    errors[0] === "no network" && errors[1] === "not signed in" && waits.join() === "1,2,4,8,16,30,30,30" && src.getFailures() === 8, { errors: errors.slice(0, 2), waits });
+  opts.u.forEach((f) => f({ text: "again", isFinal: true })); run();
+  opts.e.forEach((f) => f(NO_NET)); const w1 = run();
+  check("ASR (fake module): a transcript resets the wait (the next error waits 1 s again)", w1.join() === "1", w1);
+  src.stop(); opts.e.forEach((f) => f(NO_NET)); const nStart = calls.filter((c) => c === "start").length; run();
+  check("ASR (fake module): after stop() nothing listens again", calls.filter((c) => c === "start").length === nStart && queue.length === 0);
+  const e2 = []; new VS.AsrVoiceSource(null, schedule).start(() => {}, (w) => e2.push(w));
+  check("ASR: where the module can't load, it says so", e2.join() === "speech recognition isn't available here", e2);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

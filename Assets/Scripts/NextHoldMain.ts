@@ -74,8 +74,8 @@ import {NextHoldOffViewArrow} from "./NextHoldOffViewArrow"
 import {NextHoldPinchRipple, RippleEvent} from "./NextHoldPinchRipple"
 import {GLOW_PROFILE} from "./Wall/ProceduralTextures"
 import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/CameraProvider/WorldCameraFinderProvider"
-import {CHIP_SECONDS, PREVIEW_VOICE_LABEL, VoiceCommand, VoiceContext, chipText, parseCommand} from "./NextHoldVoice"
-import {AsrVoiceSource, InjectedVoiceSource, VoiceSource} from "./NextHoldVoiceSource"
+import {CHIP_SECONDS, PREVIEW_VOICE_LABEL, VOICE_LOG_MAX, VOICE_PAUSED, VoiceCommand, VoiceContext, chipText, parseCommand} from "./NextHoldVoice"
+import {AsrVoiceSource, InjectedVoiceSource, VoiceSource, lensAsr} from "./NextHoldVoiceSource"
 
 
 /** how far in front of the wall face the control row and the why-line stand (cm) */
@@ -399,7 +399,7 @@ export class NextHoldMain extends BaseScriptComponent {
 
       this.ready = true
       // session 27: voice. The preview has no microphone: typed text stands in (injectVoice); Spectacles use ASR
-      if (!this.voice) this.voice = global.deviceInfoSystem.isEditor() ? new InjectedVoiceSource() : new AsrVoiceSource()
+      if (!this.voice) this.voice = global.deviceInfoSystem.isEditor() ? new InjectedVoiceSource() : this.makeAsr()
       this.startVoice()
       this.updateGroundDistance(true)
       // The Lens opens in climb mode with the preset position: the best move shows.
@@ -692,14 +692,35 @@ export class NextHoldMain extends BaseScriptComponent {
   /** session 28: the button the chip is attached to, and the rank of its place (panelPlaceScore) */
   private voiceChipButton = ""
   private voiceChipRank = -1
+  private voiceChipOn = false
   private voiceLog: {text: string; isFinal: boolean; cmd: VoiceCommand | null; time: number}[] = []
   private voiceError = ""
 
   private startVoice(): void {
     if (!this.voice) return
-    this.voice.start((text, isFinal) => this.handleTranscript(text, isFinal), (why) => {
-      this.voiceError = why
-      print("NextHold voice: " + why)
+    this.voice.start((text, isFinal) => this.handleTranscript(text, isFinal), (why) => this.voicePaused(why))
+  }
+
+  /** session 28 (v7.3 P1-5): recognition stopped on an error (it tries again by itself): say so once, on the lens, by "?" */
+  voicePaused(why: string): void {
+    const first = this.voiceError !== why
+    this.voiceError = why
+    print("NextHold voice paused: " + why)
+    if (!first || !this.ready) return
+    const anchor = this.buttonPlace("AskButton")
+    if (!anchor) return
+    this.voiceChipCmd = null
+    this.voiceChipButton = "AskButton"
+    this.voiceChipUntil = getTime() + 2
+    this.placeVoiceChip(anchor, VOICE_PAUSED, why)
+  }
+
+  /** session 28: the Lens's ASR with Main's clock (a delayed callback per wait) */
+  private makeAsr(): AsrVoiceSource {
+    return new AsrVoiceSource(lensAsr(), (fn, seconds) => {
+      const e = this.createEvent("DelayedCallbackEvent")
+      e.bind(() => fn())
+      e.reset(seconds)
     })
   }
 
@@ -711,7 +732,8 @@ export class NextHoldMain extends BaseScriptComponent {
       againOnScreen: this.callouts.isAgainVisible(),
       showBetaOnScreen: climbPage && this.view === "ground",
       betaShown: this.beta.betaShown,
-      whyOnOffer: !this.beta.betaShown && this.beta.cameOffMove === null && this.beta.hintStep >= 2 && !this.isTopped(),
+      // session 28: "why" is "?" whenever "?" reads Why
+      askWord: this.controlRow.getAskWord(),
     }
   }
 
@@ -722,6 +744,9 @@ export class NextHoldMain extends BaseScriptComponent {
     if (!this.ready) return
     const cmd = parseCommand(text, isFinal, this.voiceContext())
     this.voiceLog.push({text, isFinal, cmd, time: getTime()})
+    // session 28: capped (on a device recognition runs as long as the Lens does, partials included)
+    if (this.voiceLog.length > VOICE_LOG_MAX) this.voiceLog.splice(0, this.voiceLog.length - VOICE_LOG_MAX)
+    this.voiceError = ""
     if (!cmd) return
     const button = cmd === "again" ? "AgainButton" : cmd === "showBeta" ? "ShowBetaButton" : "AskButton"
     const anchor = this.buttonPlace(button)
@@ -733,7 +758,7 @@ export class NextHoldMain extends BaseScriptComponent {
     this.voiceChipCmd = cmd
     this.voiceChipButton = button
     this.voiceChipUntil = getTime() + CHIP_SECONDS
-    this.placeVoiceChip(anchor)
+    this.placeVoiceChip(anchor, chipText(cmd), this.voice && this.voice.kind === "injected" ? PREVIEW_VOICE_LABEL : "")
   }
 
   /** what a command can change, for "did it do anything" */
@@ -760,7 +785,8 @@ export class NextHoldMain extends BaseScriptComponent {
    *  right or left, the first place whole in view that seen from the eye covers no ring, glow, label, tag or card
    *  (panelPlaceScore rank 3), else the first over nothing of the problem (rank 2), else the best. It stays there its
    *  one second. */
-  private placeVoiceChip(a: {pos: vec3; rot: quat; k: number}): void {
+  private placeVoiceChip(a: {pos: vec3; rot: quat; k: number}, heard: string, label: string): void {
+    this.voiceChipOn = true
     const camT = this.cameraTransform()
     if (!camT) return
     const finder = WorldCameraFinderProvider.getInstance()
@@ -784,8 +810,7 @@ export class NextHoldMain extends BaseScriptComponent {
       if (rank >= 3) break
     }
     this.voiceChipRank = best ? best.rank : -1
-    const label = this.voice && this.voice.kind === "injected" ? PREVIEW_VOICE_LABEL : ""
-    this.callouts.showVoiceChip(best!.p.add(a.rot.multiplyVec3(vec3.forward()).uniformScale(0.5 * a.k)), a.rot, chipText(this.voiceChipCmd!), label, a.k)
+    this.callouts.showVoiceChip(best!.p.add(a.rot.multiplyVec3(vec3.forward()).uniformScale(0.5 * a.k)), a.rot, heard, label, a.k)
   }
 
   /** a quad's corners seen from the eye (wall cm) on the wall plane, as a box: centre and half sizes; null if a corner
@@ -805,10 +830,11 @@ export class NextHoldMain extends BaseScriptComponent {
     return {c: {x: (bx0 + bx1) / 2, y: (by0 + by1) / 2}, hw: (bx1 - bx0) / 2, hh: (by1 - by0) / 2}
   }
 
-  /** the chip goes after CHIP_SECONDS */
+  /** the chip goes after CHIP_SECONDS (2 s for "voice paused") */
   private tickVoiceChip(now: number): void {
-    if (this.voiceChipCmd === null) return
+    if (!this.voiceChipOn) return
     if (now >= this.voiceChipUntil) {
+      this.voiceChipOn = false
       this.voiceChipCmd = null
       this.voiceChipButton = ""
       this.callouts.hideVoiceChip()
@@ -1701,13 +1727,29 @@ export class NextHoldMain extends BaseScriptComponent {
     const fwd = camT.getWorldTransform().multiplyDirection(new vec3(0, 0, -1)).normalize()
     const a = this.panelAnchor
     if (lazy && a && a.size === sizeKey && eye.distance(a.eye) < FOLLOW_MOVE_CM &&
-        Math.acos(Math.max(-1, Math.min(1, fwd.dot(a.fwd)))) * 180 / Math.PI < FOLLOW_TURN_DEG) return
+        Math.acos(Math.max(-1, Math.min(1, fwd.dot(a.fwd)))) * 180 / Math.PI < FOLLOW_TURN_DEG && this.panelInView()) return
     const slot = this.groundSlot(size ? size.x / 2 : ROW_HALF_W, size ? size.y / 2 : ROW_HALF_H, this.cardBoxes(), true)
     if (!slot) return
     this.controlRow.placeAt(slot.pos, slot.rot, slot.scale)
     this.panelAnchor = {eye, fwd, size: sizeKey}
     this.panelDownDeg = slot.down
     this.panelRank = slot.rank
+  }
+
+  /** session 28: the mats panel's four corners are in the frame (a small step in can push an edge out while the lazy
+   *  follow holds it: d2 at 4.4 m -> 4.25 m), or it is waiting below the view on purpose */
+  private panelInView(): boolean {
+    if (this.panelRank === -1) return true
+    const finder = WorldCameraFinderProvider.getInstance()
+    const cam = finder ? finder.getComponent() : null
+    const size = this.controlRow.getSize()
+    if (!cam || !size) return true
+    const w = this.controlRow.getSceneObject().getTransform().getWorldTransform()
+    for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      const s = cam.worldSpaceToScreenSpace(w.multiplyPoint(new vec3(sx * size.x / 2, sy * size.y / 2, 0)))
+      if (s.x < 0 || s.x > 1 || s.y < 0 || s.y > 1) return false
+    }
+    return true
   }
 
   /**
