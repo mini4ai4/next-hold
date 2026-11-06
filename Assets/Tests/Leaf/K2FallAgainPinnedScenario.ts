@@ -14,7 +14,10 @@
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
-import {checkNothingRevealed, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, presetPosition, restorePreset, samePosition} from "./NextHoldTestKit"
+import {
+  boxesOverlap, camera, checkNothingRevealed, fmtBox, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture, presetPosition,
+  restorePreset, samePosition, screenBoxOf,
+} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 
 @component
@@ -24,16 +27,19 @@ export class K2FallAgainPinnedScenario extends Scenario {
     const main = getMain()
     await restorePreset(main, false)
     const errs: string[] = []
-    const so = global.scene.createSceneObject("FallCam")
-    const cam = so.createComponent("Component.Camera") as Camera
+    // session 27: the real eye walks (it used to be a second "sizing" camera while the real eye stayed at 1.25 m, so the
+    // cards were drawn for 2.5 m and placed for 1.25 m, a state no headset can be in; with the panel following the
+    // real head that mismatch left Again no room)
+    const camT = camera().getSceneObject().getTransform()
+    const tracking = camT.getSceneObject().getComponent("Component.DeviceTracking") as DeviceTracking
+    const trackingWas = tracking ? tracking.enabled : true
+    const p0 = camT.getWorldPosition(), r0 = camT.getWorldRotation()
     try {
-      cam.devicePropertyUsage = Camera.DeviceProperty.None
-      cam.renderLayer = LayerSet.makeUnique()
+      if (tracking) tracking.enabled = false
       const face = mustFind("Hold_lh").getTransform().getWorldPosition()
-      const eye = mustFind("Camera Object").getTransform().getWorldPosition()
-      const at = async (cm: number) => { so.getTransform().setWorldPosition(new vec3(eye.x, eye.y, face.z + cm)); await frames(3) }
+      const eye = p0
+      const at = async (cm: number) => { camT.setWorldPosition(new vec3(eye.x, eye.y, face.z + cm)); await frames(3) }
       await at(250)
-      main.setSizingCamera(cam)
       await frames(3)
       const start = presetPosition()
 
@@ -57,7 +63,11 @@ export class K2FallAgainPinnedScenario extends Scenario {
       if (main.getHintStep() !== 1 || !pin || pin.step !== 1) errs.push(`the card's hint: step ${main.getHintStep()}, pin ${JSON.stringify(pin)}`)
       if (main.getHintsThisGo() !== 1) errs.push(`the card's hint (rung 1) is a hint for go 2: ${main.getHintsThisGo()}, want 1`)
       if (main.isCameOffVisible() || !main.isAgainVisible() || !mustFind("AgainButton").enabled) errs.push(`after the hint: card ${main.isCameOffVisible()}, Again ${main.isAgainVisible()}`)
-      if (mustFind("AgainButton").getTransform().getWorldPosition().distance(againAt) > 0.5) errs.push("Again moved when the card's hint was taken")
+      // session 27: the panel (hidden while the card was up) is back; Again stays offered, clear of it
+      if (main.isRowHidden()) errs.push("after the card's hint the panel is still hidden")
+      const ab = screenBoxOf("AgainButton", camera(), true), rb = screenBoxOf("ControlRow", camera())
+      print(`[K2] after the hint: Again ${fmtBox(ab)} (moved ${mustFind("AgainButton").getTransform().getWorldPosition().distance(againAt).toFixed(1)} cm), panel ${fmtBox(rb)}`)
+      if (ab && rb && boxesOverlap(ab, rb)) errs.push(`after the card's hint Again (${fmtBox(ab)}) overlaps the panel (${fmtBox(rb)})`)
       if (main.getOutlinePulse()) errs.push(`the pulse stays after the card: ${JSON.stringify(main.getOutlinePulse())}`)
 
       // ── Again: the start holds, in its own frame; session 26: the hint taken after the fall is go 2's, kept ──
@@ -99,8 +109,9 @@ export class K2FallAgainPinnedScenario extends Scenario {
       await at(60)
       if (main.isAgainVisible()) errs.push("back on the wall: Again still offered")
     } finally {
-      main.setSizingCamera(null)
-      so.destroy()
+      camT.setWorldPosition(p0); camT.setWorldRotation(r0)
+      if (tracking) tracking.enabled = trackingWas
+      await frames(4)
     }
 
     await restorePreset(main)

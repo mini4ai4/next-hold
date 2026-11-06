@@ -22,7 +22,7 @@ import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HOLD_SIZE, holdById} from "../../Scripts/Wall/WallLayout"
-import {NextHoldMain} from "../../Scripts/NextHoldMain"
+import {GROUND_PANEL_CM, GROUND_PANEL_SCALES, NextHoldMain} from "../../Scripts/NextHoldMain"
 import {camera, checkRowClearOfRing, eyeToWallCm, frames, getMain, mustFind, pinch, restorePreset} from "./NextHoldTestKit"
 
 /** the wall root's preset place (BUILD_LOG session 5); this item must not move it */
@@ -82,15 +82,27 @@ function plateOnWall(main: NextHoldMain, eyeW: vec3): {x: number; y: number}[] {
   })
 }
 
-/** Ground checks for an eye at `eyeCam` (the camera Ground is sized from). */
+/**
+ * Ground checks for the real eye (session 27, P1 item 10: the panel follows the head). The panel stands
+ * GROUND_PANEL_CM in front of the eye, faces it, is drawn at one of GROUND_PANEL_SCALES, every control is whole in the
+ * straight-ahead frame, and seen from the eye it covers no ring of the problem. TOP over the top hold as before.
+ */
 function checkGround(main: NextHoldMain, eyeCam: Camera, errs: string[], tag: string): string {
   const D = Math.min(365, Math.max(110, eyeToWallCm(eyeCam)))
   const want = D / 110
   if (main.getView() !== "ground") errs.push(`${tag}: view ${main.getView()}, want ground`)
   const k = main.getRowScale()
-  if (Math.abs(k - want) > 0.03) errs.push(`${tag}: control row drawn x${k.toFixed(3)}, want x${want.toFixed(3)} for ${D.toFixed(0)} cm`)
-  // beside the problem: the plate on the wall clears every problem ring's outer edge and the problem's outline
-  const plate = plateOnWall(main, eyeCam.getSceneObject().getTransform().getWorldPosition())
+  const eyeT = eyeCam.getSceneObject().getTransform()
+  const rowT = main.controlRow.getSceneObject().getTransform()
+  // out along the gaze (it then sits below and maybe to the side of it, so the straight line is a little longer)
+  const dist = -eyeT.getInvertedWorldTransform().multiplyPoint(rowT.getWorldPosition()).z
+  if (Math.abs(dist - GROUND_PANEL_CM) > 0.5) errs.push(`${tag}: the panel is ${dist.toFixed(1)} cm out along the gaze, want ${GROUND_PANEL_CM}`)
+  if (!GROUND_PANEL_SCALES.some((s) => Math.abs(s - k) < 1e-3)) errs.push(`${tag}: the panel is drawn x${k.toFixed(3)}, not one of the sizes it may take`)
+  const facing = rowT.getWorldRotation().multiplyVec3(vec3.forward()).dot(eyeT.getWorldRotation().multiplyVec3(vec3.forward()))
+  if (facing < 0.999) errs.push(`${tag}: the panel doesn't face the eye (${facing.toFixed(4)})`)
+  for (const n of CONTROLS) errs.push(...outOfView(n, eyeCam, tag + ", straight ahead"))
+  // seen from the eye, the plate on the wall clears every problem ring's outer edge
+  const plate = plateOnWall(main, eyeT.getWorldPosition())
   const line = main.getRingLineWidth()
   const wallInv = mustFind("ClimbingWall (stand-in)").getTransform().getInvertedWorldTransform()
   let x0 = 1e9, x1 = -1e9
@@ -105,11 +117,6 @@ function checkGround(main: NextHoldMain, eyeCam: Camera, errs: string[], tag: st
     if (Math.hypot(dx, dy) < r) covered.push(id)
   }
   if (covered.length) errs.push(`${tag}: the control row covers problem rings ${covered.join(",")}`)
-  if (px1 > x0 && px0 < x1) errs.push(`${tag}: the control row (x ${px0.toFixed(0)}..${px1.toFixed(0)}) overlaps the problem's outline (x ${x0.toFixed(0)}..${x1.toFixed(0)})`)
-  // at the start holds' height
-  const starts = main.getStartHolds().map((id) => main.getHoldWallPosition(id)!.y)
-  const sy = starts.reduce((s, y) => s + y, 0) / Math.max(1, starts.length)
-  if (!(sy > py0 && sy < py1)) errs.push(`${tag}: the start holds' height ${sy.toFixed(0)} cm is not within the row (y ${py0.toFixed(0)}..${py1.toFixed(0)})`)
   // TOP over the top hold, above its ring, sized for the distance
   const top = main.getTopHold()
   if (!top || main.getTagText(top) !== "TOP") errs.push(`${tag}: the top hold ${top} is tagged "${top ? main.getTagText(top) : null}", want "TOP"`)
@@ -121,7 +128,7 @@ function checkGround(main: NextHoldMain, eyeCam: Camera, errs: string[], tag: st
     if (!(ty > hy + HOLD_SIZE[holdById(top)!.type].ringR)) errs.push(`${tag}: TOP sits at ${ty.toFixed(1)} cm, not above ${top}'s ring (hold at ${hy})`)
     if (size < 39 * want - 0.5) errs.push(`${tag}: TOP text size ${size.toFixed(1)} reads smaller than Body at 110 cm from ${D.toFixed(0)} cm (want >= ${(39 * want).toFixed(1)})`)
   }
-  return `D ${D.toFixed(0)} cm: row x${k.toFixed(2)} at wall x ${px0.toFixed(0)}..${px1.toFixed(0)}, y ${py0.toFixed(0)}..${py1.toFixed(0)}; problem x ${x0.toFixed(0)}..${x1.toFixed(0)}`
+  return `D ${D.toFixed(0)} cm: panel ${dist.toFixed(1)} cm from the eye, x${k.toFixed(2)}, ${main.getGroundPanelDownDeg().toFixed(1)}° below the gaze, seen on the wall x ${px0.toFixed(0)}..${px1.toFixed(0)}, y ${py0.toFixed(0)}..${py1.toFixed(0)}; problem x ${x0.toFixed(0)}..${x1.toFixed(0)}`
 }
 
 /** A camera at `eyeCam`'s eye, turned to look at the row's centre: every control fully in its view. */
@@ -169,7 +176,6 @@ export class N5ControlRowInViewScenario extends Scenario {
 
       // ── Ground at the preset (125 cm) ──
       print(`[N5] ground, preset: ${checkGround(main, live, errs, "ground, preset")}`)
-      turnToRow(live, look, errs, "ground, preset")
 
       // the why-line in Ground: drawn for the distance too
       const sug = main.getSuggestion()!
@@ -181,15 +187,33 @@ export class N5ControlRowInViewScenario extends Scenario {
       if (!main.isWhyVisible()) errs.push("ground, preset: the why-line did not show")
       else if (Math.abs(main.getWhyScale() - wantNear) > 0.03) errs.push(`ground, preset: why-line drawn x${main.getWhyScale().toFixed(3)}, want x${wantNear.toFixed(3)}`)
 
-      // ── Ground from 250 cm: the Lens sizes from a camera there ──
-      so2.getTransform().setWorldPosition(new vec3(cp.x, cp.y, cp.z + (250 - eyeToWallCm(live))))
-      main.setSizingCamera(far)
-      await frames(3)
-      print(`[N5] ground, 250 cm: ${checkGround(main, far, errs, "ground, 250 cm")}, why-line x${main.getWhyScale().toFixed(2)}`)
-      if (main.isWhyVisible() && Math.abs(main.getWhyScale() - 250 / 110) > 0.03) errs.push(`ground, 250 cm: why-line drawn x${main.getWhyScale().toFixed(3)}, want x${(250 / 110).toFixed(3)}`)
-      turnToRow(far, look, errs, "ground, 250 cm")
-      main.setSizingCamera(null)
-      await frames(3)
+      // ── session 27: the real eye at 2.5 m and 4.25 m (the panel follows the real head, not a sizing camera) ──
+      const tracking = camT.getSceneObject().getComponent("Component.DeviceTracking") as DeviceTracking
+      const trackingWas = tracking ? tracking.enabled : true
+      try {
+        if (tracking) tracking.enabled = false
+        for (const [cm, z] of [[250, 125], [425, 300]]) {
+          camT.setWorldPosition(new vec3(cp.x, cp.y, cp.z + z)); camT.setWorldRotation(cr)
+          await frames(4)
+          print(`[N5] ground, ${cm} cm: ${checkGround(main, live, errs, `ground, ${cm} cm`)}`)
+          if (cm === 250 && main.isWhyVisible() && Math.abs(main.getWhyScale() - 250 / 110) > 0.03) errs.push(`ground, 250 cm: why-line drawn x${main.getWhyScale().toFixed(3)}, want x${(250 / 110).toFixed(3)}`)
+        }
+        // lazy follow: a small turn leaves the panel where it is; a bigger one brings it along, still whole and clear
+        const rowT = main.controlRow.getSceneObject().getTransform()
+        const before = rowT.getWorldPosition()
+        camT.setWorldRotation(cr.multiply(quat.angleAxis(-4 * Math.PI / 180, vec3.up()))); await frames(4)
+        const small = rowT.getWorldPosition().distance(before)
+        camT.setWorldRotation(cr.multiply(quat.angleAxis(-15 * Math.PI / 180, vec3.up()))); await frames(4)
+        const big = rowT.getWorldPosition().distance(before)
+        print(`[N5] ground, 425 cm: turned 4°, the panel moved ${small.toFixed(1)} cm; turned 15°, ${big.toFixed(1)} cm`)
+        if (small > 0.01) errs.push(`ground: a 4° turn moved the panel ${small.toFixed(1)} cm (it follows lazily, past ~8°)`)
+        if (big < 5) errs.push(`ground: a 15° turn moved the panel only ${big.toFixed(1)} cm`)
+        print(`[N5] ground, 425 cm, turned 15°: ${checkGround(main, live, errs, "ground, 425 cm, turned 15°")}`)
+      } finally {
+        camT.setWorldPosition(cp); camT.setWorldRotation(cr)
+        if (tracking) tracking.enabled = trackingWas
+        await frames(4)
+      }
     } finally {
       main.setSizingCamera(null)
       so.destroy()

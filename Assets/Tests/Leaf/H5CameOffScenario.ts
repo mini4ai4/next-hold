@@ -111,9 +111,11 @@ export class H5CameOffScenario extends Scenario {
       print(`[H5] one move on, stepped back: "${main.getCameOffText()}"`)
       if (main.getCameOffText() !== "Came off at move 4") errs.push(`next fall: "${main.getCameOffText()}"`)
 
-      // ── "?" with the card up does what the card does ──
-      await pinch("AskButton"); await frames(2)
-      if (main.isCameOffVisible() || main.getHintStep() !== 1 || main.isAskArmed()) errs.push(`"?" with the card up: card ${main.isCameOffVisible()}, step ${main.getHintStep()}, armed ${main.isAskArmed()}`)
+      // ── session 27: while the card is up it takes the panel's place on the mats (the panel follows the head, low in
+      //    view, where the card goes); its [Hint] does what "?" did ──
+      if (!main.isRowHidden() || mustFind("AskButton").isEnabledInHierarchy) errs.push(`with the card up the panel shows (hidden ${main.isRowHidden()})`)
+      await pinch("CameOffCard"); await frames(2)
+      if (main.isCameOffVisible() || main.getHintStep() !== 1 || main.isAskArmed() || main.isRowHidden()) errs.push(`the card's hint: card ${main.isCameOffVisible()}, step ${main.getHintStep()}, armed ${main.isAskArmed()}, panel hidden ${main.isRowHidden()}`)
 
       // ── an unanswered card goes when you walk back in, or make a move ──
       await restorePreset(main, false)
@@ -208,42 +210,33 @@ export class H5CameOffScenario extends Scenario {
         }
       }
       }
-      // session 26: from 1.25 m (still Ground) the row is in view beside the problem, so the card must keep off it
-      // (from 2.5 m the row is off the frame's edge and can't be hit)
+      // session 27: on the mats the panel follows the head, low in view, where the card goes: while the card is up the
+      // card takes the panel's place (the panel is hidden), from 2.5 m and from 1.25 m
+      if (!main.isRowHidden() || screenBoxOf("ControlRow", camL)) errs.push(`from 2.5 m the panel shows with the card (hidden ${main.isRowHidden()})`)
       tr.setWorldPosition(new vec3(0, 0, 0)); await frames(4)
-      const near = screenBoxOf("CameOffBlock", camL, true), nearAgain = screenBoxOf("AgainButton", camL, true), nearRow = screenBoxOf("ControlRow", camL)
-      print(`[H5] from 1.25 m: block ${fmtBox(near)}, Again ${fmtBox(nearAgain)}, row ${fmtBox(nearRow)}`)
-      if (!main.isCameOffVisible()) errs.push("from 1.25 m: the card is gone")
-      for (const b of [near, nearAgain]) if (b && nearRow && boxesOverlap(b, nearRow)) errs.push(`from 1.25 m the came-off block (${fmtBox(b)}) overlaps the control row (${fmtBox(nearRow)})`)
       print(`[H5] from 1.25 m: ${checkSideBySide("CameOffCard", BUTTON_W, "AgainButton", AGAIN_W, AGAIN_GAP, errs, "from 1.25 m")}`)
-      // looking straight ahead the row is past the frame's right edge from both distances; turned toward it, with a
-      // small step back so the card is placed again for this look, row and card share the view: they must not overlap
-      tr.setWorldRotation(quat.angleAxis(-25 * Math.PI / 180, vec3.up())); await frames(2)
-      tr.setWorldPosition(new vec3(0, 0, 6)); await frames(4)
-      const turned = screenBoxOf("CameOffBlock", camL, true), turnedAgain = screenBoxOf("AgainButton", camL, true), turnedRow = screenBoxOf("ControlRow", camL)
-      print(`[H5] 1.3 m, turned 25° right: block ${fmtBox(turned)}, Again ${fmtBox(turnedAgain)}, row ${fmtBox(turnedRow)}`)
-      if (!turnedRow || turnedRow.x1 < 0 || turnedRow.x0 > 1) errs.push(`turned right: the row isn't in view (${fmtBox(turnedRow)}), so this look checks nothing`)
-      for (const b of [turned, turnedAgain]) if (b && turnedRow && boxesOverlap(b, turnedRow)) errs.push(`turned right: the came-off block (${fmtBox(b)}) overlaps the control row (${fmtBox(turnedRow)})`)
+      if (!main.isCameOffVisible() || !main.isRowHidden()) errs.push(`from 1.25 m: card ${main.isCameOffVisible()}, panel hidden ${main.isRowHidden()}`)
 
-      // session 27: a look that can fail. A card first tries low in view straight ahead of the eye; standing 2.5 m out
-      // in front of the row (wall x about 227, right of the problem) that first try lands on the row itself, so only
-      // the card's keep-clear-of-the-row rule keeps them apart. The fall is made along that line, so the card is placed
-      // from there. Precondition: the row covers the spot where the card tries first, else this look proves nothing
-      tr.setWorldRotation(r0)
-      await restorePreset(main, false)
-      const ROW_X = 96.5 // wall x 227 = the reset eye's 130.5 + 96.5
-      tr.setWorldPosition(new vec3(ROW_X, 0, -55)); await frames(4)
-      main.pressHold("up")
-      main.pressHold("h09")
-      await frames(2)
-      for (const z of [-55, 0, 60, 125]) { tr.setWorldPosition(new vec3(ROW_X, 0, z)); await frames(3) }
-      const fr = screenBoxOf("ControlRow", camL), fb = screenBoxOf("CameOffBlock", camL, true), fa = screenBoxOf("AgainButton", camL, true)
-      print(`[H5] 2.5 m in front of the row: block ${fmtBox(fb)}, Again ${fmtBox(fa)}, row ${fmtBox(fr)}`)
-      if (!main.isCameOffVisible()) errs.push("in front of the row: no card")
+      // session 27, a look that can fail (the session-26 break went uncaught): from 2.5 m, the card's hint taken with a
+      // real pinch: the panel comes back low in view, and Again, now alone, must find a place clear of it. Again first
+      // tries low in view straight ahead, which is where the panel is, so only the keep-clear-of-the-panel rule keeps
+      // them apart. Precondition: the panel covers that first try, else this look proves nothing
+      tr.setWorldPosition(new vec3(0, 0, 125)); await frames(4)
+      await pinch("CameOffCard"); await frames(4)
+      const fr = screenBoxOf("ControlRow", camL), fa = screenBoxOf("AgainButton", camL, true)
+      print(`[H5] 2.5 m, the card's hint taken: Again ${fmtBox(fa)}, panel ${fmtBox(fr)}`)
+      if (main.isCameOffVisible() || !main.isAgainVisible() || main.isRowHidden()) errs.push(`the card's hint taken: card ${main.isCameOffVisible()}, Again ${main.isAgainVisible()}, panel hidden ${main.isRowHidden()}`)
       const first = {x: 0.5, y: 0.5 + 0.55 * 0.5}
-      if (!fr || !(fr.x0 < first.x && first.x < fr.x1 && fr.y0 < first.y && first.y < fr.y1)) errs.push(`in front of the row: the row (${fmtBox(fr)}) doesn't cover the card's first try at ${first.x},${first.y}, so this look proves nothing`)
-      for (const b of [fb, fa]) if (b && fr && boxesOverlap(b, fr)) errs.push(`in front of the row: the came-off block (${fmtBox(b)}) overlaps the control row (${fmtBox(fr)})`)
-      for (const b of [fb, fa]) if (!b || b.x0 < 0 || b.x1 > 1 || b.y0 < 0 || b.y1 > 1) errs.push(`in front of the row: the card isn't fully in view (${fmtBox(b)})`)
+      if (!fr || !(fr.x0 < first.x && first.x < fr.x1 && fr.y0 < first.y && first.y < fr.y1)) errs.push(`the card's hint taken: the panel (${fmtBox(fr)}) doesn't cover Again's first try at ${first.x},${first.y}, so this look proves nothing`)
+      if (fa && fr && boxesOverlap(fa, fr)) errs.push(`the card's hint taken: Again (${fmtBox(fa)}) overlaps the panel (${fmtBox(fr)})`)
+      if (!fa || fa.x0 < 0 || fa.x1 > 1 || fa.y0 < 0 || fa.y1 > 1) errs.push(`the card's hint taken: Again isn't fully in view (${fmtBox(fa)})`)
+      for (const id of main.getProblemHolds()) {
+        if (!fa) break
+        const c = main.getHoldWorldPosition(id)!, r = HOLD_SIZE[holdById(id)!.type].ringR
+        const s = camL.worldSpaceToScreenSpace(c), e = camL.worldSpaceToScreenSpace(c.add(new vec3(r, 0, 0)))
+        const rx = Math.abs(e.x - s.x), ry = rx * camL.aspect
+        if (s.x + rx > fa.x0 && s.x - rx < fa.x1 && s.y + ry > fa.y0 && s.y - ry < fa.y1) errs.push(`the card's hint taken: Again is over ${id}`)
+      }
     } finally {
       tr.setWorldPosition(p0)
       tr.setWorldRotation(r0)

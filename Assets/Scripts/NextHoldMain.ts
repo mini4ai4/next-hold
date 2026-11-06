@@ -87,8 +87,17 @@ const PICKER_HALF_H = 27.5
 /** half the control row block (the override line, four rows of 5 cm buttons, the note, padding), until its layout reports a size */
 const ROW_HALF_W = 13.9
 const ROW_HALF_H = 16.8
-/** Ground: gap (cm) between the problem's outermost ring and the control row beside it */
+/** Ground: gap (cm) between the problem's outermost ring and a block beside it */
 const ROW_SIDE_GAP = 4
+/** session 27 (P1 item 10): on the mats the panel stands this far in front of the eye (cm), up to this far below the
+ *  gaze (degrees; the frame's edge wins), and follows the head only past these turns / moves */
+export const GROUND_PANEL_CM = 60
+export const GROUND_PANEL_DOWN_DEG = 27.5
+/** the sizes it tries, largest first: 60/110 looks as large as at 110 cm; it shrinks only to find a clear place
+ *  (0.26: the 2.2 cm labels still about 0.55° from 60 cm) */
+export const GROUND_PANEL_SCALES = [60 / 110, 0.48, 0.42, 0.37, 0.33, 0.29, 0.26]
+const FOLLOW_TURN_DEG = 8
+const FOLLOW_MOVE_CM = 10
 
 export type Mode = "climb" | "setup"
 /** What is shown, never what is scored. "ground": standing back at the base, every ring of the
@@ -281,6 +290,10 @@ export class NextHoldMain extends BaseScriptComponent {
   private againOffered = false
   /** session 26: the glow is the shortest route's first move (the greedy best would cost a move) */
   private planned = false
+  /** session 27: where the head was when the Ground panel was last placed (it follows lazily) */
+  private panelAnchor: {eye: vec3; fwd: vec3; size: string} | null = null
+  /** session 27: how far below the gaze the Ground panel's centre sits (degrees) */
+  private panelDownDeg = 0
   /** session 26: the label carries rung 3's why (two lines) */
   private labelWhy = false
   private labelNow = ""
@@ -395,6 +408,9 @@ export class NextHoldMain extends BaseScriptComponent {
         // On wall the row keeps out of the line of sight to the ring as seen from where the eye is
         // now: placed once at the switch (mid-walk, still looking up) it stayed over the ring
         this.placeControlRow()
+      } else {
+        // session 27: on the mats it follows the head, lazily
+        this.placeControlRow(true)
       }
       this.updateFigureMask(false) // the head moves, and the row lays itself out late
       // walking in or stepping back past a threshold switches the view
@@ -1101,7 +1117,10 @@ export class NextHoldMain extends BaseScriptComponent {
     const cameOff = ground && this.beta.cameOffMove !== null
     const result = ground && !cameOff && !!this.result && !this.toppedShown
     const againAlone = ground && !cameOff && !result && this.againOffered && !this.result
-    this.controlRow.setHidden(result)
+    // session 27: on the mats the panel follows the head, low in view, where a card goes too, and from 2.5 m only one
+    // fits: a card (came off, or the result) takes the panel's place while it is up ("?" and "Show my beta" do what
+    // the came-off card does)
+    this.controlRow.setHidden(result || cameOff)
     if (!cameOff) {
       this.callouts.hideCameOff()
       this.visuals.setOutlinePulse(null)
@@ -1124,16 +1143,25 @@ export class NextHoldMain extends BaseScriptComponent {
       return
     }
     if (result) {
+      // session 27: in the panel's own slot, which follows the head on the mats (the card and Again side by side)
+      const hw = RESULT_HALF_W + AGAIN_GAP / 2 + AGAIN_W / 2, hh = RESULT_HALF_H
+      const slot = this.groundSlot(hw, hh, [])
+      if (slot) {
+        const across = slot.rot.multiplyVec3(vec3.right())
+        this.callouts.showResult(slot.pos.add(across.uniformScale((RESULT_HALF_W - hw) * slot.scale)), slot.rot, this.result!.lines, slot.scale)
+        this.callouts.showAgain(slot.pos.add(across.uniformScale((hw - AGAIN_W / 2) * slot.scale)), slot.rot, slot.scale)
+        return
+      }
       const cw = RESULT_HALF_W * k, aw = (AGAIN_W / 2) * k, g = AGAIN_GAP * k
-      const hw = cw + g / 2 + aw, hh = RESULT_HALF_H * k
-      const c = this.toWall(this.placeResultBlock(hw, hh))
-      this.callouts.showResult(this.wall.wallToWorld(c.x - hw + cw, c.y, PANEL_Z), rot, this.result!.lines, k)
-      this.callouts.showAgain(this.wall.wallToWorld(c.x + hw - aw, c.y, PANEL_Z), rot, k)
+      const c = this.toWall(this.placeResultBlock(cw + g / 2 + aw, RESULT_HALF_H * k))
+      this.callouts.showResult(this.wall.wallToWorld(c.x - g / 2 - aw, c.y, PANEL_Z), rot, this.result!.lines, k)
+      this.callouts.showAgain(this.wall.wallToWorld(c.x + cw + g / 2, c.y, PANEL_Z), rot, k)
       return
     }
-    const b = this.blockAt
-    this.callouts.showAgain(b && Math.abs(b.k - k) < 1e-3 ? this.againSlot(b)
-      : this.placeMatBlock((AGAIN_W / 2) * k, (AGAIN_H / 2) * k, this.rowBoxes()), rot, k)
+    // Again alone (the card's hint taken, or a fall with beta shown): the panel is back, so Again takes its own clear
+    // place, clear of the panel too (session 27; it used to stay in the card's slot, which the panel now uses)
+    const row = this.rowBoxes()
+    this.callouts.showAgain(this.placeMatBlock((AGAIN_W / 2) * k, (AGAIN_H / 2) * k, row, row), rot, k)
   }
 
   /** Again's place in the came-off block centred at b */
@@ -1178,7 +1206,8 @@ export class NextHoldMain extends BaseScriptComponent {
    * covers no ring or tag of the problem (lower in the view first), kept in view, and sized like the
    * other panels. World-locked once placed: it moves only when Ground re-sizes for a new distance.
    */
-  private placeMatBlock(hw: number, hh: number, extra: {x: number; y: number; hw: number; hh: number}[]): vec3 {
+  private placeMatBlock(hw: number, hh: number, extra: {x: number; y: number; hw: number; hh: number}[],
+                        hard: {x: number; y: number; hw: number; hh: number}[] = []): vec3 {
     const k = this.panelScale()
     const finder = WorldCameraFinderProvider.getInstance()
     const cam = finder ? finder.getComponent() : null
@@ -1187,11 +1216,19 @@ export class NextHoldMain extends BaseScriptComponent {
     const cx = eye ? eye.x : 120, cy = eye ? eye.y : 150
     let best: {p: vec3; clear: number} | null = null
     for (const v of [-0.55, -0.7, -0.4, -0.25, -0.1, 0.1, 0.25, 0.4, 0.55]) {
-      for (const u of [0, -0.2, 0.2]) {
+      for (const u of [0, -0.2, 0.2, -0.45, 0.45, -0.7, 0.7]) {
         // kept in view with room to spare: the card is a 3D prism, drawn k times larger from the mats
         // (h5's first run: from 2.5 m with a 1 cm margin it was cut 0.8% at the frame's edge)
         const p = this.keepInView(this.wall.wallToWorld(cx + u * h, cy + v * h, PANEL_Z), hw + 2 * k, hh + 2 * k)
-        const clear = this.matClear(this.toWall(p), hw, hh, extra)
+        const w = this.toWall(p)
+        let clear = this.matClear(w, hw, hh, extra)
+        // session 27: the panel is never covered (k2: with nothing fully clear in view the "clearest" place lay on it)
+        // (both as the eye sees them on the wall: the block stands PANEL_Z in front of it, the panel's box is projected)
+        if (hard.length && eye) {
+          const s = this.seenScale(eye, PANEL_Z)
+          const seen = {x: eye.x + (w.x - eye.x) * s, y: eye.y + (w.y - eye.y) * s}
+          for (const b of hard) { const g = boxBoxGap(seen, hw * s + k, hh * s + k, b); if (g < 0) clear = Math.min(clear, -1000 + g) }
+        }
         if (!best || clear > best.clear + 1e-6) best = {p, clear}
         if (clear >= 2) break
       }
@@ -1387,23 +1424,18 @@ export class NextHoldMain extends BaseScriptComponent {
    * From the near end of Ground it may sit outside a straight-ahead view: you turn your head to it,
    * as you turn it to read the problem. It is kept in view vertically and never slides over the problem.
    */
-  private placeControlRow(): void {
+  private placeControlRow(lazy = false): void {
     const k = this.panelScale()
     const size = this.controlRow.getSize()
     const halfW = (size ? size.x / 2 : ROW_HALF_W) * k
     const halfH = (size ? size.y / 2 : ROW_HALF_H) * k
     if (this.view === "ground") {
-      const box = this.problemBox()
-      const starts = this.getStartHolds()
-      const level = starts.length ? starts : HAND_LIMBS.map((l) => this.position[l]).filter((id) => id != null && this.holds[id]) as string[]
-      const y = level.length ? level.reduce((s, id) => s + this.holds[id].y, 0) / level.length : 150
-      const eyeX = this.eyeWallX()
-      const right = eyeX === null || box.x1 - eyeX <= eyeX - box.x0
-      const x = right ? box.x1 + ROW_SIDE_GAP + halfW : box.x0 - ROW_SIDE_GAP - halfW
-      const p = this.toWall(this.keepInView(this.wall.wallToWorld(x, y, 10), halfW, halfH))
-      this.controlRow.placeAt(this.wall.wallToWorld(x, Math.max(halfH + 2, p.y), 10), this.wallRot(), k)
+      // session 27 (P1 item 10): on the mats the panel follows the head (lazily), GROUND_PANEL_CM in front of the eye
+      // and low in view, so from any distance it is whole in the frame and never beside the problem off its edge
+      this.placeGroundPanel(lazy)
       return
     }
+    this.panelAnchor = null
     if (this.mode === "climb" && this.page() === "climb" && this.placeStrip(halfW, halfH, k)) return
     const ring = this.overlay && this.mode === "climb" ? this.overlay.glowHoldId : null
     if (!ring) {
@@ -1446,6 +1478,107 @@ export class NextHoldMain extends BaseScriptComponent {
     const x = below ? kv.x : p.x
     const y = Math.max(halfH + 2, below ? Math.min(p.y, kv.y) : kv.y)
     this.controlRow.placeAt(this.wall.wallToWorld(x, y, PANEL_Z), this.wallRot(), k)
+  }
+
+  /**
+   * Session 27 (P1 item 10): the panel on the mats follows the head. It stands GROUND_PANEL_CM in front of the eye,
+   * facing it, drawn GROUND_PANEL_CM/110 of its size so it looks as large as at 110 cm, and lazily: it moves only
+   * when the head turns more than FOLLOW_TURN_DEG or the eye moves more than FOLLOW_MOVE_CM (or `lazy` is false).
+   */
+  private placeGroundPanel(lazy: boolean): void {
+    const camT = this.cameraTransform()
+    if (!camT) return
+    const size = this.controlRow.getSize()
+    const sizeKey = size ? size.x.toFixed(2) + "x" + size.y.toFixed(2) : "-"
+    const eye = camT.getWorldPosition()
+    const fwd = camT.getWorldTransform().multiplyDirection(new vec3(0, 0, -1)).normalize()
+    const a = this.panelAnchor
+    if (lazy && a && a.size === sizeKey && eye.distance(a.eye) < FOLLOW_MOVE_CM &&
+        Math.acos(Math.max(-1, Math.min(1, fwd.dot(a.fwd)))) * 180 / Math.PI < FOLLOW_TURN_DEG) return
+    const slot = this.groundSlot(size ? size.x / 2 : ROW_HALF_W, size ? size.y / 2 : ROW_HALF_H, this.cardBoxes())
+    if (!slot) return
+    this.controlRow.placeAt(slot.pos, slot.rot, slot.scale)
+    this.panelAnchor = {eye, fwd, size: sizeKey}
+    this.panelDownDeg = slot.down
+  }
+
+  /**
+   * Where a camera-facing block halfW x halfH (cm, at its 110 cm size) goes at GROUND_PANEL_CM from the eye: as far
+   * below the gaze as GROUND_PANEL_DOWN_DEG, but never past the frame's edge (the preview's frame is only ±18.3°
+   * tall, so there it sits at the frame's lower edge), centred, then up and to either side until, seen from the eye
+   * on the wall, it covers no ring of the problem, no tag or label and none of `avoid` (else the clearest).
+   */
+  private groundSlot(halfW: number, halfH: number, avoid: {x: number; y: number; hw: number; hh: number}[]):
+      {pos: vec3; rot: quat; scale: number; down: number} | null {
+    const finder = WorldCameraFinderProvider.getInstance()
+    const cam = finder ? finder.getComponent() : null
+    const camT = this.cameraTransform()
+    if (!cam || !camT) return null
+    const D = GROUND_PANEL_CM
+    const tanV = Math.tan(cam.fov / 2), tanH = tanV * cam.aspect
+    const toWall = this.wall.getTransform().getInvertedWorldTransform()
+    const eyeW = toWall.multiplyPoint(camT.getWorldPosition())
+    const x0 = this.wall.wallToLocal(0, 0).x
+    const world = camT.getWorldTransform()
+    // the largest size, from "as large as at 110 cm" down, with a place in frame clear of the problem (from 2.5 m the
+    // problem fills most of the preview's frame: only the band under the START tags is free)
+    let pick: {x: number; y: number; clear: number; s: number} | null = null
+    for (const s of GROUND_PANEL_SCALES) {
+      const b = this.groundSlotAt(s, halfW, halfH, avoid, D, tanV, tanH, toWall, eyeW, x0, world)
+      if (b && (!pick || b.clear > pick.clear + 1e-6)) pick = {...b, s}
+      if (b && b.clear >= 1) { pick = {...b, s}; break }
+    }
+    if (!pick) return null
+    return {pos: world.multiplyPoint(new vec3(pick.x, -pick.y, -D)), rot: camT.getWorldRotation(), scale: pick.s,
+      down: Math.atan2(pick.y, D) * 180 / Math.PI}
+  }
+
+  /** one size's search for groundSlot: the clearest (or first clear) centre, in the camera's frame at D */
+  private groundSlotAt(s: number, halfW: number, halfH: number, avoid: {x: number; y: number; hw: number; hh: number}[], D: number,
+      tanV: number, tanH: number, toWall: mat4, eyeW: vec3, x0: number, world: mat4): {x: number; y: number; clear: number} | null {
+    const hw = halfW * s, hh = halfH * s
+    const lowest = Math.max(0, D * tanV - hh - 1)
+    const yDown = Math.min(D * Math.tan(GROUND_PANEL_DOWN_DEG * Math.PI / 180), lowest)
+    const xMax = Math.max(0, D * tanH - hw - 1)
+    let best: {x: number; y: number; clear: number} | null = null
+    outer:
+    for (const dy of [0, 0.5, 1, 1.5, 2, 2.5]) {
+      const y = yDown - dy * hh
+      if (y < -lowest) break
+      for (const fx of [0, -0.35, 0.35, -0.7, 0.7, -1, 1]) {
+        const x = fx * xMax
+        // the block's corners, seen from the eye on the wall plane
+        const pts: WallPt[] = []
+        for (const [cx, cy] of [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]]) {
+          const c = toWall.multiplyPoint(world.multiplyPoint(new vec3(x + cx, -y + cy, -D)))
+          if (eyeW.z <= c.z + 1e-3) continue
+          const t = eyeW.z / (eyeW.z - c.z)
+          pts.push({x: eyeW.x + t * (c.x - eyeW.x) - x0, y: eyeW.y + t * (c.y - eyeW.y)})
+        }
+        if (pts.length < 4) continue
+        const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y)
+        const bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys)
+        const clear = this.matClear({x: (bx0 + bx1) / 2, y: (by0 + by1) / 2}, (bx1 - bx0) / 2, (by1 - by0) / 2, avoid)
+        if (!best || clear > best.clear + 1e-6) best = {x, y, clear}
+        if (clear >= 1) break outer
+      }
+    }
+    return best
+  }
+
+  /** the came-off block on the wall while it shows (the panel keeps off it) */
+  private cardBoxes(): {x: number; y: number; hw: number; hh: number}[] {
+    const b = this.blockAt
+    // by the card's own state, not its widget: the widget is hidden later in the same pass (placeMatCards), and a panel
+    // placed against a card that is about to go stayed off to one side (h5)
+    const up = this.view === "ground" && this.mode === "climb" && this.beta.cameOffMove !== null
+    return b && up ? [{x: b.x, y: b.y, hw: CARD_HALF_W * b.k, hh: CARD_HALF_H * b.k}] : []
+  }
+
+  private cameraTransform(): Transform | null {
+    const finder = WorldCameraFinderProvider.getInstance()
+    const cam = finder ? finder.getComponent() : null
+    return cam ? cam.getSceneObject().getTransform() : null
   }
 
   /**
@@ -1875,6 +2008,9 @@ export class NextHoldMain extends BaseScriptComponent {
   /** the hold whose outline pulses while the came-off card is up, and its scale now */
   getOutlinePulse(): {hold: string; scale: number} | null { return this.visuals ? this.visuals.getOutlinePulse() : null }
   isRowHidden(): boolean { return this.controlRow.isHidden() }
+  /** session 27: on the mats, how far below the gaze the panel's centre sits (degrees), and how far it is from the eye */
+  getGroundPanelDownDeg(): number { return this.panelDownDeg }
+  getGroundPanelCm(): number { return GROUND_PANEL_CM }
   /** the row's cell layout: "grid", "strip" (on the wall) or "settings" */
   getRowLayout(): string { return this.controlRow.getLayout() }
   /** the goes kept for this problem (whatever the height) */
