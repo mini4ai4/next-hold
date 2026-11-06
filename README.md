@@ -34,15 +34,17 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    "2 · LH", "3 · LF" (each tag its own blue badge, so a ring's colour only ever means the grip for you), and "TOP". Walk in under 80 cm
    and it shows **On wall**: one ring, its label, and a stick figure for your body (hidden in Ground). The Ground / On wall switch (in Setup) overrides until you next cross one of those distances.
 4. To record the demo, select the `DemoAutopilot` object, tick **Play On Start** and refresh the preview: 3 s later
-   the Lens plays VIDEO_PLAN scenes 0–8 by itself (about 2:20) and prints "SCENE n start t=…" to the Logger. Untick it
+   the Lens plays VIDEO_PLAN scenes 0–8 by itself (about 2:20) and prints "SCENE n start t=…" to the Logger, ending on
+   the result card "SEND · go 2 / 4 moves · your par 4 / 0 hints · ticked on this go" (session 26). Untick it
    when done. The timeline is `Assets/Scripts/Demo/DemoTimeline.ts`. It starts from 175 cm with a fresh in-memory
    store, so nothing kept in the preview changes the take, and the take keeps nothing.
 
 ## Tests
 - LEAF: open the LEAF panel and run all thirty-five scenarios (one per done criterion in `devpost/design-brief.md`, one per review fix, h1–h5 and e1 for beta on request and the tag's outline, g1 for the control count, k1–k3 for the result card, Again, the pinned hint and what is kept, the k4/k5 pair for a kept height on reopen (run k4 then k5), and d1 for the demo autopilot).
-  The raw output of the last full run (35 of 35 pass, session 24): `devpost/LEAF_RUN_2026-11-05_s24.txt`, copied out of
+  The raw output of the last full run (35 of 35 pass, session 26, one clean run on one build): `devpost/LEAF_RUN_2026-11-05_s26.txt`, copied out of
   the Lens Studio log with `node tests/extract_leaf_run.mjs <log> <first line>`. `node tests/leaf_wait.mjs <id>` waits
-  for one scenario's result in the log when the run call times out.
+  for one scenario's result in the log when the run call times out; `node tests/leaf_status.mjs <first line>` lists
+  every scenario's last verdict since then. Run LEAF in the preview (`onDevice: false`).
 - Scoring port, plan, beta and attempt logic: `node tests/scoring.port.test.mjs` (163 checks, including the 1-2-3 search
   against a brute force, following the glow = par at all 11 heights from 150 to 200 cm (`NextHoldPlan.ts`), the hint
   ladder, cue, came-off, goes and pinned-hint rules of `NextHoldBeta.ts`, and the ticks, card lines, best and fail-safe
