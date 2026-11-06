@@ -237,6 +237,17 @@ export function reveal(s: BetaState): Reveal {
   return {rings: s.hintStep >= 1 ? "reach" : "none", glow: next, limb: next, steps: false, figure: false, outlines: true, why: s.hintStep >= 3}
 }
 
+/**
+ * Session 27 (P1 item 11, the climber): with beta hidden, a foot's position marker on its starting hold is beta (most
+ * gym problems are "feet free"), so it shows only if the setter marked that hold as a start hold. Once the foot has
+ * moved its marker shows again (it is where the body is), and with beta shown every marker shows.
+ */
+export function footMarkerShown(limb: string, on: string | null, startOn: string | null, isStartHold: boolean, betaShown: boolean): boolean {
+  if (limb !== "LF" && limb !== "RF") return true
+  if (betaShown || !on) return true
+  return on !== startOn || isStartHold
+}
+
 /** The holds a hint's rings go on: those a limb can reach from here, whatever the colour. */
 export function inReach<T extends {parts: {reachFactor: number}}>(result: T | null | undefined): boolean {
   return !!result && result.parts.reachFactor > 0

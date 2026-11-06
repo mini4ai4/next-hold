@@ -762,6 +762,11 @@ const N = await import("../Assets/Scripts/NextHoldPlan.ts");
   // engineer 3 / hound 3b: rung 1 breaks an onsight
   const r1 = B.ask(s0, false, false).state;
   check("hound 3b: rung 1 alone is a hint: the first go reads FLASH, not ONSIGHT", A.tickFor(r1.attempt, r1.betaSeenThisGo, r1.hintsThisGo) === "FLASH" && r1.hintsThisGo === 1);
+  // session 27 (P1 item 11): start feet aren't marked with beta hidden unless the setter marked them
+  check("item 11: beta hidden, a foot on its unmarked starting hold shows no marker; a hand always does",
+    !B.footMarkerShown("LF", "lf", "lf", false, false) && !B.footMarkerShown("RF", "rf", "rf", false, false) && B.footMarkerShown("LH", "lh", "lh", false, false));
+  check("item 11: the setter marked it as a start hold, or the foot moved, or beta is shown: the marker shows",
+    B.footMarkerShown("LF", "lf", "lf", true, false) && B.footMarkerShown("LF", "lh", "lf", false, false) && B.footMarkerShown("LF", "lf", "lf", false, true));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

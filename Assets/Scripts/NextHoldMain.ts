@@ -66,7 +66,7 @@ import {
   WHY_HALF_H, whyHalfWidth,
 } from "./NextHoldCalloutUI"
 import {
-  BetaState, CUE_TEXT, HintStep, again as betaAgain, arrivedOnWall, ask, askDots, askWord, cameOffHintLabel, cameOffLine, cueShown,
+  BetaState, CUE_TEXT, HintStep, again as betaAgain, arrivedOnWall, ask, askDots, askWord, cameOffHintLabel, cameOffLine, cueShown, footMarkerShown,
   heightChanged, hideBeta, inReach, initialBeta, moved, newAttempt, positionKey, problemKey, reveal, showBeta, steppedBack, takeHint, toppedOut,
 } from "./NextHoldBeta"
 import {NextHoldOffViewArrow} from "./NextHoldOffViewArrow"
@@ -1033,6 +1033,9 @@ export class NextHoldMain extends BaseScriptComponent {
       position: {...this.position},
       selectedLimb: limbShown ? this.selected : null,
       showMarkers: true,
+      // session 27 (P1 item 11): with beta hidden a foot still on its starting hold isn't marked unless the setter
+      // marked that hold as a start
+      hideMarkers: climb ? this.hiddenStartFeet() : {},
       marks,
       tags,
       tagsAbove: climb,
@@ -1564,6 +1567,16 @@ export class NextHoldMain extends BaseScriptComponent {
       }
     }
     return best
+  }
+
+  /** session 27: the feet whose marker the hidden read leaves out (NextHoldBeta.footMarkerShown) */
+  private hiddenStartFeet(): {[limb: string]: boolean} {
+    const out: {[limb: string]: boolean} = {}
+    for (const l of ["LF", "RF"] as Limb[]) {
+      const on = this.position[l]
+      if (!footMarkerShown(l, on, this.startPos[l], !!on && !!this.startFlags[on] && !!this.problem[on], this.beta.betaShown)) out[l] = true
+    }
+    return out
   }
 
   /** the came-off block on the wall while it shows (the panel keeps off it) */

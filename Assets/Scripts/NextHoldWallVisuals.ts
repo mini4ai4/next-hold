@@ -83,6 +83,8 @@ export interface OverlayState {
   position: {[limb: string]: string | null}
   selectedLimb: string | null
   showMarkers: boolean
+  /** session 27: limbs whose marker is not drawn (a start foot with beta hidden, NextHoldBeta.footMarkerShown) */
+  hideMarkers?: {[limb: string]: boolean}
   /** setup mode: holds marked as part of "your problem" (thin pale ring); empty outside setup */
   marks: {[id: string]: boolean}
   /** tag text by a hold: in setup under each marked hold ("START", "TOP"); in Ground's climb view
@@ -636,7 +638,7 @@ export class NextHoldWallVisuals {
       const m = this.markers[limb]
       const id = s.position[limb]
       const h = id ? this.holdDef(id) : null
-      m.so.enabled = s.showMarkers && !!h
+      m.so.enabled = s.showMarkers && !!h && !(s.hideMarkers && s.hideMarkers[limb])
       if (!h) continue
       // in front of the hold so it isn't hidden by the hold's bulk;
       // nudge the four markers apart a little if two limbs share a hold

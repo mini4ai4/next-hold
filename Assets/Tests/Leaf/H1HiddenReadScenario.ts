@@ -9,7 +9,10 @@ import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {HOLDS, PRESET_START, PRESET_TOP} from "../../Scripts/Wall/WallLayout"
-import {NEUTRAL_COLOR, camera, checkNothingRevealed, eyeToWallCm, frames, getMain, isColour, isHued, isPresetProblem, makeReference, mustFind, pinch, pinchCapture, renderedLineWidthOf, restorePreset} from "./NextHoldTestKit"
+import {
+  NEUTRAL_COLOR, camera, checkNothingRevealed, eyeToWallCm, frames, getMain, isColour, isHued, isPresetProblem, makeReference, mustFind, pinch,
+  pinchCapture, presetPosition, renderedLineWidthOf, restorePreset,
+} from "./NextHoldTestKit"
 import {REF_LIMBS, RefPosition} from "./NextHoldReferenceRule"
 
 /** the read from the mats, as drawn */
@@ -34,12 +37,18 @@ function checkWall(main: NextHoldMain, errs: string[], tag: string): void {
   checkMarkers(main, errs, tag)
 }
 
-/** every limb has its marker on its hold, all at one brightness: none says which limb moves next */
+/** every limb has its marker on its hold, all at one brightness: none says which limb moves next. Session 27 (P1 item
+ *  11): with beta hidden a foot still on its starting hold has no marker unless the setter marked it a start hold */
 function checkMarkers(main: NextHoldMain, errs: string[], tag: string): void {
   const pos = main.getPosition() as RefPosition
+  const start = presetPosition()
+  const starts = main.getStartHolds()
   const levels: number[] = []
   for (const l of REF_LIMBS) {
-    if (main.getMarkerHold(l as any) !== pos[l]) errs.push(`${tag}: Marker_${l} on ${main.getMarkerHold(l as any)}, the limb is on ${pos[l]}`)
+    const startFoot = (l === "LF" || l === "RF") && !main.isBetaShown() && pos[l] === start[l] && starts.indexOf(pos[l] as string) < 0
+    const want = startFoot ? null : pos[l]
+    if (main.getMarkerHold(l as any) !== want) errs.push(`${tag}: Marker_${l} on ${main.getMarkerHold(l as any)}, want ${want}${startFoot ? " (a start foot the setter didn't mark)" : ""}`)
+    if (!want) continue
     levels.push(((mustFind("Marker_" + l).getComponent("Component.RenderMeshVisual") as RenderMeshVisual).mainMaterial.mainPass.baseColor as vec4).x)
   }
   if (Math.max(...levels) - Math.min(...levels) > 1e-3) errs.push(`${tag}: the markers differ in brightness (${levels.map((v) => v.toFixed(2)).join(", ")}): one names the next move`)
@@ -124,6 +133,28 @@ export class H1HiddenReadScenario extends Scenario {
       main.setSizingCamera(null)
       so.destroy()
     }
+
+    // ── session 27 (P1 item 11): start feet ──
+    await restorePreset(main, false)
+    const footMarks = () => `LF ${main.getMarkerHold("LF")}, RF ${main.getMarkerHold("RF")}, LH ${main.getMarkerHold("LH")}, RH ${main.getMarkerHold("RH")}`
+    print(`[H1] start feet, beta hidden: ${footMarks()}`)
+    if (main.getMarkerHold("LF") || main.getMarkerHold("RF") || !main.getMarkerHold("LH") || !main.getMarkerHold("RH")) errs.push(`beta hidden at the start: ${footMarks()}, want the hands only (the setter marked lh and rh)`)
+    await pinch("ShowBetaButton"); await frames(2)
+    print(`[H1] start feet, beta shown: ${footMarks()}`)
+    if (!main.getMarkerHold("LF") || !main.getMarkerHold("RF")) errs.push(`beta shown: ${footMarks()}, want all four`)
+    await pinch("ShowBetaButton"); await frames(2)
+    // a foot that moves is marked where it is (the marker is the body); here LF to h16 with a real override pinch
+    await pinch("Toggle_LF"); await frames(2)
+    await pinch("Hold_h16"); await frames(2)
+    print(`[H1] LF moved: ${footMarks()}`)
+    if (main.getMarkerHold("LF") !== "h16" || main.getMarkerHold("RF")) errs.push(`after LF moved: ${footMarks()}, want LF on h16 and RF still unmarked`)
+    // the setter marks rf as a start hold (setup through the action API, as the kit's restoreProblem does): RF shows
+    await restorePreset(main, false)
+    main.pressMode(); main.pressHold("rf"); main.pressStart(); main.pressDone(); main.pressMode()
+    main.resetBetaForTests(false)
+    await frames(2)
+    print(`[H1] rf marked a start hold: ${footMarks()} (starts ${main.getStartHolds().join(",")})`)
+    if (main.getMarkerHold("RF") !== "rf" || main.getMarkerHold("LF")) errs.push(`rf marked as a start: ${footMarks()}, want RF on rf and LF unmarked`)
     await restorePreset(main)
     expect(errs.length, "the hidden read:\n" + errs.join("\n")).toBe(0)
   }
