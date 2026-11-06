@@ -224,6 +224,26 @@ export class H5CameOffScenario extends Scenario {
       print(`[H5] 1.3 m, turned 25° right: block ${fmtBox(turned)}, Again ${fmtBox(turnedAgain)}, row ${fmtBox(turnedRow)}`)
       if (!turnedRow || turnedRow.x1 < 0 || turnedRow.x0 > 1) errs.push(`turned right: the row isn't in view (${fmtBox(turnedRow)}), so this look checks nothing`)
       for (const b of [turned, turnedAgain]) if (b && turnedRow && boxesOverlap(b, turnedRow)) errs.push(`turned right: the came-off block (${fmtBox(b)}) overlaps the control row (${fmtBox(turnedRow)})`)
+
+      // session 27: a look that can fail. A card first tries low in view straight ahead of the eye; standing 2.5 m out
+      // in front of the row (wall x about 227, right of the problem) that first try lands on the row itself, so only
+      // the card's keep-clear-of-the-row rule keeps them apart. The fall is made along that line, so the card is placed
+      // from there. Precondition: the row covers the spot where the card tries first, else this look proves nothing
+      tr.setWorldRotation(r0)
+      await restorePreset(main, false)
+      const ROW_X = 96.5 // wall x 227 = the reset eye's 130.5 + 96.5
+      tr.setWorldPosition(new vec3(ROW_X, 0, -55)); await frames(4)
+      main.pressHold("up")
+      main.pressHold("h09")
+      await frames(2)
+      for (const z of [-55, 0, 60, 125]) { tr.setWorldPosition(new vec3(ROW_X, 0, z)); await frames(3) }
+      const fr = screenBoxOf("ControlRow", camL), fb = screenBoxOf("CameOffBlock", camL, true), fa = screenBoxOf("AgainButton", camL, true)
+      print(`[H5] 2.5 m in front of the row: block ${fmtBox(fb)}, Again ${fmtBox(fa)}, row ${fmtBox(fr)}`)
+      if (!main.isCameOffVisible()) errs.push("in front of the row: no card")
+      const first = {x: 0.5, y: 0.5 + 0.55 * 0.5}
+      if (!fr || !(fr.x0 < first.x && first.x < fr.x1 && fr.y0 < first.y && first.y < fr.y1)) errs.push(`in front of the row: the row (${fmtBox(fr)}) doesn't cover the card's first try at ${first.x},${first.y}, so this look proves nothing`)
+      for (const b of [fb, fa]) if (b && fr && boxesOverlap(b, fr)) errs.push(`in front of the row: the came-off block (${fmtBox(b)}) overlaps the control row (${fmtBox(fr)})`)
+      for (const b of [fb, fa]) if (!b || b.x0 < 0 || b.x1 > 1 || b.y0 < 0 || b.y1 > 1) errs.push(`in front of the row: the card isn't fully in view (${fmtBox(b)})`)
     } finally {
       tr.setWorldPosition(p0)
       tr.setWorldRotation(r0)
