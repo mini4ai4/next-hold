@@ -461,7 +461,8 @@ check("session 24: with beta shown a fall is a go too, only the card is skipped"
 const off = B.steppedBack(m2, false);
 check("two moves made, came off: the card names move 3, the attempt is over, the position's count stays",
   off.cameOffMove === 3 && off.attempt === 2 && off.moves === 2 && off.hintStep === 0, off);
-check("session 26: the card's headline and its hint button, word for word", B.cameOffLine(3) === "Came off at move 3" && B.cameOffHintLabel(3) === "Hint ·\nmove 3");
+// session 28 (v7.3 P1-6): the headline agrees with the pulse (on the hold last reached); the button is one line
+check("session 28: the card's headline and its hint button, word for word", B.cameOffLine(3) === "Came off from here" && B.cameOffHintLabel(3) === "Hint · move 3" && B.cameOffHintLabel(4).indexOf("\n") < 0);
 check("stepping back again with no new move is the same fall", B.steppedBack({ ...off, cameOffMove: null }, false).attempt === 2 && B.steppedBack({ ...off, cameOffMove: null }, false).cameOffMove === null);
 const hint = B.takeHint(off);
 check("one pinch on the card opens the ladder on step 1, at that position",

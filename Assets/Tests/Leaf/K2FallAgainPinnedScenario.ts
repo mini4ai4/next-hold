@@ -50,7 +50,7 @@ export class K2FallAgainPinnedScenario extends Scenario {
       const fallPos = main.getPosition() as RefPosition
       await at(250)
       print(`[K2] fell at ${fmtPos(fallPos)}: "${main.getCameOffText()}", Again ${main.isAgainVisible()}, go ${main.getAttempt()}`)
-      if (main.getCameOffText() !== "Came off at move 3" || main.getCameOffHintText() !== "Hint ·\nmove 3" || !main.isAgainVisible() || main.getAttempt() !== 2) errs.push(`the fall: "${main.getCameOffText()}" / "${main.getCameOffHintText()}", Again ${main.isAgainVisible()}, go ${main.getAttempt()}`)
+      if (main.getCameOffText() !== "Came off from here" || main.getCameOffHintText() !== "Hint · move 3" || !main.isAgainVisible() || main.getAttempt() !== 2) errs.push(`the fall: "${main.getCameOffText()}" / "${main.getCameOffHintText()}", Again ${main.isAgainVisible()}, go ${main.getAttempt()}`)
       // session 26: the hold the climber came off from (the last one reached, h09) pulses while the card is up
       const pulse = main.getOutlinePulse()
       if (!pulse || pulse.hold !== fallPos.LH) errs.push(`while the card is up the pulse is on ${pulse ? pulse.hold : "nothing"}, want ${fallPos.LH}`)

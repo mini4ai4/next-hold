@@ -193,11 +193,14 @@ export function cueShown(s: BetaState, c: {onWall: boolean; climbing: boolean; t
 }
 
 /** Session 26: the came-off card's headline, and its hint button's label (two lines in an 11 cm cell) */
-export function cameOffLine(move: number): string {
-  return `Came off at move ${move}`
+export function cameOffLine(_move: number): string {
+  // session 28 (v7.3 P1-6): the words and the pulse agree. The pulse is on the hold the climber last reached (pulsing
+  // the next move's hold would be beta); "Came off at move 3" sent them looking for move 3, a hold not yet made
+  return "Came off from here"
 }
 export function cameOffHintLabel(move: number): string {
-  return `Hint ·\nmove ${move}`
+  // session 28: one line, in a 16 cm button (it wrapped as "Hint ·" / "move 3")
+  return `Hint · move ${move}`
 }
 
 /** The step dots on "?", one per rung: "●○○" on rung 1. Session 26: kept with beta shown too (all hollow until

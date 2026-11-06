@@ -58,13 +58,18 @@ const TEXT_PER_CM = 56
 export const BUTTON_W = 11
 export const BUTTON_H = 10
 export const AGAIN_GAP = 3
-export const CARD_HALF_W = (2 * BUTTON_W + AGAIN_GAP) / 2 + 1
+/** session 28 (v7.3 P1-6): the hint button is 16 cm wide, so "Hint · move 3" reads on one line at the button cap (in an
+ *  11 cm cell it wrapped as "Hint ·" / "move 3", the dot dangling) */
+export const HINT_W = 16
+export const CARD_HALF_W = (HINT_W + AGAIN_GAP + BUTTON_W) / 2 + 1
 /** 0.5 cm padding, a 3 cm headline row, 0.5 cm, the 10 cm buttons, 0.5 cm (h5: at 17 cm it found no clear place
  *  from 2.5 m and touched the START tags) */
 export const CARD_HALF_H = 7.25
 export const CARD_HEAD_Y = 5.25
 export const CARD_BUTTONS_Y = -1.75
-export const CARD_BUTTON_X = (BUTTON_W + AGAIN_GAP) / 2
+/** session 28: the buttons' centres across the block: the hint at the left, Again (CARD_BUTTON_X) at the right */
+export const CARD_HINT_X = -CARD_HALF_W + 1 + HINT_W / 2
+export const CARD_BUTTON_X = CARD_HALF_W - 1 - BUTTON_W / 2
 /** the result card (cm, at the 110 cm size); Again stands AGAIN_GAP to its right as its own button */
 export const RESULT_HALF_W = 18
 export const RESULT_HALF_H = 7.5
@@ -233,13 +238,13 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     blockPlate.size = new vec2(2 * CARD_HALF_W, 2 * CARD_HALF_H)
     const headSO = this.obj(this.blockRoot, "CameOffText", new vec3(0, CARD_HEAD_Y, 0.8))
     this.cardText = this.bigText(headSO, "", 2 * CARD_HALF_W - 2, CARD_HEAD_CAP)
-    this.cardRoot = this.obj(this.blockRoot, "CameOffCard", new vec3(-CARD_BUTTON_X, CARD_BUTTONS_Y, 0.5))
+    this.cardRoot = this.obj(this.blockRoot, "CameOffCard", new vec3(CARD_HINT_X, CARD_BUTTONS_Y, 0.5))
     const card = this.cardRoot.createComponent(Button.getTypeName()) as Button
     card.setVariant({theme: "SnapOS3", shape: "Rectangle", style: "Prism"})
-    card.size = new vec3(BUTTON_W, BUTTON_H, 1)
+    card.size = new vec3(HINT_W, BUTTON_H, 1)
     card.setIsToggleable(false)
     card.onTriggerUp.add(() => this._onCameOffPressed.invoke())
-    this.hintText = this.bigText(this.obj(this.cardRoot, "CameOffHintText", new vec3(0, 0, 1.6)), "", BUTTON_W - 1, BUTTON_CAP)
+    this.hintText = this.bigText(this.obj(this.cardRoot, "CameOffHintText", new vec3(0, 0, 1.6)), "", HINT_W - 1, BUTTON_CAP)
     // start hidden, but only after the button and the plate have initialised
     let cardInit = 0
     const cardReady = () => {

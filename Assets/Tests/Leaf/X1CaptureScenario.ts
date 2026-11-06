@@ -74,7 +74,7 @@ export class X1CaptureScenario extends Scenario {
     else if (shot >= 4 && shot <= 6) { await pose(...MATS); await ask(shot - 3); what = `hint rung ${shot - 3}`; if (main.getHintStep() !== shot - 3) errs.push(`rung ${main.getHintStep()}`) }
     else if (shot === 7) {
       await fall(); what = "came off"
-      if (main.getCameOffText() !== "Came off at move 3" || !main.isAgainVisible()) errs.push(`card "${main.getCameOffText()}", Again ${main.isAgainVisible()}`)
+      if (main.getCameOffText() !== "Came off from here" || main.getCameOffHintText() !== "Hint · move 3" || !main.isAgainVisible()) errs.push(`card "${main.getCameOffText()}", Again ${main.isAgainVisible()}`)
     } else if (shot === 8) {
       // go 1 comes off; Again; go 2 from the start with one hint, to the top; read from the mats
       await fall()

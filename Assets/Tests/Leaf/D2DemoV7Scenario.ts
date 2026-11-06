@@ -4,7 +4,8 @@
 //   buttons, "Show my beta", ○○○) · s1 Show my beta (the glow on up, "2 · LH" on h09, "3 · LF" on lh, "Hide beta") ·
 //   s2 Setup: 155 ("2 · LH" on h09), 195 (on h10), 175 again and the climb page · s3 the quiet wall (On wall, nothing
 //   revealed, the strip ? and Body in view) · s4 "next hold" typed: rung 1, the chip with its preview line · s5 "?":
-//   rung 2 (the glow on up, "R hand"), rung 3 (●●●) · s6 two moves, then off the wall: "Came off at move 3", Again,
+//   rung 2 (the glow on up, "R hand"), rung 3 (●●●) · s6 two moves, then off the wall: "Came off from here" (h09 pulsing)
+//   over "Hint · move 3", Again,
 //   the panel hidden, go 2 · s7 the card's hint (rung 1, pinned, one hint for go 2), Again (the start holds, 0 moves)
 //   · s8 the pin back at h09, LF to lh, TOPPED on h20 · the card's exact three lines, with Again beside it, and the card
 //   up for at least 4 s of the take before it ends.
@@ -129,7 +130,8 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
       break
     case "s6-came-off":
       ground()
-      want(main.getCameOffText() === "Came off at move 3" && main.isAgainVisible() && main.isRowHidden(), `card "${main.getCameOffText()}", Again ${main.isAgainVisible()}, panel hidden ${main.isRowHidden()}`)
+      want(main.getCameOffText() === "Came off from here" && main.getCameOffHintText() === "Hint · move 3" && main.isAgainVisible() && main.isRowHidden(), `card "${main.getCameOffText()}" / "${main.getCameOffHintText()}", Again ${main.isAgainVisible()}, panel hidden ${main.isRowHidden()}`)
+      { const p = main.getOutlinePulse(); want(!!p && p.hold === "h09", `"from here" pulses ${p ? p.hold : "nothing"}, want h09 (the hold last reached)`) }
       want(main.getAttempt() === 2, `go ${main.getAttempt()}, want 2 (the fall ended go 1)`)
       inView(["CameOffCard", "AgainButton"])
       break

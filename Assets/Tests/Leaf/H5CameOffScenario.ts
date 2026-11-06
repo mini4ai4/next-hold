@@ -12,7 +12,7 @@ import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {HOLD_SIZE, holdById, PRESET_TOP} from "../../Scripts/Wall/WallLayout"
-import {AGAIN_GAP, AGAIN_W, BUTTON_W} from "../../Scripts/NextHoldCalloutUI"
+import {AGAIN_GAP, AGAIN_W, HINT_W} from "../../Scripts/NextHoldCalloutUI"
 import {
   boxesOverlap, camera, checkNothingRevealed, checkSideBySide, fmtBox, fmtPos, frames, getMain, makeReference, mustFind, pinch, pinchCapture,
   renderedRingColour, restorePreset, samePosition, screenBoxOf,
@@ -66,7 +66,16 @@ export class H5CameOffScenario extends Scenario {
       await at(125)
       const line = main.getCameOffText()
       print(`[H5] stepped back past 120 cm after two moves: "${line}", view ${main.getView()}, attempt ${attempt0} -> ${main.getAttempt()}, ${fmtPos(main.getPosition() as RefPosition)}`)
-      if (line !== "Came off at move 3" || main.getCameOffHintText() !== "Hint ·\nmove 3") errs.push(`the card reads "${line}" / "${main.getCameOffHintText()}"`)
+      // session 28 (v7.3 P1-6): "from here" is the hold that pulses, the one last reached (h09 after "up", "h09"); the button
+      // one line, drawn on one line
+      if (line !== "Came off from here" || main.getCameOffHintText() !== "Hint · move 3") errs.push(`the card reads "${line}" / "${main.getCameOffHintText()}"`)
+      {
+        const pulse = main.getOutlinePulse()
+        if (!pulse || pulse.hold !== pos2.LH || pos2.LH !== "h09") errs.push(`"from here" pulses ${pulse ? pulse.hold : "nothing"}, the hold last reached is ${pos2.LH}`)
+        const hb = screenBoxOf("CameOffHintText", camera()), cb = screenBoxOf("CameOffCard", camera(), true)
+        // (the text's box is its 15 cm layout area in the 16 cm button; 0.005 of the frame is the boxes' own slack)
+        if (hb && cb && (hb.x0 < cb.x0 - 0.005 || hb.x1 > cb.x1 + 0.005)) errs.push(`"Hint · move 3" (${fmtBox(hb)}) runs past its button (${fmtBox(cb)})`)
+      }
       if (!mustFind("CameOffCard").isEnabledInHierarchy) errs.push("the card's hint button isn't enabled")
       if ((mustFind("CameOffText").getComponent("Component.Text") as Text).text !== line) errs.push("the card's text isn't what it says")
       if (main.getView() !== "ground") errs.push(`the view is ${main.getView()}`)
@@ -109,7 +118,11 @@ export class H5CameOffScenario extends Scenario {
       await pinch("Hold_" + best.holdId); await frames(2)
       await at(250)
       print(`[H5] one move on, stepped back: "${main.getCameOffText()}"`)
-      if (main.getCameOffText() !== "Came off at move 4") errs.push(`next fall: "${main.getCameOffText()}"`)
+      if (main.getCameOffText() !== "Came off from here" || main.getCameOffHintText() !== "Hint · move 4") errs.push(`next fall: "${main.getCameOffText()}" / "${main.getCameOffHintText()}"`)
+      {
+        const pulse = main.getOutlinePulse(), last = main.getPosition()[best.limb]
+        if (!pulse || pulse.hold !== last) errs.push(`next fall: "from here" pulses ${pulse ? pulse.hold : "nothing"}, the hold last reached is ${last}`)
+      }
 
       // ── session 27: while the card is up it takes the panel's place on the mats (the panel follows the head, low in
       //    view, where the card goes); its [Hint] does what "?" did ──
@@ -189,7 +202,7 @@ export class H5CameOffScenario extends Scenario {
       // had Again at y 0.14-0.29 and the card at 0.79-0.94, and passed): Again is the card's own right-hand button,
       // level with [Hint · move 3] and 3 cm (x the card's scale) from it; the block is clear of the control row
       if (!main.isAgainVisible()) errs.push("the real eye: no Again with the card")
-      print(`[H5] from 2.5 m: ${checkSideBySide("CameOffCard", BUTTON_W, "AgainButton", AGAIN_W, AGAIN_GAP, errs, "from 2.5 m")}`)
+      print(`[H5] from 2.5 m: ${checkSideBySide("CameOffCard", HINT_W, "AgainButton", AGAIN_W, AGAIN_GAP, errs, "from 2.5 m")}`)
       const blockBox = screenBoxOf("CameOffBlock", camL, true), rowBox = screenBoxOf("ControlRow", camL)
       print(`[H5] from 2.5 m: block ${fmtBox(blockBox)}, row ${fmtBox(rowBox)}`)
       if (blockBox && rowBox && boxesOverlap(blockBox, rowBox)) errs.push(`from 2.5 m the came-off block (${fmtBox(blockBox)}) overlaps the control row (${fmtBox(rowBox)})`)
@@ -214,7 +227,7 @@ export class H5CameOffScenario extends Scenario {
       // card takes the panel's place (the panel is hidden), from 2.5 m and from 1.25 m
       if (!main.isRowHidden() || screenBoxOf("ControlRow", camL)) errs.push(`from 2.5 m the panel shows with the card (hidden ${main.isRowHidden()})`)
       tr.setWorldPosition(new vec3(0, 0, 0)); await frames(4)
-      print(`[H5] from 1.25 m: ${checkSideBySide("CameOffCard", BUTTON_W, "AgainButton", AGAIN_W, AGAIN_GAP, errs, "from 1.25 m")}`)
+      print(`[H5] from 1.25 m: ${checkSideBySide("CameOffCard", HINT_W, "AgainButton", AGAIN_W, AGAIN_GAP, errs, "from 1.25 m")}`)
       if (!main.isCameOffVisible() || !main.isRowHidden()) errs.push(`from 1.25 m: card ${main.isCameOffVisible()}, panel hidden ${main.isRowHidden()}`)
 
       // session 27, a look that can fail (the session-26 break went uncaught): from 2.5 m, the card's hint taken with a
