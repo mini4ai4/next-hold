@@ -1,0 +1,714 @@
+16:58:19.861 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+16:58:19.861 [LeafPlugin][PluginViewModel] Running scenario: c5-ask-why
+17:00:55.871 [  0.000s]RUNS: c5-ask-why with args: []
+17:00:55.872 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:01:02.650 [C5] asked up (a pinch moves RH): Lens why "JUG HOLD", reference "JUG HOLD" (best limb RH); position LH=lh RH=rh LF=lf RF=rf
+17:01:02.695 [C5] why "JUG HOLD" on up (best limb RH), ring green; plate x 0.505..0.758 y 0.458..0.532; nearest up 0.018, h09 0.200
+17:01:08.070 [C5] tagged h09 (step tag 2): why "STEP 2" on h09 (step tag 2), ring green; plate x 0.096..0.349 y 0.342..0.416; nearest h09 0.018, up 0.050
+17:01:08.177 [ 12.307s]PASSED: c5-ask-why
+17:01:08.177 [ 12.307s][c5-ask-why] PASSED
+17:01:08.180 [LeafPlugin][PluginViewModel] ✅ Scenario c5-ask-why completed successfully.
+17:01:12.531 Lens has been reset
+17:01:12.540 Lens has been reset
+17:01:14.324 Lens has been reset
+17:01:14.330 Lens has been reset
+17:01:21.333 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:01:21.334 [LeafPlugin][PluginViewModel] Running scenario: extra-ik-reach-controls
+17:04:17.381 [  0.000s]RUNS: extra-ik-reach-controls with args: []
+17:04:17.381 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:04:18.956 [IK] BodyButton: right hand routes INDIRECT (far-field ray)
+17:04:18.957 [IK] AskButton: right hand routes INDIRECT (far-field ray)
+17:04:18.957 [IK] Hold_up: right hand routes INDIRECT (far-field ray)
+17:04:18.958 [IK] Hold_lf: right hand routes INDIRECT (far-field ray)
+17:04:33.447 [IK] 0 reach diagnostics
+17:04:33.448 [ 16.068s]PASSED: extra-ik-reach-controls
+17:04:33.448 [ 16.068s][extra-ik-reach-controls] PASSED
+17:04:33.450 [LeafPlugin][PluginViewModel] ✅ Scenario extra-ik-reach-controls completed successfully.
+17:04:36.244 Lens has been reset
+17:04:36.254 Lens has been reset
+17:04:37.922 Lens has been reset
+17:04:37.927 Lens has been reset
+17:04:44.923 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:04:44.924 [LeafPlugin][PluginViewModel] Running scenario: r1-mark-problem
+17:07:42.168 [  0.000s]RUNS: r1-mark-problem with args: []
+17:07:42.168 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:08:07.979 [N1] problem now lf,rf,lh,rh,up,h09,h10,h16,h20; start lh,rh; top null
+17:08:08.073 [ 25.906s]PASSED: r1-mark-problem
+17:08:08.073 [ 25.906s][r1-mark-problem] PASSED
+17:08:08.076 [LeafPlugin][PluginViewModel] ✅ Scenario r1-mark-problem completed successfully.
+17:08:11.786 Lens has been reset
+17:08:11.795 Lens has been reset
+17:08:13.386 Lens has been reset
+17:08:13.395 Lens has been reset
+17:08:20.342 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:08:20.343 [LeafPlugin][PluginViewModel] Running scenario: r2-upward-goal
+17:11:17.161 [  0.000s]RUNS: r2-upward-goal with args: []
+17:11:17.162 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:11:18.811 [N2] preset: 6 rings match the plain colour rule; 2 out of reach, all red
+17:11:20.474 [N2] after RH->up (LH=lh RH=up LF=lf RF=rf): Lens LH->h09; reference with goal LH->h09, without RH->rh
+17:11:20.488 [N2] after RH->up: 6 rings match the plain colour rule; 2 out of reach, all red
+17:11:20.488 [  3.328s]PASSED: r2-upward-goal
+17:11:20.488 [  3.328s][r2-upward-goal] PASSED
+17:11:20.492 [LeafPlugin][PluginViewModel] ✅ Scenario r2-upward-goal completed successfully.
+17:11:23.334 Lens has been reset
+17:11:23.343 Lens has been reset
+17:11:24.922 Lens has been reset
+17:11:24.927 Lens has been reset
+17:11:31.074 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:11:31.075 [LeafPlugin][PluginViewModel] Running scenario: r3-sequence-preview
+17:14:06.700 [  0.000s]RUNS: r3-sequence-preview with args: []
+17:14:06.700 [  0.003s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:14:18.474 [N3] preset: LH=lh RH=rh LF=lf RF=rf, selected RH; look-ahead 1. RH->up  2. LH->h09  3. LF->lh; shown up,h09,lh
+17:14:18.543 [N3] preset: badges: 2 "2 · LH": nearest h09 0.5 cm, next up 8.4 cm; 3 "3 · LF": nearest lh 0.4 cm, next h09 22.1 cm; tags: 2 on h09: neutral outline, 3 on lh: neutral outline; styles: green solid x2, red broken x2, yellow dashed x2
+17:14:18.556 [N3] preset: badges vs glow: 2: 7.58 cm clear, 3: 36.31 cm clear; path 20 dots
+17:14:18.586 [N3] preset colours: 2. LH->h09 green 0.75 (neutral outline on an occupied hold); 3. LF->lh green 1.00 (neutral outline on an occupied hold)
+17:14:20.127 [N3] pinch frame: LH=lh RH=up LF=lf RF=rf, selected LH; look-ahead 1. LH->h09  2. LF->lh  3. LH->h20; shown h09,lh,h20
+17:14:20.185 [N3] pinch frame: badges: 2 "2 · LF": nearest lh 0.4 cm, next h09 17.1 cm; 3 "3 · LH": nearest h20 0.1 cm, next h10 19.4 cm; tags: 2 on lh: neutral outline, 3 on h20: neutral outline; styles: green solid x3, red broken x1, yellow dashed x2
+17:14:20.189 [N3] pinch frame: badges vs glow: 2: 17.40 cm clear, 3: 32.77 cm clear; path 55 dots
+17:14:20.226 [N3] pinch frame colours: 2. LF->lh green 1.00 (neutral outline on an occupied hold); 3. LH->h20 yellow 0.69 (neutral outline on an occupied hold)
+17:14:23.656 [N3] after Toggle_LF: LH=lh RH=up LF=lf RF=rf, selected LF; look-ahead 1. LF->h16  2. LH->h10  3. RF->lh; shown h16,h10,lh
+17:14:23.713 [N3] after Toggle_LF: badges: 2 "2 · LH": nearest h10 0.6 cm, next h20 19.4 cm; 3 "3 · RF": nearest lh 0.4 cm, next h09 22.1 cm; tags: 2 on h10: neutral outline, 3 on lh: neutral outline; styles: red broken x4, yellow dashed x2
+17:14:23.719 [N3] after Toggle_LF: badges vs glow: 2: 139.05 cm clear, 3: 74.99 cm clear; path 106 dots
+17:14:27.264 [N3] match h09,h09: badges 19.6 cm apart, arc of 19 dots; badges: 2 "2 · LH": nearest h09 0.5 cm, next up 8.4 cm; 3 "3 · RH": nearest h09 0.3 cm, next up 8.3 cm; tags: 2 on h09: neutral outline, 3 on h09: neutral outline; styles: green solid x2, red broken x2, yellow dashed x2; badges vs glow: 2: 7.58 cm clear, 3: 7.57 cm clear; path 22 dots
+17:14:27.291 [N3] tag on h10 (score red): Ring_h10 renders red; badges: 2 "2 · LH": nearest h10 0.6 cm, next h20 19.4 cm; tags: 2 on h10: ring red; styles: green solid x2, red broken x2, yellow dashed x2
+17:14:27.339 [N3] step 2 on the glow up: badges: 2 "2 · LH": nearest up 1.4 cm, next h09 18.1 cm; 3 "3 · RF": nearest h09 0.5 cm, next up 8.4 cm; tags: 2 on up: glow, 3 on h09: neutral outline; styles: green solid x2, red broken x2, yellow dashed x2; badges vs glow: 2: 0.40 cm clear, 3: 7.58 cm clear; path 10 dots
+17:14:27.358 [N3] forced green: glow and the ring under a tag draw solid, tags solid; styles: green solid x3, yellow dashed x2, red broken x1
+17:14:27.373 [N3] forced yellow: glow and the ring under a tag draw dashed, tags solid; styles: yellow dashed x5, red broken x1
+17:14:27.388 [N3] forced red: glow and the ring under a tag draw broken, tags solid; styles: red broken x4, yellow dashed x2
+17:14:27.499 [ 20.802s]FAILED: r3-sequence-preview - AssertionError: sequence-preview mismatches: tag on h10 (score red): under badge 2 Ring_h10 shows red: a hold under a step tag wears the neutral outline Expected: "0" - Received: "1"
+17:14:27.499 [ 20.802s][r3-sequence-preview] FAILED - AssertionError: sequence-preview mismatches: tag on h10 (score red): under badge 2 Ring_h10 shows red: a hold under a step tag wears the neutral outline Expected: "0" - Received: "1"
+17:14:27.501 [LeafPlugin][PluginViewModel] ❌ Scenario r3-sequence-preview failed.
+17:14:55.357 Lens has been reset
+17:14:55.421 Lens has been reset
+17:14:55.803 Lens has been reset
+17:14:57.430 Lens has been reset
+17:14:57.436 Lens has been reset
+17:14:59.134 Lens has been reset
+17:14:59.140 Lens has been reset
+17:15:05.394 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:15:05.395 [LeafPlugin][PluginViewModel] Running scenario: r3-sequence-preview
+17:17:42.319 [  0.000s]RUNS: r3-sequence-preview with args: []
+17:17:42.320 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:17:43.878 [N3] preset: LH=lh RH=rh LF=lf RF=rf, selected RH; look-ahead 1. RH->up  2. LH->h09  3. LF->lh; shown up,h09,lh
+17:17:43.911 [N3] preset: badges: 2 "2 · LH": nearest h09 0.5 cm, next up 8.4 cm; 3 "3 · LF": nearest lh 0.4 cm, next h09 22.1 cm; tags: 2 on h09: neutral outline, 3 on lh: neutral outline; styles: green solid x2, red broken x2, yellow dashed x2
+17:17:43.916 [N3] preset: badges vs glow: 2: 7.58 cm clear, 3: 36.31 cm clear; path 20 dots
+17:17:43.941 [N3] preset colours: 2. LH->h09 green 0.75 (neutral outline on an occupied hold); 3. LF->lh green 1.00 (neutral outline on an occupied hold)
+17:17:45.562 [N3] pinch frame: LH=lh RH=up LF=lf RF=rf, selected LH; look-ahead 1. LH->h09  2. LF->lh  3. LH->h20; shown h09,lh,h20
+17:17:45.610 [N3] pinch frame: badges: 2 "2 · LF": nearest lh 0.4 cm, next h09 17.1 cm; 3 "3 · LH": nearest h20 0.1 cm, next h10 19.4 cm; tags: 2 on lh: neutral outline, 3 on h20: neutral outline; styles: green solid x3, red broken x1, yellow dashed x2
+17:17:45.617 [N3] pinch frame: badges vs glow: 2: 17.40 cm clear, 3: 32.77 cm clear; path 55 dots
+17:17:45.640 [N3] pinch frame colours: 2. LF->lh green 1.00 (neutral outline on an occupied hold); 3. LH->h20 yellow 0.69 (neutral outline on an occupied hold)
+17:17:49.188 [N3] after Toggle_LF: LH=lh RH=up LF=lf RF=rf, selected LF; look-ahead 1. LF->h16  2. LH->h10  3. RF->lh; shown h16,h10,lh
+17:17:49.222 [N3] after Toggle_LF: badges: 2 "2 · LH": nearest h10 0.6 cm, next h20 19.4 cm; 3 "3 · RF": nearest lh 0.4 cm, next h09 22.1 cm; tags: 2 on h10: neutral outline, 3 on lh: neutral outline; styles: red broken x4, yellow dashed x2
+17:17:49.233 [N3] after Toggle_LF: badges vs glow: 2: 139.05 cm clear, 3: 74.99 cm clear; path 106 dots
+17:17:52.861 [N3] match h09,h09: badges 19.6 cm apart, arc of 19 dots; badges: 2 "2 · LH": nearest h09 0.5 cm, next up 8.4 cm; 3 "3 · RH": nearest h09 0.3 cm, next up 8.3 cm; tags: 2 on h09: neutral outline, 3 on h09: neutral outline; styles: green solid x2, red broken x2, yellow dashed x2; badges vs glow: 2: 7.58 cm clear, 3: 7.57 cm clear; path 22 dots
+17:17:52.911 [N3] tag on h10 (score red): Ring_h10 shown false, outline true; badges: 2 "2 · LH": nearest h10 0.6 cm, next h20 19.4 cm; tags: 2 on h10: neutral outline; styles: green solid x2, yellow dashed x2, red broken x1
+17:17:52.950 [N3] step 2 on the glow up: badges: 2 "2 · LH": nearest up 1.4 cm, next h09 18.1 cm; 3 "3 · RF": nearest h09 0.5 cm, next up 8.4 cm; tags: 2 on up: glow, 3 on h09: neutral outline; styles: green solid x2, yellow dashed x2, red broken x1; badges vs glow: 2: 0.40 cm clear, 3: 7.58 cm clear; path 10 dots
+17:17:52.984 [N3] forced green: glow and the ring under a tag draw solid, tags solid; styles: green solid x3, yellow dashed x1, red broken x1
+17:17:53.015 [N3] forced yellow: glow and the ring under a tag draw dashed, tags solid; styles: yellow dashed x4, red broken x1
+17:17:53.039 [N3] forced red: glow and the ring under a tag draw broken, tags solid; styles: red broken x4, yellow dashed x1
+17:17:53.148 [ 10.830s]PASSED: r3-sequence-preview
+17:17:53.148 [ 10.830s][r3-sequence-preview] PASSED
+17:17:53.151 [LeafPlugin][PluginViewModel] ✅ Scenario r3-sequence-preview completed successfully.
+17:17:58.549 Lens has been reset
+17:17:58.559 Lens has been reset
+17:18:00.198 Lens has been reset
+17:18:00.207 Lens has been reset
+17:18:07.260 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:18:07.263 [LeafPlugin][PluginViewModel] Running scenario: r4-why-wording
+17:21:06.241 [  0.000s]RUNS: r4-why-wording with args: []
+17:21:06.243 [  0.003s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:21:21.635 [N4] ? then h09: why line "STEP 2"
+17:21:25.157 [N4] ? then up: why line "JUG HOLD"
+17:21:28.692 [N4] ? then h20: why line "JUG HOLD · OUT OF REACH"
+17:21:32.146 [N4] LONG REACH case: LH on h16
+17:21:35.631 [N4] ? then h16: why line "CRIMP HOLD · LONG REACH · COMMITTING BALANCE"
+17:21:35.734 [ 29.494s]FAILED: r4-why-wording - AssertionError: why-wording mismatches: precondition: h09's ring shows step tag 2 "STEP 2", want LH's "PINCH HOLD" h09: "STEP 2" is not "<TYPE> HOLD · ..." in capitals Expected: "0" - Received: "2"
+17:21:35.734 [ 29.494s][r4-why-wording] FAILED - AssertionError: why-wording mismatches: precondition: h09's ring shows step tag 2 "STEP 2", want LH's "PINCH HOLD" h09: "STEP 2" is not "<TYPE> HOLD · ..." in capitals Expected: "0" - Received: "2"
+17:21:35.736 [LeafPlugin][PluginViewModel] ❌ Scenario r4-why-wording failed.
+17:21:44.569 Lens has been reset
+17:21:44.987 Lens has been reset
+17:21:46.710 Lens has been reset
+17:21:47.037 Lens has been reset
+17:21:48.641 Lens has been reset
+17:21:48.972 Lens has been reset
+17:21:50.549 Lens has been reset
+17:21:50.556 Lens has been reset
+17:21:50.562 Lens has been reset
+17:21:56.461 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:21:56.461 [LeafPlugin][PluginViewModel] Running scenario: r4-why-wording
+17:24:23.526 [  0.000s]RUNS: r4-why-wording with args: []
+17:24:23.526 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:24:38.730 [N4] ? then h09: why line "STEP 2"
+17:24:42.234 [N4] ? then up: why line "JUG HOLD"
+17:24:45.699 [N4] ? then h20: why line "JUG HOLD · OUT OF REACH"
+17:24:49.149 [N4] LONG REACH case: LH on h16
+17:24:52.630 [N4] ? then h16: why line "CRIMP HOLD · LONG REACH · COMMITTING BALANCE"
+17:24:52.779 [ 29.253s]PASSED: r4-why-wording
+17:24:52.779 [ 29.254s][r4-why-wording] PASSED
+17:24:52.781 [LeafPlugin][PluginViewModel] ✅ Scenario r4-why-wording completed successfully.
+17:24:55.355 Lens has been reset
+17:24:55.367 Lens has been reset
+17:24:57.023 Lens has been reset
+17:24:57.032 Lens has been reset
+17:25:03.275 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:25:03.275 [LeafPlugin][PluginViewModel] Running scenario: r5-control-row-in-view
+17:27:39.406 [  0.000s]RUNS: r5-control-row-in-view with args: []
+17:27:39.407 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:27:41.093 [N5] ground, preset: D 125 cm: row x1.14 at wall x 201..235, y 128..169; problem x 61..191
+17:27:41.100 [N5] ground, preset: head turned 35 deg to the row: every control in view
+17:27:44.594 [N5] ground, 250 cm: D 250 cm: row x2.27 at wall x 199..264, y 110..189; problem x 60..192, why-line x2.27
+17:27:44.599 [N5] ground, 250 cm: head turned 22 deg to the row: every control in view
+17:27:48.241 [N5] on wall, preset: ring x 0.370..0.894 y -0.021..0.438, row none
+17:27:49.971 [N5] on wall, after RH -> up: ring x 0.037..0.533 y -0.009..0.426, row none
+17:27:49.971 [N5] on wall: 5 out of view
+17:27:50.068 [ 10.662s]FAILED: r5-control-row-in-view - AssertionError: control row and panels: on wall: ControlRow: a corner is behind the camera on wall: ControlRow: a corner is behind the camera on wall: ControlRow: a corner is behind the camera on wall: ControlRow: a corner is behind the camera on wall: ControlRow spans screen x -Infinity..Infinity, y -Infinity..Infinity (must stay in 0..1) Expected: "0" - Received: "5"
+17:27:50.068 [ 10.663s][r5-control-row-in-view] FAILED - AssertionError: control row and panels: on wall: ControlRow: a corner is behind the camera on wall: ControlRow: a corner is behind the camera on wall: ControlRow: a corner is behind the camera on wall: ControlRow: a corner is behind the camera on wall: ControlRow spans screen x -Infinity..Infinity, y -Infinity..Infinity (must stay in 0..1) Expected: "0" - Received: "5"
+17:27:50.072 [LeafPlugin][PluginViewModel] ❌ Scenario r5-control-row-in-view failed.
+17:28:45.242 Lens has been reset
+17:28:45.349 Lens has been reset
+17:28:45.837 Lens has been reset
+17:28:47.640 Lens has been reset
+17:28:47.646 Lens has been reset
+17:28:49.344 Lens has been reset
+17:28:49.355 Lens has been reset
+17:28:56.501 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:28:56.502 [LeafPlugin][PluginViewModel] Running scenario: r5-control-row-in-view
+17:31:53.673 [  0.000s]RUNS: r5-control-row-in-view with args: []
+17:31:53.674 [  0.003s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:31:55.351 [N5] ground, preset: D 125 cm: row x1.14 at wall x 201..235, y 128..169; problem x 61..191
+17:31:55.357 [N5] ground, preset: head turned 35 deg to the row: every control in view
+17:31:58.846 [N5] ground, 250 cm: D 250 cm: row x2.27 at wall x 199..264, y 110..189; problem x 60..192, why-line x2.27
+17:31:58.848 [N5] ground, 250 cm: head turned 22 deg to the row: every control in view
+17:32:02.492 [N5] on wall, preset: ring x 0.370..0.894 y -0.021..0.438, row x 0.422..0.840 y 0.475..0.916
+17:32:04.231 [N5] on wall, after RH -> up: ring x 0.037..0.533 y -0.009..0.426, row x 0.077..0.495 y 0.462..0.904
+17:32:04.231 [N5] on wall: every control in the straight-ahead view
+17:32:04.335 [ 10.664s]PASSED: r5-control-row-in-view
+17:32:04.335 [ 10.664s][r5-control-row-in-view] PASSED
+17:32:04.341 [LeafPlugin][PluginViewModel] ✅ Scenario r5-control-row-in-view completed successfully.
+17:32:10.055 Lens has been reset
+17:32:10.064 Lens has been reset
+17:32:11.690 Lens has been reset
+17:32:11.703 Lens has been reset
+17:32:18.714 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:32:18.715 [LeafPlugin][PluginViewModel] Running scenario: r6-foot-reach
+17:35:16.805 [  0.000s]RUNS: r6-foot-reach with args: []
+17:35:16.806 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:35:32.346 [r6] A LH=h09 RH=up LF=lf RF=rf: rh 40 cm under the hands, hip y 151.5, 16.3 cm from it (leg reach 96.3), high step 1.00, score 1.00 green; renders green
+17:35:51.494 [r6] B LH=h09 RH=h11 LF=lf RF=rf: hip y 133.5, rh 16.5 cm above it, high step 0.39, score 0.39 red, why "JUG HOLD · HIGH STEP"; renders red
+17:36:02.033 [r6] 48 rings checked against the rule (hands also against the arm rule), 0 mismatches
+17:36:02.161 [ 45.357s]PASSED: r6-foot-reach
+17:36:02.161 [ 45.357s][r6-foot-reach] PASSED
+17:36:02.166 [LeafPlugin][PluginViewModel] ✅ Scenario r6-foot-reach completed successfully.
+17:36:04.305 Lens has been reset
+17:36:04.313 Lens has been reset
+17:36:06.342 Lens has been reset
+17:36:06.349 Lens has been reset
+17:36:14.064 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:36:14.065 [LeafPlugin][PluginViewModel] Running scenario: r7-height
+17:39:24.322 [  0.000s]RUNS: r7-height with args: []
+17:39:24.323 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:39:27.674 [r7] height: − at -3.00,-2.40, + at 3.00,-2.40, label at 0.00,2.60
+17:39:27.689 [r7] 175 cm: glow RH, green rings h09,up; look-ahead RH->up LH->h09 LF->lh
+17:39:36.419 [r7] in the pinch frame: height 150, reach 66.0, panel "150 cm", h09 yellow (0.582; rule yellow 0.582)
+17:39:36.504 [r7] 150 cm: glow RH, green rings up; look-ahead RH->up LH->h09 LF->lh
+17:39:40.056 [r7] 155 cm: 1-2-3 RH->up (green 0.88), LH->h09 (green 0.75), LF->lh (green 1.00); rule RH->up LH->h09 LF->lh; route to the top 5 moves; 2. LH->h09 green 0.75 (neutral outline on an occupied hold); 3. LF->lh green 1.00 (neutral outline on an occupied hold)
+17:39:40.094 [r7] 155 cm: badges: 2 "2 · LH": nearest h09 0.5 cm, next up 8.4 cm; 3 "3 · LF": nearest lh 0.4 cm, next h09 22.1 cm; tags: 2 on h09: neutral outline, 3 on lh: neutral outline; styles: green solid x2, red broken x2, yellow dashed x2
+17:39:50.412 [r7] 180 cm look-ahead RH->up LH->h09 LF->lh; in the 185 pinch frame RH->up LH->h10 LF->lh (rule RH->up LH->h10 LF->lh); badge 2 "2 · LH" on h10, badge 3 on lh; 2. LH->h10 yellow 0.64 (neutral outline on an occupied hold); 3. LF->lh green 0.98 (neutral outline on an occupied hold)
+17:39:53.879 [r7] 195 cm: 1-2-3 RH->up (green 1.00), LH->h10 (green 0.74), LF->lh (green 0.90); rule RH->up LH->h10 LF->lh; route to the top 4 moves; 2. LH->h10 green 0.74 (neutral outline on an occupied hold); 3. LF->lh green 0.90 (neutral outline on an occupied hold)
+17:39:53.910 [r7] 195 cm: badges: 2 "2 · LH": nearest h10 0.6 cm, next h20 19.4 cm; 3 "3 · LF": nearest lh 0.4 cm, next h09 22.1 cm; tags: 2 on h10: neutral outline, 3 on lh: neutral outline; styles: green solid x3, yellow dashed x2, red broken x1
+17:39:57.246 [r7] 200 cm: RH green h09,up; look-ahead RH->up LH->h10 LF->lh
+17:40:12.996 [r7] LH=lh RH=h09 LF=h16 RF=rf: best at 170 cm LH->h10 (Lens LH); in the 165 pinch frame RH, rule RH->up
+17:40:21.719 [ 57.398s]PASSED: r7-height
+17:40:21.720 [ 57.399s][r7-height] PASSED
+17:40:21.728 [LeafPlugin][PluginViewModel] ✅ Scenario r7-height completed successfully.
+17:40:28.365 Lens has been reset
+17:40:28.389 Lens has been reset
+17:40:30.815 Lens has been reset
+17:40:30.829 Lens has been reset
+17:40:40.996 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:40:40.998 [LeafPlugin][PluginViewModel] Running scenario: r8-arrow-clear-of-panel
+17:44:51.522 [  0.000s]RUNS: r8-arrow-clear-of-panel with args: []
+17:44:51.523 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:44:53.277 [R8] look down 0: no arrow (hold in view true); row x 0.100..0.900 y 0.455..1.302
+17:44:53.370 [R8] look down 4: no arrow (hold in view true); row x 0.098..0.902 y 0.349..1.171
+17:44:53.495 [R8] look down 8: disc x 0.416..0.584 y 0.074..0.222, radius 3.90 cm (moved); plate x 0.094..0.906 y 0.241..1.048
+17:44:53.591 [R8] look down 12: disc x 0.445..0.555 y 0.019..0.115, radius 2.54 cm (moved); plate x 0.088..0.912 y 0.131..0.931
+17:44:53.680 [R8] look down 16: disc x 0.445..0.555 y 0.873..0.969, radius 2.54 cm (moved); plate x 0.080..0.920 y 0.017..0.819
+17:44:53.772 [R8] look down 20: disc x 0.817..0.986 y 0.814..0.961, radius 3.90 cm (moved); plate x 0.079..0.921 y 0.002..0.782
+17:44:53.869 [R8] look down 25: disc x 0.816..0.985 y 0.765..0.913, radius 3.90 cm (moved); plate x 0.081..0.919 y -0.007..0.738
+17:44:53.957 [R8] look down 30: disc x 0.815..0.983 y 0.717..0.864, radius 3.90 cm (moved); plate x 0.083..0.917 y -0.030..0.681
+17:44:54.034 [R8] yaw -14, down 6: no arrow (hold in view true); row x 0.213..0.993 y 0.293..1.137
+17:44:54.134 [R8] yaw -14, down 14: disc x 0.025..0.193 y 0.057..0.205, radius 3.90 cm (moved); plate x 0.214..1.019 y 0.072..0.902
+17:44:54.215 [R8] yaw 14, down 6: no arrow (hold in view true); row x 0.007..0.787 y 0.293..1.137
+17:44:54.304 [R8] yaw 14, down 14: disc x 0.807..0.975 y 0.057..0.205, radius 3.90 cm (moved); plate x -0.019..0.786 y 0.072..0.902
+17:44:57.892 [R8] from 125 cm, On wall: disc x 0.076..0.244 y 0.151..0.299, radius 3.90 cm (moved); plate x 0.017..0.443 y 0.323..0.781
+17:44:57.980 [R8] from 125 cm, On wall, down: disc x 0.463..0.631 y 0.032..0.180, radius 3.90 cm (moved); plate x -0.001..0.450 y 0.010..0.477
+17:44:58.075 [R8] 14 looks: arrow shown in 10, moved off the panel in 10, hidden with the hold off view in 0
+17:44:58.181 [  6.660s]PASSED: r8-arrow-clear-of-panel
+17:44:58.181 [  6.660s][r8-arrow-clear-of-panel] PASSED
+17:44:58.187 [LeafPlugin][PluginViewModel] ✅ Scenario r8-arrow-clear-of-panel completed successfully.
+17:45:01.939 Lens has been reset
+17:45:01.955 Lens has been reset
+17:45:04.057 Lens has been reset
+17:45:04.089 Lens has been reset
+17:45:12.522 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:45:12.524 [LeafPlugin][PluginViewModel] Running scenario: a1-view-modes
+17:48:42.170 [  0.000s]RUNS: a1-view-modes with args: []
+17:48:42.170 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:48:43.836 [N6] ground at open: LH=lh RH=rh LF=lf RF=rf, suggestion RH->up, 6 rings, ghosts up,h09,lh
+17:48:43.847 [N6] ground at the preset viewpoint: eye 125.0 cm from the wall, Lens sized for 125.0 cm; D 125.0 cm: line 1.82-1.82 (want 1.82), glow edge 19.01, ghosts number/radius 64.0/2.60 64.0/2.60 (want 64.0/2.60), label 80.6 (want 80.6)
+17:48:47.225 [N6] on wall, pinch frame: LH=lh RH=rh LF=lf RF=rf, suggestion RH->up, visible rings [up]
+17:48:47.326 [N6] on wall, 3 frames later: LH=lh RH=rh LF=lf RF=rf, suggestion RH->up, visible rings [up]
+17:48:47.327 [N6] on wall sizes: ring line 1.60 cm, label 80.6
+17:48:50.309 [N6] on wall, 3 s later: label "R hand" shown true, opacity 1.00
+17:48:53.818 [N6] ground again, pinch frame: LH=lh RH=rh LF=lf RF=rf, suggestion RH->up, 6 rings, ghosts up,h09,lh
+17:48:56.475 [N6] back on ground: label shown on return true, 2.6 s later false
+17:49:01.686 [N6] on wall, after RH -> up: LH=lh RH=up LF=lf RF=rf, suggestion LH->h09, visible rings [h09]
+17:49:09.578 [N6] on wall, after RF->h16: LH=lh RH=up LF=lf RF=h16, suggestion LH->h10, visible rings [h10]
+17:49:09.579 [N6] on wall off-view: suggestion LH->h10 in view false, arrow true, chime heard true
+17:49:09.694 [ 27.525s]PASSED: a1-view-modes
+17:49:09.694 [ 27.525s][a1-view-modes] PASSED
+17:49:09.707 [LeafPlugin][PluginViewModel] ✅ Scenario a1-view-modes completed successfully.
+17:49:20.096 Lens has been reset
+17:49:20.107 Lens has been reset
+17:49:22.088 Lens has been reset
+17:49:22.109 Lens has been reset
+17:49:29.188 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:49:29.190 [LeafPlugin][PluginViewModel] Running scenario: a2-ground-scan-250
+17:52:26.351 [  0.000s]RUNS: a2-ground-scan-250 with args: []
+17:52:26.352 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:52:38.167 [N7] sanity: aim point visible true, point behind the eye visible false
+17:52:38.230 [N7] sized from the second camera (250.0 cm, Lens 250.0 cm): D 250.0 cm: line 3.64-3.64 (want 3.64), glow edge 20.78, ghosts number/radius 195.1/7.93 195.1/7.93 (want 195.0/7.92), label 195.1 (want 195.0)
+17:52:38.238 [N7] from 250 cm: narrowest gap 4.19 cm, line 3.64 cm
+17:52:38.239 [N7] view 32.3 x 36.6 deg; problem (whole rings, drawn Ground line 3.64 cm) spans 132 x 235 cm; eye 166 cm above the floor, 250 cm back
+17:52:38.239 [N7] lower half (head pitched -17.5 deg): 5/10 whole rings inside: lf,rf,lh,rh,h16 (isSphereVisible: 6)
+17:52:38.239 [N7] lower half: clearance to the nearest view edge, cm: lf 32.5, rf 36.6, lh 8.3, rh 8.3, up -31.7, h09 -30.7, h10 -57.7, h11 -12.2, h16 10.3, h20 -93.7
+17:52:38.244 [N7] lower half: badges vs glow: 2: 2.40 cm clear, 3: 24.66 cm clear; path 4 dots
+17:52:38.281 [N7] lower half: badges: 2 "2 · LH": nearest h09 0.6 cm, next up 3.5 cm; 3 "3 · LF": nearest lh 0.5 cm, next h09 11.1 cm; tags: 2 on h09: neutral outline, 3 on lh: neutral outline; styles: green solid x2, red broken x2, yellow dashed x2
+17:52:38.282 [N7] upper half (head pitched 8.8 deg): 7/10 whole rings inside: lh,rh,up,h09,h10,h11,h20 (isSphereVisible: 7)
+17:52:38.282 [N7] upper half: clearance to the nearest view edge, cm: lf -94.3, rf -89.4, lh 14.2, rh 14.2, up 44.7, h09 49.1, h10 7.9, h11 5.1, h16 -61.8, h20 25.9
+17:52:38.285 [N7] upper half: badges vs glow: 2: 2.40 cm clear, 3: 24.66 cm clear; path 4 dots
+17:52:38.315 [N7] upper half: badges: 2 "2 · LH": nearest h09 0.5 cm, next up 3.4 cm; 3 "3 · LF": nearest lh 0.5 cm, next h09 10.8 cm; tags: 2 on h09: neutral outline, 3 on lh: neutral outline; styles: green solid x2, red broken x2, yellow dashed x2
+17:52:38.315 [N7] two head positions from 250 cm cover 10/10 problem holds; in both: lh,rh
+17:52:38.368 [N7] back on the wearer's camera (125.0 cm, Lens 125.0 cm): D 125.0 cm: line 1.82-1.82 (want 1.82), glow edge 19.01, ghosts number/radius 64.0/2.60 64.0/2.60 (want 64.0/2.60), label 80.6 (want 80.6)
+17:52:38.368 [ 12.018s]PASSED: a2-ground-scan-250
+17:52:38.368 [ 12.018s][a2-ground-scan-250] PASSED
+17:52:38.368 [LeafPlugin][PluginViewModel] ✅ Scenario a2-ground-scan-250 completed successfully.
+17:52:40.970 Lens has been reset
+17:52:40.979 Lens has been reset
+17:52:42.552 Lens has been reset
+17:52:42.558 Lens has been reset
+17:52:49.185 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:52:49.186 [LeafPlugin][PluginViewModel] Running scenario: a3-auto-view
+17:55:37.155 [  0.000s]RUNS: a3-auto-view with args: []
+17:55:37.155 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:55:46.719 [N9] 365 cm: ground (5 rings) -> 100 cm: ground (5 rings) -> 75 cm: wall (1 rings) -> 45 cm: wall (1 rings) -> 100 cm: wall (1 rings) -> 125 cm: ground (5 rings) -> 250 cm: ground (5 rings) -> 200 cm: wall (1 rings) -> 100 cm: wall (1 rings) -> 70 cm: wall (1 rings) -> 50 cm: ground (5 rings) -> 140 cm: ground (5 rings) -> 60 cm: wall (1 rings)
+17:55:46.849 [  9.695s]PASSED: a3-auto-view
+17:55:46.850 [  9.695s][a3-auto-view] PASSED
+17:55:46.854 [LeafPlugin][PluginViewModel] ✅ Scenario a3-auto-view completed successfully.
+17:55:49.754 Lens has been reset
+17:55:49.768 Lens has been reset
+17:55:51.115 Lens has been reset
+17:55:51.120 Lens has been reset
+17:55:55.751 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:55:55.751 [LeafPlugin][PluginViewModel] Running scenario: b1-stick-figure
+17:57:53.917 [  0.000s]RUNS: b1-stick-figure with args: []
+17:57:53.918 [  0.003s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+17:57:55.564 [N8] ground, preset: figure hidden, markers all shown
+17:57:59.030 [N8] on wall, preset: LH=lh RH=rh LF=lf RF=rf, neck (120.0, 131.3), pelvis (120.0, 88.9), head r 4.6; worst point error 0.00 cm; LH->lh bend 3.1 cm, RH->rh bend 3.1 cm, LF->lf bend 7.2 cm, RF->rf bend 6.5 cm
+17:57:59.042 [N8] on wall, preset, fade behind the control row: RH_Upper 192/201 behind, RH_Lower 201/201 behind, head 4.9 cm clear, alpha 0.02
+17:57:59.049 [N8] figure line 0.99 cm wide (ring line 1.6 cm at 110 cm, wider further back), alpha <= half a ring's
+17:58:00.150 [N8] pinch frame, RH -> up, fade behind the control row: Spine 41/201 behind, Shoulders 168/201 behind, head behind, alpha 0.02
+17:58:00.710 [N8] pinch frame, RH -> up: LH=lh RH=up LF=lf RF=rf, neck (117.5, 141.3), pelvis (117.5, 98.9), head r 4.6; worst point error 0.00 cm; LH->lh bend 1.8 cm, RH->up bend 6.9 cm, LF->lf bend 8.4 cm, RF->rf bend 7.9 cm
+17:58:04.128 [N8] ground, after the hand move: figure hidden, markers all shown
+17:58:08.829 [N8] ground, pinch frame, LF -> h16: figure hidden, markers all shown
+17:58:12.847 [N8] on wall, after LF -> h16: LH=lh RH=up LF=h16 RF=rf, neck (111.3, 149.3), pelvis (111.3, 106.9), head r 4.6; worst point error 0.00 cm; LH->lh bend 0.5 cm, RH->up bend 5.9 cm, LF->h16 bend 6.6 cm, RF->rf bend 9.3 cm
+17:58:12.858 [N8] on wall, after the foot move, fade behind the control row: head 1.5 cm clear, alpha 0.02
+17:58:12.984 [N8] ground, after restore: figure hidden, markers all shown
+17:58:16.475 [N8] on wall, after restore: LH=lh RH=rh LF=lf RF=rf, neck (120.0, 131.3), pelvis (120.0, 88.9), head r 4.6; worst point error 0.00 cm; LH->lh bend 3.1 cm, RH->rh bend 3.1 cm, LF->lf bend 7.2 cm, RF->rf bend 6.5 cm
+17:58:16.572 [ 22.657s]PASSED: b1-stick-figure
+17:58:16.572 [ 22.657s][b1-stick-figure] PASSED
+17:58:16.577 [LeafPlugin][PluginViewModel] ✅ Scenario b1-stick-figure completed successfully.
+17:58:19.102 Lens has been reset
+17:58:19.117 Lens has been reset
+17:58:21.164 Lens has been reset
+17:58:21.175 Lens has been reset
+17:58:27.665 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+17:58:27.666 [LeafPlugin][PluginViewModel] Running scenario: t1-top-out
+18:00:58.054 [  0.000s]RUNS: t1-top-out with args: []
+18:00:58.054 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:01:08.422 [T1] followed the plan: RH->up (green), LH->h09 (green), LF->lh (green), RF->rh (green), LH->h20 (green) -> TOPPED
+18:01:10.975 [T1] TOPPED: full in 88 frames to 2 s true, fading in 18 true, gone in 16 true
+18:01:16.144 [T1] LH back down to h09: topped false, glow true, h20 tag "TOP"
+18:01:16.235 [ 18.182s]PASSED: t1-top-out
+18:01:16.235 [ 18.182s][t1-top-out] PASSED
+18:01:16.237 [LeafPlugin][PluginViewModel] ✅ Scenario t1-top-out completed successfully.
+18:01:18.754 Lens has been reset
+18:01:18.764 Lens has been reset
+18:01:20.369 Lens has been reset
+18:01:20.379 Lens has been reset
+18:01:27.077 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:01:27.077 [LeafPlugin][PluginViewModel] Running scenario: l1-label-sizes
+18:04:14.078 [  0.000s]RUNS: l1-label-sizes with args: []
+18:04:14.078 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:04:25.999 [L1] opening, from 250 cm: "2 · LH" 0.0273 (at least 0.0250), "3 · LF" 0.0293 (at least 0.0268), "R hand" 0.0273 (at least 0.0262), "TOP" 0.0396 (at least 0.0362); clear of the glow by GhostNumber_2 0.026, GhostNumber_3 0.165, SuggestLabel 0.017, Tag_h20 0.388; 0 overlaps
+18:04:34.686 [L1] topped: "TOPPED" 0.0628 (at least 0.0578), box x 0.202..0.510 y 0.028..0.091
+18:04:38.269 [L1] at the preset: tag size 64.0; on wall: label size 80.6
+18:04:38.351 [ 24.274s]PASSED: l1-label-sizes
+18:04:38.351 [ 24.274s][l1-label-sizes] PASSED
+18:04:38.353 [LeafPlugin][PluginViewModel] ✅ Scenario l1-label-sizes completed successfully.
+18:04:44.081 Lens has been reset
+18:04:44.093 Lens has been reset
+18:04:45.344 Lens has been reset
+18:04:45.350 Lens has been reset
+18:04:49.970 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:04:49.971 [LeafPlugin][PluginViewModel] Running scenario: p1-pinch-best-limb
+18:06:45.649 [  0.000s]RUNS: p1-pinch-best-limb with args: []
+18:06:45.649 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:06:47.272 [P1] preset rings: h16 LF yellow, up RH green, h09 LH green, h10 LH red, h11 RH yellow, h20 LH red; 4 not the glow's limb, 1 would have looked red for it
+18:06:50.681 [P1] ? on h16: "CRIMP HOLD", rule LF "CRIMP HOLD"
+18:06:52.352 [P1] no limb chosen: pinch on h09: LH=lh RH=rh LF=lf RF=rf -> LH=h09 RH=rh LF=lf RF=rf (want LH to move)
+18:06:54.152 [P1] no limb chosen, a foot: pinch on h16: LH=lh RH=rh LF=lf RF=rf -> LH=lh RH=rh LF=h16 RF=rf (want LF to move)
+18:06:55.976 [P1] the glow itself: pinch on up: LH=lh RH=rh LF=lf RF=rf -> LH=lh RH=up LF=lf RF=rf (want RH to move)
+18:07:04.669 [P1] override LH: pinch on up: LH=lh RH=rh LF=lf RF=rf -> LH=up RH=rh LF=lf RF=rf (want LH to move)
+18:07:06.427 [P1] after the override: pinch on h16: LH=up RH=rh LF=lf RF=rf -> LH=up RH=rh LF=h16 RF=rf (want LF to move)
+18:07:06.664 [ 21.016s]PASSED: p1-pinch-best-limb
+18:07:06.664 [ 21.016s][p1-pinch-best-limb] PASSED
+18:07:06.666 [LeafPlugin][PluginViewModel] ✅ Scenario p1-pinch-best-limb completed successfully.
+18:07:11.078 Lens has been reset
+18:07:11.087 Lens has been reset
+18:07:12.430 Lens has been reset
+18:07:12.435 Lens has been reset
+18:07:16.798 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:07:16.799 [LeafPlugin][PluginViewModel] Running scenario: p2-pinch-out-of-reach
+18:09:02.121 [  0.000s]RUNS: p2-pinch-out-of-reach with args: []
+18:09:02.121 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:09:06.868 [P2] from the start: pinch on h20: LH=lh RH=rh LF=lf RF=rf -> LH=lh RH=rh LF=lf RF=rf; why "OUT OF REACH" for 1.48 s; ring pulse to x1.30, over by 0.44 s; TOPPED in 0 of 142 frames; override null
+18:09:10.007 [P2] view change while it is up: pinch on h20: LH=lh RH=rh LF=lf RF=rf -> LH=lh RH=rh LF=lf RF=rf; why "OUT OF REACH" for 1.49 s; ring pulse to x1.30, over by 0.44 s; TOPPED in 0 of 139 frames; override null
+18:09:13.157 [P2] on wall: pinch on h20: LH=lh RH=rh LF=lf RF=rf -> LH=lh RH=rh LF=lf RF=rf; why "OUT OF REACH" for 1.48 s; ring pulse to x1.30, over by 0.44 s; TOPPED in 0 of 140 frames; override null
+18:09:21.853 [P2] "?" on up while OUT OF REACH was up: "JUG HOLD", still "JUG HOLD" after 1.9 s
+18:09:28.579 [P2] override LF, red, under its step tag: pinch on up: LH=lh RH=rh LF=lf RF=rf -> LH=lh RH=rh LF=lf RF=rf; why "STEP 1 FIRST" for 1.49 s; ring pulse to x1.30, over by 0.43 s; TOPPED in 0 of 140 frames; override LF
+18:09:31.724 [P2] override LF, red, no tag: pinch on h09: LH=lh RH=rh LF=lf RF=rf -> LH=lh RH=rh LF=lf RF=rf; why "OUT OF REACH" for 1.49 s; ring pulse to x1.30, over by 0.45 s; TOPPED in 0 of 137 frames; override LF
+18:09:36.887 [P2] override LH, green: LH=up RH=rh LF=lf RF=rf; override null; why ""
+18:09:38.769 [P2] red RF (rank 0.334) over yellow LF (rank 0.300) on h16: LH=h10 RH=rh LF=h16 RF=rf
+18:09:42.065 [P2] under its step tag, for now: pinch on h20: LH=h09 RH=up LF=lf RF=rf -> LH=h09 RH=up LF=lf RF=rf; why "STEP 1 FIRST" for 1.49 s; ring pulse to x1.30, over by 0.43 s; TOPPED in 0 of 143 frames; override null
+18:09:45.375 [P2] under its step 3 tag: pinch on h20: LH=h09 RH=up LF=lf RF=rf -> LH=h09 RH=up LF=lf RF=rf; why "STEP 1 FIRST" for 1.49 s; ring pulse to x1.30, over by 0.44 s; TOPPED in 0 of 144 frames; override null
+18:09:48.688 [P2] 195 cm, 2 · LH on a red ring: pinch on h10: LH=lh RH=rh LF=lf RF=rf -> LH=lh RH=rh LF=lf RF=rf; why "STEP 1 FIRST" for 1.48 s; ring pulse to x1.30, over by 0.44 s; TOPPED in 0 of 144 frames; override null
+18:09:51.820 [P2] 195 cm, the top hold: pinch on h20: LH=lh RH=rh LF=lf RF=rf -> LH=lh RH=rh LF=lf RF=rf; why "OUT OF REACH" for 1.48 s; ring pulse to x1.30, over by 0.44 s; TOPPED in 0 of 141 frames; override null
+18:09:56.949 [P2] 195 cm, view change while it is up: pinch on h10: LH=lh RH=rh LF=lf RF=rf -> LH=lh RH=rh LF=lf RF=rf; why "STEP 1 FIRST" for 1.46 s; ring pulse to x1.30, over by 0.43 s; TOPPED in 0 of 92 frames; override null
+18:10:00.149 [P2] 195 cm, on wall, no tag drawn: pinch on h10: LH=lh RH=rh LF=lf RF=rf -> LH=lh RH=rh LF=lf RF=rf; why "OUT OF REACH" for 1.48 s; ring pulse to x1.30, over by 0.45 s; TOPPED in 0 of 81 frames; override null
+18:10:03.769 [P2] 195 cm, step 1 made, then h10: LH=h10 RH=up LF=lf RF=rf
+18:10:03.859 [ 61.739s]PASSED: p2-pinch-out-of-reach
+18:10:03.859 [ 61.739s][p2-pinch-out-of-reach] PASSED
+18:10:03.861 [LeafPlugin][PluginViewModel] ✅ Scenario p2-pinch-out-of-reach completed successfully.
+18:10:07.275 Lens has been reset
+18:10:07.289 Lens has been reset
+18:10:08.600 Lens has been reset
+18:10:08.605 Lens has been reset
+18:10:13.172 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:10:13.172 [LeafPlugin][PluginViewModel] Running scenario: h1-hidden-read
+18:12:08.457 [  0.000s]RUNS: h1-hidden-read with args: []
+18:12:08.458 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:12:10.202 [H1] from 250 cm: outline line 3.64 cm, a ring's 3.64 cm
+18:12:18.728 [H1] refused on the top hold: "OUT OF REACH"
+18:12:27.643 [ 19.186s]PASSED: h1-hidden-read
+18:12:27.646 [ 19.189s][h1-hidden-read] PASSED
+18:12:27.648 [LeafPlugin][PluginViewModel] ✅ Scenario h1-hidden-read completed successfully.
+18:12:33.432 Lens has been reset
+18:12:33.439 Lens has been reset
+18:12:34.992 Lens has been reset
+18:12:35.023 Lens has been reset
+18:12:40.024 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:12:40.025 [LeafPlugin][PluginViewModel] Running scenario: h2-show-my-beta
+18:14:46.321 [  0.000s]RUNS: h2-show-my-beta with args: []
+18:14:46.321 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:14:47.910 [H2] button 11 x 10 cm at -7.0,6.5; gaps 3.00 to "?", 3.00 to Body; panel 27.8 x 33.6 cm
+18:14:56.554 [H2] in the pinch frame: betaShown true, 0 problems, position LH=lh RH=rh LF=lf RF=rf
+18:14:58.354 [H2] "Hide beta": betaShown false, 0 leaks in the pinch frame, button "Show my
+18:15:15.623 [H2] a hold added in setup: problem 11 holds, betaShown false
+18:15:30.360 [H2] a hand off the top: betaShown false, attempt 2
+18:15:30.448 [ 44.128s]PASSED: h2-show-my-beta
+18:15:30.448 [ 44.128s][h2-show-my-beta] PASSED
+18:15:30.450 [LeafPlugin][PluginViewModel] ✅ Scenario h2-show-my-beta completed successfully.
+18:15:32.463 Lens has been reset
+18:15:32.473 Lens has been reset
+18:15:33.688 Lens has been reset
+18:15:33.694 Lens has been reset
+18:15:38.314 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:15:38.314 [LeafPlugin][PluginViewModel] Running scenario: h3-hint-ladder
+18:17:33.767 [  0.000s]RUNS: h3-hint-ladder with args: []
+18:17:33.768 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:17:47.620 [H3] step 1: rings on h16, up, h09, h11 ({"yellow":2,"green":2}); out of reach, no ring: lf, rf, lh, rh, h10, h20
+18:17:49.322 [H3] step 2: glow on up, "R hand"
+18:17:51.043 [H3] step 3: in the pinch frame {"step":3,"armed":false,"shown":true,"on":"up","text":"JUG HOLD"} (rule "JUG HOLD"); dots "●●●", hints this go 2
+18:17:52.873 [H3] step 3 from the wall, 70 cm: why "JUG HOLD" on up (best limb RH), ring green; plate x 0.315..0.685 y 0.044..0.137; nearest up 0.020, h09 0.314
+18:17:58.323 [H3] Ground, step 1: rings h16, up, h09, h11, the rest outlined
+18:17:58.420 [ 24.654s]PASSED: h3-hint-ladder
+18:17:58.420 [ 24.654s][h3-hint-ladder] PASSED
+18:17:58.424 [LeafPlugin][PluginViewModel] ✅ Scenario h3-hint-ladder completed successfully.
+18:18:01.881 Lens has been reset
+18:18:01.890 Lens has been reset
+18:18:03.425 Lens has been reset
+18:18:03.430 Lens has been reset
+18:18:09.699 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:18:09.699 [LeafPlugin][PluginViewModel] Running scenario: h4-hint-cue
+18:20:47.197 [  0.000s]RUNS: h4-hint-cue with args: []
+18:20:47.198 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:21:12.638 [H4] first attempt: cue after -1.0 s (-1: none in 22 s); top line ""
+18:21:34.397 [H4] back on the wall after the fall: cue after 20.0 s; top line "? for a hint"
+18:22:07.113 [H4] "?" pinched: cue false, hint step 1, top line ""
+18:22:10.637 [ 83.441s]PASSED: h4-hint-cue
+18:22:10.637 [ 83.441s][h4-hint-cue] PASSED
+18:22:10.640 [LeafPlugin][PluginViewModel] ✅ Scenario h4-hint-cue completed successfully.
+18:22:13.700 Lens has been reset
+18:22:13.714 Lens has been reset
+18:22:14.955 Lens has been reset
+18:22:14.960 Lens has been reset
+18:22:19.225 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:22:19.226 [LeafPlugin][PluginViewModel] Running scenario: h5-came-off
+18:24:03.640 [  0.000s]RUNS: h5-came-off with args: []
+18:24:03.640 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:24:21.518 [H5] stepped back past 120 cm after two moves: "Came off at move 3. Hint for that move?", view ground, attempt 1 -> 2, LH=h09 RH=up LF=lf RF=rf
+18:24:21.591 [H5] from 250 cm the card is drawn x2.27
+18:24:23.263 [H5] the card pinched: {"step":1,"shown":false,"rings":5,"pos":{"LH":"h09","RH":"up","LF":"lf","RF":"rf"}}; 5 holds in reach at that position (lh, rh, h16, h10, h11)
+18:24:25.028 [H5] second rung: glow on lh, "L foot" (rule LF->lh)
+18:24:27.011 [H5] one move on, stepped back: "Came off at move 4. Hint for that move?"
+18:24:39.874 [H5] beta shown, stepped back after a move: attempt 1 -> 2, card false, Again true
+18:24:45.747 [H5] from 2.5 m, level: CameOffCard x 0.235..0.765 y 0.791..0.941
+18:24:45.749 [H5] from 2.5 m, level: AgainButton x 0.264..0.497 y 0.138..0.287
+18:24:45.941 [ 42.302s]PASSED: h5-came-off
+18:24:45.941 [ 42.302s][h5-came-off] PASSED
+18:24:45.945 [LeafPlugin][PluginViewModel] ✅ Scenario h5-came-off completed successfully.
+18:24:50.199 Lens has been reset
+18:24:50.207 Lens has been reset
+18:24:51.570 Lens has been reset
+18:24:51.579 Lens has been reset
+18:24:57.859 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:24:57.860 [LeafPlugin][PluginViewModel] Running scenario: e1-tag-own-badge
+18:27:36.459 [  0.000s]RUNS: e1-tag-own-badge with args: []
+18:27:36.460 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:27:38.077 [E1] badge vs green: 0.92
+18:27:38.077 [E1] badge vs yellow: 1.44
+18:27:38.078 [E1] badge vs red: 1.34
+18:27:38.100 [E1] preset: 2 on h09: neutral outline (its score from here green), 3 on lh: neutral outline (its score from here none, occupied); tags: 2 on h09: neutral outline, 3 on lh: neutral outline; styles: green solid x2, red broken x2, yellow dashed x2
+18:27:46.713 [E1] 195 cm: 2 on h10: neutral outline (its score from here red), 3 on lh: neutral outline (its score from here none, occupied)
+18:27:51.869 [E1] ? on h10: "STEP 2"
+18:27:53.590 [E1] pinch on h10: why "STEP 1 FIRST", LH on lh
+18:27:55.337 [E1] 195 cm, after step 1: 2 on lh: neutral outline (its score from here none, occupied), 3 on h20: neutral outline (its score from here red); h10 glowing true, its own colour green
+18:27:57.189 [E1] after up: 2 on lh: neutral outline (its score from here none, occupied), 3 on h20: neutral outline (its score from here red)
+18:27:58.904 [E1] after h09: 2 on h20: neutral outline (its score from here red)
+18:28:00.608 [E1] after lh: 2 on h20: neutral outline (its score from here yellow)
+18:28:02.338 [E1] after rh:
+18:28:02.443 [ 25.985s]PASSED: e1-tag-own-badge
+18:28:02.443 [ 25.985s][e1-tag-own-badge] PASSED
+18:28:02.445 [LeafPlugin][PluginViewModel] ✅ Scenario e1-tag-own-badge completed successfully.
+18:28:05.334 Lens has been reset
+18:28:05.340 Lens has been reset
+18:28:06.803 Lens has been reset
+18:28:06.808 Lens has been reset
+18:28:13.429 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:28:13.429 [LeafPlugin][PluginViewModel] Running scenario: g1-control-count
+18:31:01.642 [  0.000s]RUNS: g1-control-count with args: []
+18:31:01.643 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:31:03.320 [G1] mats: 4 buttons (ShowBetaButton 11x10, AskButton 11x10, BodyButton 11x10, SetupButton 11x10), least gap 3.00 cm; texts "Show my beta", "?", "•", "•", "•", "Body", "Setup", "Planned for 175 cm", "Bouldering/top-rope aid. Not a spotter."
+18:31:05.073 [G1] mats, beta shown: 4 buttons (ShowBetaButton 11x10, AskButton 11x10, BodyButton 11x10, SetupButton 11x10), least gap 3.00 cm; texts "Hide beta", "?", "Body", "Setup", "Planned for 175 cm", "Bouldering/top-rope aid. Not a spotter."
+18:31:06.816 [G1] body: 4 buttons (Toggle_LH 11x10, Toggle_RH 11x10, Toggle_LF 11x10, Toggle_RF 11x10), least gap 3.00 cm; texts "Pick a limb", "LH", "RH", "LF", "RF", "Planned for 175 cm", "Bouldering/top-rope aid. Not a spotter."
+18:31:08.610 [G1] LF picked: 4 buttons (ShowBetaButton 11x10, AskButton 11x10, BodyButton 11x10, SetupButton 11x10), least gap 3.00 cm; texts "Limb override: LF", "Hide beta", "?", "Body", "Setup", "Planned for 175 cm", "Bouldering/top-rope aid. Not a spotter."
+18:31:10.342 [G1] setup: 5 buttons (SetupButton 11x10, ModeSwitch 11x10, ViewToggle 11x10, HeightDown 5x5, HeightUp 5x5), least gap 1.00 cm; texts "Limb override: LF", "Setup", "Marknholds", "Ground", "175 cm", "−", "+", "Planned for 175 cm", "Bouldering/top-rope aid. Not a spotter."
+18:31:12.275 [G1] wall: 3 buttons (AskButton 11x10, BodyButton 11x10, SetupButton 11x10), least gap 3.00 cm; texts "?", "•", "•", "•", "Body", "Setup", "Planned for 175 cm", "Bouldering/top-rope aid. Not a spotter."
+18:31:12.277 [G1] before (session 23): 10 buttons while climbing (LH, RH, ?, LF, RF, Setup/Climb, View, Show my beta, −, +), 8 x 5 cm, 2 cm gaps; now 4
+18:31:12.378 [ 10.737s]PASSED: g1-control-count
+18:31:12.379 [ 10.738s][g1-control-count] PASSED
+18:31:12.383 [LeafPlugin][PluginViewModel] ✅ Scenario g1-control-count completed successfully.
+18:31:14.373 Lens has been reset
+18:31:14.381 Lens has been reset
+18:31:15.990 Lens has been reset
+18:31:15.995 Lens has been reset
+18:31:22.993 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:31:22.994 [LeafPlugin][PluginViewModel] Running scenario: k1-result-card
+18:34:21.703 [  0.000s]RUNS: k1-result-card with args: []
+18:34:21.703 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:34:31.884 [K1] go 1: RH->up, LH->h09, LF->lh, RF->rh, LH->h20; top frame {"pos":{"LH":"h20","RH":"up","LF":"lh","RF":"rh"},"topped":true,"result":true,"card":false,"again":false}
+18:34:34.290 [K1] go 1 card: ONSIGHT | 5 moves · par for your body 4 | Clean onsight. Pick something harder? (par from the test: 4)
+18:34:34.295 [K1] kept under nh.best.de635afc: {"g":1,"b":{"t":"ONSIGHT","n":1,"m":5,"h":0}}; store max 10240 bytes
+18:34:35.938 [K1] Again: {"pos":{"LH":"lh","RH":"rh","LF":"lf","RF":"rf"},"card":false,"go":2,"beta":false,"moves":0}
+18:34:48.737 [K1] go 2 card: SEND (attempt 2) | 5 moves · par for your body 4 | Hints: 0 · Best: ONSIGHT, 5 moves
+18:35:04.877 [K1] go 3 card: SEND (attempt 3) | 5 moves · par for your body 4 | Hints: 1 · Best: ONSIGHT, 5 moves
+18:35:29.693 [K1] 195 cm card: FLASH | 5 moves · par for your body 4 | Hints: 0 · New best (par from the test: 4)
+18:35:31.548 [ 69.846s]PASSED: k1-result-card
+18:35:31.548 [ 69.846s][k1-result-card] PASSED
+18:35:31.551 [LeafPlugin][PluginViewModel] ✅ Scenario k1-result-card completed successfully.
+18:35:35.205 Lens has been reset
+18:35:35.223 Lens has been reset
+18:35:37.309 Lens has been reset
+18:35:37.316 Lens has been reset
+18:35:43.862 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:35:43.862 [LeafPlugin][PluginViewModel] Running scenario: k2-fall-again-pinned
+18:38:31.565 [  0.000s]RUNS: k2-fall-again-pinned with args: []
+18:38:31.565 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:38:36.963 [K2] fell at LH=h09 RH=up LF=lf RF=rf: "Came off at move 3. Hint for that move?", Again true, go 2
+18:38:38.724 [K2] the card's hint: step 1, pinned {"at":"h09/up/lf/rf","step":1}, card false, Again true
+18:38:40.390 [K2] Again: {"pos":{"LH":"lh","RH":"rh","LF":"lf","RF":"rf"},"card":false,"step":0,"go":2,"moves":0}
+18:38:43.891 [K2] back at the fall's position: {"step":1,"pos":{"LH":"h09","RH":"up","LF":"lf","RF":"rf"},"rings":5,"others":[]}; in reach lh, rh, h16, h10, h11
+18:38:47.363 [K2] move 3 (LF->lh) made: step 0, pin null
+18:38:47.609 [ 16.045s]PASSED: k2-fall-again-pinned
+18:38:47.609 [ 16.045s][k2-fall-again-pinned] PASSED
+18:38:47.611 [LeafPlugin][PluginViewModel] ✅ Scenario k2-fall-again-pinned completed successfully.
+18:38:50.046 Lens has been reset
+18:38:50.055 Lens has been reset
+18:38:51.610 Lens has been reset
+18:38:51.617 Lens has been reset
+18:38:58.639 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:38:58.639 [LeafPlugin][PluginViewModel] Running scenario: k3-kept
+18:41:58.102 [  0.000s]RUNS: k3-kept with args: []
+18:41:58.102 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:42:03.163 [K3] after −: 170 cm, kept 170, "Planned for 170 cm" (wrote nh.height 170)
+18:42:03.217 [K3] opened with 160 kept: 160 cm, reach 70.4, "Planned for 160 cm", label "160 cm"
+18:42:03.235 [K3] at 160 cm 6 rings by the test's rule
+18:42:18.834 [K3] an in-memory store reports a cap of 0 bytes; the Lens uses 10240
+18:42:29.841 [K3] a store near its 10240 bytes: card "FLASH | 5 moves · par for your body 4 | Hints: 0 · New best", last write "skipped nh.best.de635afc", key kept false
+18:42:29.841 [K3] the real store: max 102400 bytes; keys before []; smoke before none; wrote "s24-216.743", read "s24-216.743", removed true
+18:42:29.953 [ 31.852s]PASSED: k3-kept
+18:42:29.953 [ 31.852s][k3-kept] PASSED
+18:42:29.956 [LeafPlugin][PluginViewModel] ✅ Scenario k3-kept completed successfully.
+18:42:31.980 Lens has been reset
+18:42:31.988 Lens has been reset
+18:42:33.577 Lens has been reset
+18:42:33.587 Lens has been reset
+18:42:39.908 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:42:39.908 [LeafPlugin][PluginViewModel] Running scenario: k4-reopen-write
+18:45:16.154 [  0.000s]RUNS: k4-reopen-write with args: []
+18:45:16.155 [  0.003s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:45:33.018 [K4] the real store now holds nh.height = 165 (wrote nh.height 165); keys [nh.test.reopen, nh.height]
+18:45:33.149 [ 16.997s]PASSED: k4-reopen-write
+18:45:33.149 [ 16.997s][k4-reopen-write] PASSED
+18:45:33.153 [LeafPlugin][PluginViewModel] ✅ Scenario k4-reopen-write completed successfully.
+18:45:34.571 Lens has been reset
+18:45:34.580 Lens has been reset
+18:45:36.206 Lens has been reset
+18:45:36.223 Lens has been reset
+18:45:42.832 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:45:42.833 [LeafPlugin][PluginViewModel] Running scenario: k5-reopen-read
+18:48:32.071 [  0.000s]RUNS: k5-reopen-read with args: []
+18:48:32.072 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:48:33.567 [K5] after the reset the Lens opened at 165 cm ("Planned for 165 cm", reach 72.6); marker 165
+18:48:33.567 [K5] the real store left with keys []
+18:48:33.709 [  1.639s]PASSED: k5-reopen-read
+18:48:33.710 [  1.640s][k5-reopen-read] PASSED
+18:48:33.710 [LeafPlugin][PluginViewModel] ✅ Scenario k5-reopen-read completed successfully.
+18:48:37.580 Lens has been reset
+18:48:37.590 Lens has been reset
+18:48:39.172 Lens has been reset
+18:48:39.177 Lens has been reset
+18:48:45.419 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:48:45.420 [LeafPlugin][PluginViewModel] Running scenario: d1-demo-autopilot
+18:51:23.117 [  0.000s]RUNS: d1-demo-autopilot with args: []
+18:51:23.117 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:51:34.347 [d1] s4-155: row x 0.087..0.165 y 0.678..0.745 .. x 0.170..0.248 y 0.678..0.746, badge 2 x 0.570..0.649 y 0.449..0.475
+18:51:34.350 [d1] s4-155: glow of up x 0.727..0.959 y 0.361..0.560
+18:51:35.596 [d1] s4-195: row x 0.087..0.165 y 0.678..0.745 .. x 0.170..0.248 y 0.678..0.746, badge 2 x 0.506..0.584 y 0.442..0.468
+18:51:35.599 [d1] s4-195: glow of up x 0.727..0.959 y 0.361..0.560
+18:51:37.464 [d1] s5-lf: glow of lh x 0.071..0.340 y 0.464..0.699
+18:51:38.240 [d1] s5-why: why "POCKET HOLD · HIGH STEP" on h11 (override LF), ring red; plate x 0.520..0.949 y 0.340..0.412; nearest h11 0.007, rh 0.110
+18:51:39.088 [d1] s6-away: arrow at -0.78,-0.46 toward lh at -2.03,-1.19 (0° off, mesh 0°); row x -1.785..-0.751 y 0.768..1.524
+18:51:41.708 [d1] s8-plan: glow of lh x 0.067..0.360 y 0.705..0.968
+18:51:41.997 [d1] s8-rf: glow of rh x 0.491..0.785 y 0.705..0.968
+18:51:42.278 [d1] s8-lh: glow of h20 x 0.146..0.422 y 0.113..0.345
+18:51:42.985 [d1] s0-ground-read t=2.7: ok
+18:51:42.985 [d1] s1-lower t=17.6: ok
+18:51:42.985 [d1] s1-upper t=27.1: ok
+18:51:42.985 [d1] s2-still-ground t=36.1: ok
+18:51:42.985 [d1] s2-on-wall t=47.1: ok
+18:51:42.985 [d1] s3-after-pinch t=54.6: ok
+18:51:42.985 [d1] s3-ground-again t=61.3: ok
+18:51:42.985 [d1] s4-start t=68.1: ok
+18:51:42.985 [d1] s4-155 t=74.1: ok
+18:51:42.985 [d1] s4-195 t=84.0: ok
+18:51:42.985 [d1] s5-lf t=99.1: ok
+18:51:42.985 [d1] s5-why t=105.0: ok
+18:51:42.986 [d1] s6-away t=112.0: ok
+18:51:42.986 [d1] s6-back t=116.6: ok
+18:51:42.986 [d1] s7-picker t=120.9: ok
+18:51:42.986 [d1] s7-crimp t=122.4: ok
+18:51:42.986 [d1] s7-start t=124.0: ok
+18:51:42.986 [d1] s7-done t=125.7: ok
+18:51:42.986 [d1] s7-reopened t=127.5: ok
+18:51:42.986 [d1] s7-removed t=129.0: ok
+18:51:42.986 [d1] s8-plan t=132.9: ok
+18:51:42.986 [d1] s8-rf t=135.3: ok
+18:51:42.986 [d1] s8-lh t=137.5: ok
+18:51:42.986 [d1] s8-topped t=138.3: ok
+18:51:42.986 [d1] end t=141.1: ok
+18:51:42.986 [d1] every frame: 94 On wall frames, panel vs ring clear; 12 height changes in scene 4, the −/+ row in shot at each
+18:51:42.987 [d1] ripples: 37 of 37 pinches; on holds, on screen at: up@50.8 (scene 3) centre 0.50,0.50 ±0.29; rh@66.7 (scene 4) centre 0.89,0.61 ±0.08; up@94.3 (scene 5) centre 0.50,0.38 ±0.09; h09@96.6 (scene 5) centre 0.35,0.38 ±0.08; h11@100.8 (scene 5) centre 0.74,0.47 ±0.08; h12@119.9 (scene 7) centre 0.89,0.66 ±0.12; h12@126.1 (scene 7) centre 0.90,0.67 ±0.12; lh@133.3 (scene 8) centre 0.21,0.83 ±0.10; rh@135.7 (scene 8) centre 0.64,0.83 ±0.10; h20@138.0 (scene 8) centre 0.28,0.23 ±0.10
+18:51:42.987 [d1] scenes 0@0.0 1@8.1 2@30.1 3@48.0 4@65.1 5@90.2 6@105.4 7@117.1 8@130.1
+18:51:43.159 [ 20.043s]PASSED: d1-demo-autopilot
+18:51:43.160 [ 20.044s][d1-demo-autopilot] PASSED
+18:51:43.160 [LeafPlugin][PluginViewModel] ✅ Scenario d1-demo-autopilot completed successfully.
+18:51:50.693 Lens has been reset
+18:51:50.702 Lens has been reset
+18:51:51.947 Lens has been reset
+18:51:51.952 Lens has been reset
+18:51:56.249 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:51:56.250 [LeafPlugin][PluginViewModel] Running scenario: c1-open-rings
+18:53:41.959 [  0.000s]RUNS: c1-open-rings with args: []
+18:53:41.960 [  0.003s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:53:43.688 [C1] after restore: limb RH, reference colours green 2 / yellow 2 / red 2, 0 mismatches; styles: green solid x2, red broken x2, yellow dashed x2
+18:53:43.689 [  1.732s]PASSED: c1-open-rings
+18:53:43.689 [  1.732s][c1-open-rings] PASSED
+18:53:43.689 [LeafPlugin][PluginViewModel] ✅ Scenario c1-open-rings completed successfully.
+18:53:46.605 Lens has been reset
+18:53:46.613 Lens has been reset
+18:53:48.135 Lens has been reset
+18:53:48.141 Lens has been reset
+18:53:54.019 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:53:54.020 [LeafPlugin][PluginViewModel] Running scenario: c2-pinch-move
+18:56:22.623 [  0.000s]RUNS: c2-pinch-move with args: []
+18:56:22.624 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:56:25.951 [C2] move 1: RH rh -> up; now LH=lh RH=up LF=lf RF=rf; selected LH; reference best LH->h09
+18:56:25.951 [C2] move 1: 2 rings changed colour/visibility in the pinch frame
+18:56:27.770 [C2] move 2: RH up -> rh; now LH=lh RH=rh LF=lf RF=rf; selected RH; reference best RH->up
+18:56:27.770 [C2] move 2: 2 rings changed colour/visibility in the pinch frame
+18:56:33.221 [C2] move 3 (RF -> h16): RF rf -> h16; now LH=lh RH=rh LF=lf RF=h16; selected RH; reference best RH->up
+18:56:33.222 [C2] move 3 (RF -> h16): 5 rings changed colour/visibility in the pinch frame
+18:56:36.248 [C2] ripple on a pinch of up: shown true in the pinch frame, 0.00 cm from the hold, logged "up"
+18:56:36.249 [C2] ripple: band 3.64 cm (ring line 1.82), radius 11.3 -> 20.4 cm
+18:56:36.250 [C2] ripple: shown in 18 frames, last at 392 ms, gone at 416 ms
+18:56:39.732 [C2] ripple on a pinch of Toggle_LF: logged "Toggle_LF", 0.00 cm from the button, shown false
+18:56:39.854 [ 17.232s]PASSED: c2-pinch-move
+18:56:39.854 [ 17.232s][c2-pinch-move] PASSED
+18:56:39.856 [LeafPlugin][PluginViewModel] ✅ Scenario c2-pinch-move completed successfully.
+18:56:44.272 Lens has been reset
+18:56:44.281 Lens has been reset
+18:56:45.821 Lens has been reset
+18:56:45.827 Lens has been reset
+18:56:52.085 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+18:56:52.085 [LeafPlugin][PluginViewModel] Running scenario: c3-reach-and-jug
+18:59:32.248 [  0.000s]RUNS: c3-reach-and-jug with args: []
+18:59:32.249 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+18:59:37.352 [C3] LH: 3 problem holds beyond reach, all checked red
+18:59:40.796 [C3] RH: 3 problem holds beyond reach, all checked red
+18:59:44.307 [C3] LF: 5 problem holds beyond reach, all checked red
+18:59:47.797 [C3] RF: 5 problem holds beyond reach, all checked red
+18:59:51.236 [C3] up: type jug, 58.8 cm from the RH shoulder (80% of reach = 61.6), y 190 vs COM 96.3, feet on true
+18:59:58.159 [C3] RH: qualifying jug up renders green
+18:59:58.160 [ 25.913s]PASSED: c3-reach-and-jug
+18:59:58.160 [ 25.913s][c3-reach-and-jug] PASSED
+18:59:58.161 [LeafPlugin][PluginViewModel] ✅ Scenario c3-reach-and-jug completed successfully.
+19:00:02.018 Lens has been reset
+19:00:02.026 Lens has been reset
+19:00:03.617 Lens has been reset
+19:00:03.622 Lens has been reset
+19:00:09.533 [LeafPlugin][PluginViewModel] Loaded 35 scenario(s) from preview.
+19:00:09.533 [LeafPlugin][PluginViewModel] Running scenario: c4-suggestion-label-arrow
+19:02:39.090 [  0.000s]RUNS: c4-suggestion-label-arrow with args: []
+19:02:39.091 [  0.006s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+19:02:57.341 [C4] pinch frame: label "R hand" opacity 1.00 enabled true
+19:02:59.317 [C4] label "R hand" opacity: 0.55s 1.00, 1.2s 1.00, 1.8s 0.36, 2.5s 0.00 (object enabled false)
+19:02:59.359 [C4] open suggestion up in view (camera.isSphereVisible): true; arrow false
+19:02:59.364 [C4] problem holds out of view: lf,rf,h16,h10,h11,h20
+19:03:09.905 [C4] after RF->h16, RH->up: Lens suggests LH->h10, reference LH->h10
+19:03:09.909 [C4] arrow camera-local (-18.1, 15.4, -80.0), hold (-58.5, 50.0, -125.0), arrow in view true
+19:03:09.909 [ 30.824s]PASSED: c4-suggestion-label-arrow
+19:03:09.909 [ 30.824s][c4-suggestion-label-arrow] PASSED
+19:03:09.911 [LeafPlugin][PluginViewModel] ✅ Scenario c4-suggestion-label-arrow completed successfully.
