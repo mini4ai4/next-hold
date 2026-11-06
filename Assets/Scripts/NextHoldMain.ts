@@ -1842,7 +1842,9 @@ export class NextHoldMain extends BaseScriptComponent {
   private rippleButton(name: string): void {
     let so = this.uiObjects[name]
     if (!so) {
-      so = findUnder(this.controlRow.getSceneObject(), name) || findUnder(this.typePicker.getSceneObject(), name)
+      // session 28: and the cards' buttons (CameOffCard, AgainButton): a pinch on them never rippled
+      so = findUnder(this.controlRow.getSceneObject(), name) || findUnder(this.typePicker.getSceneObject(), name) ||
+        findUnder(this.callouts.getSceneObject(), name)
       if (!so) return
       this.uiObjects[name] = so
     }

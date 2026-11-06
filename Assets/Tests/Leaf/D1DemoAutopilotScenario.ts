@@ -17,12 +17,13 @@
 // eye distance (no sizing camera). It also checks that idle the autopilot touches nothing, every
 // scene start is logged in order, and stop() hands back tracking, hidden objects and colours.
 // Session 23: the Lens opens with beta hidden; play() sets it shown itself, so this starts from hidden.
+// Session 28: this is the legacy v4 take (V4_TAKE, betaShownAtStart); the video's v7 take is d2's.
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {findSceneObjectsByName, sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {DemoAutopilot} from "../../Scripts/Demo/DemoAutopilot"
-import {ACTIONS, CHECKS, DemoAction, HIDE_WHILE_PLAYING, SCENES} from "../../Scripts/Demo/DemoTimeline"
+import {ACTIONS, CHECKS, DemoAction, HIDE_WHILE_PLAYING, SCENES, V4_TAKE} from "../../Scripts/Demo/DemoTimeline"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {HOLDS} from "../../Scripts/Wall/WallLayout"
 import {AGAIN_GAP, AGAIN_W, RESULT_HALF_W} from "../../Scripts/NextHoldCalloutUI"
@@ -326,7 +327,8 @@ export class D1DemoAutopilotScenario extends Scenario {
     let rippleSeen = rippleFrom
     const rippleShots: string[] = []
     try {
-      pilot.play(SPEED)
+      // session 28: the legacy v4 take (the video's take is v7, checked by d2)
+      pilot.play(SPEED, 0, V4_TAKE)
       if (!pilot.isPlaying()) throw new Error("play() did not start")
       await frames(2)
       if (tracking && tracking.enabled) errs.push("device tracking still on while playing")

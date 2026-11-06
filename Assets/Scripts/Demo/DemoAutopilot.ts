@@ -1,9 +1,11 @@
-// DemoAutopilot — plays the demo video's scenes 0-8 (devpost/VIDEO_PLAN.md) by itself, so the
-// take is the real Lens running, smooth and the same every time. OFF unless "Play On Start" is
-// ticked (or a LEAF scenario calls play()): with it off this component binds nothing and changes nothing.
+// DemoAutopilot — plays the demo video's take by itself, so the take is the real Lens running, smooth and the
+// same every time. OFF unless "Play On Start" is ticked (or a LEAF scenario calls play()): with it off this
+// component binds nothing and changes nothing.
 //
-// The timeline is data, in DemoTimeline.ts. At play() it sets the beta shown (no pinch, no ripple), and
-// leaves it so: the take's beats are the full read, as before beta on request. Session 24: it also hands
+// The takes are data. Session 28: the default is the v7 take (DemoTimelineV7.ts, LEAF d2), which opens as the Lens
+// opens, with beta hidden, and reaches every state with the pinch, or the preview's typed voice, that reaches it.
+// The legacy v4 take (DemoTimeline.ts, "Legacy V4 Take", LEAF d1) sets the beta shown at play() (no pinch, no
+// ripple): its beats are the full read, as before beta on request. Session 24: it also hands
 // the Lens a fresh in-memory store and sets 175 cm, so a height or a best kept in the preview never changes
 // the take, and the take keeps nothing. While it plays:
 // - it holds the wearer's camera: device tracking is paused and the eye eases between CAMERA keys
@@ -23,9 +25,8 @@
 import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/CameraProvider/WorldCameraFinderProvider"
 import {NextHoldMain} from "../NextHoldMain"
 import {Limb} from "../NextHoldScoring"
-import {
-  ACTIONS, CAMERA, CHECKS, CameraKey, DemoAction, END, FADE_SECONDS, HIDE_WHILE_PLAYING, OVERLAYS_FROM, SCENES, START_DELAY,
-} from "./DemoTimeline"
+import {CameraKey, DemoAction, DemoTake, FADE_SECONDS, HIDE_WHILE_PLAYING, OVERLAYS_FROM, START_DELAY, V4_TAKE} from "./DemoTimeline"
+import {V7_TAKE} from "./DemoTimelineV7"
 
 /** after END the last pose holds this long (timeline s) before tracking comes back */
 const END_HOLD = 2
@@ -60,6 +61,13 @@ export class DemoAutopilot extends BaseScriptComponent {
   @hint("Hide what isn't the product while playing: the LEAF banner, SIK's cursor and hand visuals, collider wireframes")
   hideChrome: boolean = true
 
+  @input
+  @hint("Play the legacy v4 take (the full read from the first frame) instead of the v7 take. OFF for the video")
+  legacyV4Take: boolean = false
+
+  private take: DemoTake = V7_TAKE
+  /** the card gate's wait so far (real s), for the log */
+  private waited = 0
   private playing = false
   private scale = 1
   /** the timeline time play() started from, and the getTime() it is reached at (after the pre-roll) */
@@ -88,12 +96,15 @@ export class DemoAutopilot extends BaseScriptComponent {
 
   /** Start the timeline at `scale` x real time, after START_DELAY s of pre-roll (shortened when
    *  faster than real time) holding the first pose. From `from` > 0: every action before it runs now. */
-  play(scale = 1, from = 0): void {
+  play(scale = 1, from = 0, take?: DemoTake): void {
     if (this.playing) return
     if (!this.main || !this.main.isReady()) {
       print("[DemoAutopilot] ERROR: NextHoldMain not wired or not ready")
       return
     }
+    this.take = take || (this.legacyV4Take ? V4_TAKE : V7_TAKE)
+    const END = this.take.end
+    this.waited = 0
     this.scale = Math.max(0.01, scale)
     this.from = Math.max(0, Math.min(END, from))
     this.t0 = getTime() + START_DELAY / Math.max(1, this.scale)
@@ -107,8 +118,14 @@ export class DemoAutopilot extends BaseScriptComponent {
     this.main.useStore(GeneralDataStore.create())
     this.main.setHeightCm(175)
     this.main.reloadFromStore()
-    // session 23: the Lens opens with beta hidden; the take is the full read, from its first frame
-    this.main.setBetaShown()
+    const {scenes: SCENES, actions: ACTIONS, checks: CHECKS} = this.take
+    if (this.take.betaShownAtStart) {
+      // the legacy v4 take only: the full read from its first frame (session 23: the Lens opens with beta hidden)
+      this.main.setBetaShown()
+    } else if (this.main.isBetaShown()) {
+      // session 28: the v7 take opens as the Lens opens; it sets nothing, it says so
+      print("[DemoAutopilot] WARNING: the beta is shown at the take's start; the v7 take opens with it hidden (refresh the preview)")
+    }
     while (this.nextAction < ACTIONS.length && ACTIONS[this.nextAction].t < this.from) this.run(ACTIONS[this.nextAction++])
     while (this.nextCheck < CHECKS.length && CHECKS[this.nextCheck].t < this.from) this.nextCheck++
     while (this.nextScene < SCENES.length && SCENES[this.nextScene].start < this.from) this.nextScene++
@@ -123,7 +140,7 @@ export class DemoAutopilot extends BaseScriptComponent {
       this.createEvent("LateUpdateEvent").bind(() => this.lateUpdate())
     }
     const preroll = START_DELAY / Math.max(1, this.scale)
-    print(`[DemoAutopilot] play x${this.scale}: ${preroll.toFixed(1)} s pre-roll, then t=${this.from.toFixed(1)}-${END} ` +
+    print(`[DemoAutopilot] play the ${this.take.name} take x${this.scale}: ${preroll.toFixed(1)} s pre-roll, then t=${this.from.toFixed(1)}-${END} ` +
       `(${((END - this.from + END_HOLD) / this.scale).toFixed(1)} s, scenes 0-${SCENES.length - 1})`)
     this.update()
   }
@@ -148,6 +165,9 @@ export class DemoAutopilot extends BaseScriptComponent {
   getTimelineTime(): number { return this.from + (getTime() - this.t0) * this.scale }
   getOverlayAlpha(): number { return this.alpha }
   getSceneLog(): {n: number; t: number}[] { return this.sceneLog.slice() }
+  /** session 28: the take playing (or last played), and how long its card gate waited (real s) */
+  getTake(): DemoTake { return this.take }
+  getCardWait(): number { return this.waited }
   /** fn(key) runs at each CHECKS entry's time, late in that frame; returns an unsubscribe */
   addCheckListener(fn: (key: string) => void): () => void {
     this.checkListeners.push(fn)
@@ -157,6 +177,15 @@ export class DemoAutopilot extends BaseScriptComponent {
   // ── the timeline ──────────────────────────────────────────────────────────
   private update(): void {
     if (!this.playing) return
+    const {scenes: SCENES, actions: ACTIONS, checks: CHECKS, end: END} = this.take
+    // session 28, the card gate: while the next action is waitCard, due, and the card isn't up, the timeline stands
+    // still there (t0 moves with the clock)
+    const gate = this.nextAction < ACTIONS.length ? ACTIONS[this.nextAction] : null
+    if (gate && gate.do === "waitCard" && this.getTimelineTime() >= gate.t && !this.main.isResultVisible()) {
+      const before = this.t0
+      this.t0 = getTime() - (gate.t - this.from) / this.scale
+      this.waited += Math.max(0, this.t0 - before)
+    }
     const t = this.getTimelineTime()
     // the pre-roll holds the start point's pose and overlay alpha
     const at = Math.max(t, this.from)
@@ -174,6 +203,8 @@ export class DemoAutopilot extends BaseScriptComponent {
         this.sceneLog.push({n: sc.n, t})
         print(`SCENE ${sc.n} start t=${sc.start.toFixed(1)}  (${sc.title})`)
       } else if (a === first) {
+        // the card gate holds everything after it until the card is up
+        if (ACTIONS[this.nextAction].do === "waitCard" && !this.main.isResultVisible()) break
         this.run(ACTIONS[this.nextAction++])
       } else {
         // a check reads what is drawn: it runs late in this frame, after the alpha is applied, and
@@ -213,6 +244,13 @@ export class DemoAutopilot extends BaseScriptComponent {
       case "pressDone": m.pressDone(); break
       case "pressRemove": m.pressRemove(); break
       case "showLabel": m.showLabelAgain(); break
+      // session 28
+      case "pressShowBeta": m.pressShowBeta(); break
+      case "pressCameOffHint": m.pressCameOffHint(); break
+      case "pressAgain": m.pressAgain(); break
+      case "pressBody": m.pressBody(); break
+      case "say": if (!m.injectVoice(String(a.arg))) print(`[DemoAutopilot] "say" needs the preview's typed voice source (it is ${m.getVoiceKind()})`); break
+      case "waitCard": if (this.waited > 0) print(`[DemoAutopilot] the card gate waited ${this.waited.toFixed(1)} s for the card`); break
     }
   }
 
@@ -237,7 +275,7 @@ export class DemoAutopilot extends BaseScriptComponent {
   /** the eye's pose at timeline t: eased between the keys around it, or the key itself after a cut */
   private placeCamera(t: number): void {
     if (!this.camT) return
-    const p = poseAt(t)
+    const p = poseAt(t, this.take.camera)
     this.camT.setWorldPosition(new vec3(p.x, p.y, p.z))
     const d = Math.PI / 180
     this.camT.setWorldRotation(quat.angleAxis(-p.yaw * d, vec3.up()).multiply(quat.angleAxis(p.pitch * d, vec3.right())))
@@ -315,9 +353,8 @@ export class DemoAutopilot extends BaseScriptComponent {
   }
 }
 
-/** the eye's pose at timeline t (DemoTimeline.CAMERA) */
-export function poseAt(t: number): CameraKey {
-  const k = CAMERA
+/** the eye's pose at timeline t on a take's camera keys */
+export function poseAt(t: number, k: CameraKey[]): CameraKey {
   if (t <= k[0].t) return k[0]
   for (let i = 0; i + 1 < k.length; i++) {
     const a = k[i], b = k[i + 1]

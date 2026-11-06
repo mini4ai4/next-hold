@@ -1,4 +1,6 @@
-// DemoTimeline — the demo video's scenes 0-8 (devpost/VIDEO_PLAN.md) as data, for DemoAutopilot.
+// DemoTimeline — the v4 demo take's scenes 0-8 (VIDEO_PLAN v4) as data, for DemoAutopilot. Session 28: this is the
+// LEGACY take (it opens with the full read, betaShownAtStart), kept so LEAF d1 still checks those beats; the video's
+// take is the v7 timeline in DemoTimelineV7.ts (opens with beta hidden), checked by LEAF d2.
 //
 // Everything here is in timeline seconds from the start of the take (scene 0 = 0.0). The autopilot
 // waits START_DELAY seconds after the Lens starts, then plays this; its Time Scale input speeds the
@@ -19,10 +21,25 @@ export const START_DELAY = 3
 
 export interface DemoScene { n: number; start: number; title: string }
 export interface CameraKey { t: number; x: number; y: number; z: number; pitch: number; yaw: number; cut?: boolean }
+// session 28: + pressShowBeta, pressCameOffHint, pressAgain, pressBody (the v7 buttons), say (the preview's typed voice,
+// arg = the words) and waitCard (a gate: the timeline stops here until the result card is up; TOPPED fades in real
+// time, so at real speed the card is already up and nothing waits, while a sped-up run waits for it)
 export type DemoActionName = "pressLimb" | "pressHold" | "pressHeight" | "pressAsk" | "pressMode" | "pressView" |
-  "pickType" | "pressStart" | "pressTop" | "pressDone" | "pressRemove" | "showLabel" | "pressSetup"
+  "pickType" | "pressStart" | "pressTop" | "pressDone" | "pressRemove" | "showLabel" | "pressSetup" |
+  "pressShowBeta" | "pressCameOffHint" | "pressAgain" | "pressBody" | "say" | "waitCard"
 export interface DemoAction { t: number; do: DemoActionName; arg?: string | number }
 export interface DemoCheck { t: number; key: string }
+/** session 28: one whole take */
+export interface DemoTake {
+  name: string
+  scenes: DemoScene[]
+  end: number
+  camera: CameraKey[]
+  actions: DemoAction[]
+  checks: DemoCheck[]
+  /** v4 only: the take is the full read from its first frame (beta shown with no pinch); v7 opens as the Lens does */
+  betaShownAtStart: boolean
+}
 
 /** VIDEO_PLAN v4 scene starts (s); the take ends at END */
 export const SCENES: DemoScene[] = [
@@ -209,6 +226,9 @@ export const CHECKS: DemoCheck[] = [
   {t: 139.5, key: "s8-card"},
   {t: END, key: "end"},
 ]
+
+/** the legacy v4 take, for LEAF d1 */
+export const V4_TAKE: DemoTake = {name: "v4", scenes: SCENES, end: END, camera: CAMERA, actions: ACTIONS, checks: CHECKS, betaShownAtStart: true}
 
 /** objects that are not the product, hidden while the autopilot plays (looked up by name at play) */
 export const HIDE_WHILE_PLAYING = ["LeafDebugUICamera", "[OPTIONAL] Visuals"]
