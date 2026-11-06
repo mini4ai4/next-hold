@@ -50,8 +50,38 @@ function whyWords(main: NextHoldMain, pos: RefPosition): string {
     : g.highStep < 1 ? "high step"
     : g.reachFactor < 1 ? "a stretch"
     : g.balanceFactor < 1 ? "committing"
+    // session 28: never "in reach" while the plan has a next move: what this move sets up
+    : p.steps[1] ? `sets up ${p.steps[1].limb} to the ${p.steps[1].holdId === top ? "top" : presetTypes()[p.steps[1].holdId] || "next hold"}`
     : "in reach"
   return `${presetTypes()[g.holdId] || "hold"}, ${reason}`
+}
+
+/** Session 28 (v7.3 P1-3): the label is its own hold's, measured on the wall (cm): no hold of the wall is nearer the
+ *  point where the label points (its box's point nearest the glowing hold) than the glowing hold, and that point is
+ *  within 1.5 ring widths (3 ring radii) of the hold's centre. */
+function checkLabelOwn(main: NextHoldMain, errs: string[], tag: string): string {
+  const sug = main.getSuggestion()
+  if (!sug) { errs.push(`${tag}: no suggestion`); return "no suggestion" }
+  const toWall = mustFind("ClimbingWall (stand-in)").getTransform().getInvertedWorldTransform()
+  const label = mustFind("SuggestLabel")
+  const vis = label.getComponent("Component.Text") as Text
+  const lo = toWall.multiplyPoint(vis.worldAabbMin()), hi = toWall.multiplyPoint(vis.worldAabbMax())
+  const x0 = Math.min(lo.x, hi.x), x1 = Math.max(lo.x, hi.x), y0 = Math.min(lo.y, hi.y), y1 = Math.max(lo.y, hi.y)
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2
+  const at = (id: string) => toWall.multiplyPoint(mustFind("Hold_" + id).getTransform().getWorldPosition())
+  const own = at(sug.holdId)
+  // where the label points: its box's point nearest its own hold (from the mats it is drawn large, so its centre says
+  // little); no other hold of the wall nearer that point
+  const ax = Math.max(x0, Math.min(x1, own.x)), ay = Math.max(y0, Math.min(y1, own.y))
+  const dOwn = Math.hypot(ax - own.x, ay - own.y)
+  const nearer = HOLDS.filter((h) => h.id !== sug.holdId && Math.hypot(ax - at(h.id).x, ay - at(h.id).y) < dOwn).map((h) => h.id)
+  if (nearer.length) errs.push(`${tag}: the label "${main.getLabelText().replace("\n", " / ")}" is nearer ${nearer.join(", ")} than its own hold ${sug.holdId}`)
+  const R = HOLD_SIZE[holdById(sug.holdId)!.type].ringR
+  const edge = Math.hypot(Math.max(0, x0 - own.x, own.x - x1), Math.max(0, y0 - own.y, own.y - y1))
+  const cap = 3 * R
+  if (edge > cap) errs.push(`${tag}: the label's nearest edge is ${edge.toFixed(1)} cm from ${sug.holdId}'s centre, want within ${cap.toFixed(1)} (1.5 ring widths)`)
+  if (/in reach/.test(main.getLabelText())) errs.push(`${tag}: the why says "in reach" ("${main.getLabelText().replace("\n", " / ")}")`)
+  return `label centre ${Math.hypot(cx - own.x, cy - own.y).toFixed(1)} cm from ${sug.holdId}, nearest edge ${edge.toFixed(1)} cm (cap ${cap.toFixed(1)})`
 }
 
 /** Session 26 (shot 06: the why plate sat on a start hold's outline): the label, with its why, covers no hold of the
@@ -76,9 +106,10 @@ function checkLabelClear(main: NextHoldMain, cam: Camera, errs: string[], tag: s
     if (g < 0) hits.push(id)
   }
   if (sug) {
-    const glow = mustFind("SuggestGlow")
-    const g = clearOf(glow.getTransform().getWorldPosition(), renderedOuterRadius("SuggestGlow"))
-    if (g < 0) hits.push("its own glow")
+    // session 28 (v7.3 P1-3): within ~1.5 ring widths of its hold is on the glow's faint halo, by design; never on its
+    // own hold's ring (session 26 kept it off the whole glow, which is what sent it 3 ring radii away in S06)
+    const g = clearOf(main.getHoldWorldPosition(sug.holdId)!, HOLD_SIZE[holdById(sug.holdId)!.type].ringR + line / 2)
+    if (g < 0) hits.push("its own hold's ring")
   }
   if (hits.length) errs.push(`${tag}: the label "${main.getLabelText().replace("\n", " / ")}" (${fmtBox(box)}) covers ${hits.join(", ")}`)
   return `label ${fmtBox(box)}, nearest other hold ${least.toFixed(3)} frame heights clear`
@@ -144,7 +175,8 @@ export class H3HintLadderScenario extends Scenario {
 
       // ── third pinch (session 26): why the move works, under its label ("R hand" / "jug, in reach"), in the pinch's
       //    own frame; no why plate, nothing armed, no pinch on a ring ──
-      const wantLabel = LIMB_WORDS[sug.limb] + "\n" + whyWords(main, pos0)
+      // session 28: a why that sets something up breaks before "to the" (two short lines)
+      const wantLabel = LIMB_WORDS[sug.limb] + "\n" + whyWords(main, pos0).replace(" to the ", "\nto the ")
       const p3 = await pinchCapture("AskButton", () => ({step: main.getHintStep(), armed: main.isAskArmed(), plate: main.isWhyVisible(), label: main.getLabelText(), shown: main.isLabelVisible()}))
       await frames(2)
       print(`[H3] step 3: in the pinch frame ${JSON.stringify(p3.value)} (the test's words "${wantLabel.replace("\n", " / ")}"); dots "${main.getAskDots()}", hints this go ${main.getHintsThisGo()}`)
@@ -163,7 +195,7 @@ export class H3HintLadderScenario extends Scenario {
           tr.setWorldRotation(quat.angleAxis(18.9 * Math.PI / 180, vec3.right()))
           await frames(3)
           await pinch("AskButton"); await frames(3) // step 3 again (a repeat isn't another hint): placed from here
-          print(`[H3] step 3 from the wall, 70 cm: ${checkLabelClear(main, camera(), errs, "step 3, eye on the wall")}`)
+          print(`[H3] step 3 from the wall, 70 cm: ${checkLabelClear(main, camera(), errs, "step 3, eye on the wall")}; ${checkLabelOwn(main, errs, "step 3, eye on the wall")}`)
           // and it is read, so it is in view (s26's first run had it past the frame's bottom edge)
           const lb = screenBoxOf("SuggestLabel", camera())
           if (!lb || lb.x0 < 0 || lb.x1 > 1 || lb.y0 < 0 || lb.y1 > 1) errs.push(`step 3, eye on the wall: the label isn't fully in view (${fmtBox(lb)})`)
@@ -189,9 +221,18 @@ export class H3HintLadderScenario extends Scenario {
       checkNothingRevealed(main, errs, "after the move")
 
       // ── from the mats: the rings replace the outlines only on the holds in reach ──
+      // session 28: the real eye at 2.5 m (it used to be a sizing camera there while the real eye stayed at 1.25 m, a
+      // state no headset can be in: the label was then placed for one eye and kept in view for the other)
       await restorePreset(main, false)
-      await at(250)
-      await frames(3)
+      main.setSizingCamera(null)
+      const eyeSo = camera().getSceneObject(), etr = eyeSo.getTransform()
+      const eTracking = eyeSo.getComponent("Component.DeviceTracking") as DeviceTracking
+      const eWas = eTracking ? eTracking.enabled : true
+      const e0 = etr.getWorldPosition(), er0 = etr.getWorldRotation()
+      if (eTracking) eTracking.enabled = false
+      try {
+      etr.setWorldPosition(new vec3(e0.x, e0.y, face.z + 250))
+      await frames(4)
       await pinch("AskButton"); await frames(2)
       const ground = checkRings(main, errs, "Ground, step 1")
       for (const id of main.getProblemHolds()) {
@@ -200,11 +241,33 @@ export class H3HintLadderScenario extends Scenario {
       }
       if (main.getTagText("lh") !== "START" || main.getTagText("h20") !== "TOP") errs.push(`Ground, step 1: tags ${main.getTagText("lh")}, ${main.getTagText("h20")}`)
       print(`[H3] Ground, step 1: rings ${ground.join(", ")}, the rest outlined`)
-      // session 26, the shot-06 case from the mats: rung 3's words sit clear of every outline (the preview's eye)
+      // session 28 (v7.3 P1-3): rung 2 from the mats keeps its word (S05: "R hand" had faded): still up after 4 s
       await pinch("AskButton"); await frames(2)
+      {
+        const g2 = main.getSuggestion()!
+        const t0 = getTime()
+        while (getTime() - t0 < 4) await frames(1)
+        print(`[H3] Ground, step 2, 4 s on: "${main.getLabelText()}" shown ${main.isLabelVisible()} (opacity ${main.getLabelOpacity().toFixed(2)})`)
+        if (main.getHintStep() !== 2 || !main.isLabelVisible() || main.getLabelOpacity() < 0.99 || main.getLabelText() !== g2.label) errs.push(`Ground, step 2: 4 s on the label "${main.getLabelText()}" is at opacity ${main.getLabelOpacity().toFixed(2)}, want "${g2.label}" fully up`)
+      }
+      // session 26, the shot-06 case from the mats: rung 3's words sit clear of every outline (the preview's eye);
+      // session 28: and by their own hold
       await pinch("AskButton"); await frames(3)
       if (main.getHintStep() !== 3 || main.isWhyVisible()) errs.push(`Ground, step 3: step ${main.getHintStep()}, a why plate ${main.isWhyVisible()}`)
-      print(`[H3] Ground, step 3: "${main.getLabelText().replace("\n", " / ")}"; ${checkLabelClear(main, camera(), errs, "Ground, step 3")}`)
+      print(`[H3] Ground, step 3: "${main.getLabelText().replace("\n", " / ")}"; ${checkLabelClear(main, camera(), errs, "Ground, step 3")}; ${checkLabelOwn(main, errs, "Ground, step 3")}`)
+      // and from S06's pose (4.25 m, 37.5 cm right, -2°)
+      etr.setWorldPosition(new vec3(e0.x + 37.5, e0.y, e0.z + 300))
+      etr.setWorldRotation(er0.multiply(quat.angleAxis(-2 * Math.PI / 180, vec3.right())))
+      await frames(5)
+      print(`[H3] Ground, step 3, from 4.25 m: ${checkLabelClear(main, camera(), errs, "Ground 4.25 m, step 3")}; ${checkLabelOwn(main, errs, "Ground 4.25 m, step 3")}`)
+      const lb = screenBoxOf("SuggestLabel", camera())
+      if (!lb || lb.x0 < 0 || lb.x1 > 1 || lb.y0 < 0 || lb.y1 > 1) errs.push(`Ground 4.25 m, step 3: the label isn't fully in view (${fmtBox(lb)})`)
+      } finally {
+        etr.setWorldPosition(e0)
+        etr.setWorldRotation(er0)
+        if (eTracking) eTracking.enabled = eWas
+        await frames(3)
+      }
     } finally {
       main.setSizingCamera(null)
       so.destroy()

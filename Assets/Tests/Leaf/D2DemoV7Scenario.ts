@@ -121,7 +121,7 @@ function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string
       break
     case "s5-why":
       want(main.getHintStep() === 3 && main.getAskDots() === "●●●", `rung ${main.getHintStep()} ${main.getAskDots()}`)
-      want(main.isLabelVisible() && main.getLabelText().split("\n").length === 2 && main.getLabelText().indexOf("R hand\n") === 0, `label "${main.getLabelText()}"`)
+      want(main.isLabelVisible() && main.getLabelText() === "R hand\njug, sets up LH\nto the pinch", `label "${main.getLabelText()}", want "R hand / jug, sets up LH / to the pinch"`)
       inView(["SuggestLabel"])
       break
     case "s6-moved":

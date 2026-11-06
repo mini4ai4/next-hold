@@ -306,6 +306,8 @@ export class NextHoldMain extends BaseScriptComponent {
   private panelAnchor: {eye: vec3; fwd: vec3; size: string} | null = null
   /** session 27: how far below the gaze the Ground panel's centre sits (degrees) */
   private panelDownDeg = 0
+  /** session 28: the plan's second move (rung 3's "sets up ..."), or null */
+  private planNext: {limb: Limb; holdId: string} | null = null
   /** session 28: the rank the mats panel's place reached (panelPlaceScore: 3 covers nothing) */
   private panelRank = 3
   /** session 26: the label carries rung 3's why (two lines) */
@@ -612,7 +614,18 @@ export class NextHoldMain extends BaseScriptComponent {
     const word = LIMB_LABEL[s.limb]
     if (!withWhy) return word
     const r = this.evaluation.suggestion
-    return r ? word + "\n" + moveWhy(r, this.holdTypes[r.holdId], this.planned, this.getTopHold()) : word
+    // session 28: the plan's next move, for "sets up LH to the pinch"
+    const n = this.planNext
+    const next = n ? {limb: n.limb, holdId: n.holdId, holdType: this.holdTypes[n.holdId]} : null
+    // a why that sets something up is two short lines ("jug, sets up LH" / "to the pinch"): one 28-character line was too
+    // wide to sit by its hold between two others
+    return r ? word + "\n" + moveWhy(r, this.holdTypes[r.holdId], this.planned, this.getTopHold(), next).replace(" to the ", "\nto the ") : word
+  }
+
+  /** session 28: the move's label stays up (no fade on the mats) while it says why, and while a hint rung the climber
+   *  asked for shows it (rung 2 from the mats lost its word: S05) */
+  private labelHeld(): boolean {
+    return this.labelWhy || (!this.beta.betaShown && this.beta.hintStep >= 2)
   }
 
   /** What "?" says about a hold: its ring's score, or, under a drawn step tag (which shows no grip colour,
@@ -1045,6 +1058,7 @@ export class NextHoldMain extends BaseScriptComponent {
       if (p.glow) this.selected = p.glow.limb
     }
     this.planned = !!p && p.planned
+    this.planNext = p && p.steps.length > 1 ? {limb: p.steps[1].limb, holdId: p.steps[1].holdId} : null
     this.evaluation = evaluate({...moveArgs, limb: this.selected})
     if (p && p.planned && p.glow) this.evaluation = {...this.evaluation, suggestion: p.glow}
     // session 20: each ring shows what a pinch on it would do: the override's move if there is one,
@@ -1141,7 +1155,7 @@ export class NextHoldMain extends BaseScriptComponent {
       const r = this.ringRadius(sug.holdId)
       // session 26: rung 3 is the move's why under its label, which then stays (it is read, not glanced at)
       this.callouts.showSuggestion(this.labelPos(sug.holdId), this.wallRot(), this.labelNow)
-      this.callouts.setLabelSticky(this.view !== "ground" || this.labelWhy)
+      this.callouts.setLabelSticky(this.view !== "ground" || this.labelHeld())
       this.offViewArrow.setTarget(this.wall.wallToWorld(h.x, h.y, 0), sug.limb + ":" + sug.holdId, r)
     } else {
       this.callouts.hideSuggestion()
@@ -1156,7 +1170,7 @@ export class NextHoldMain extends BaseScriptComponent {
     const ground = this.view === "ground"
     this.callouts.setLabelMinSize(ground ? minReadSize(this.groundCm) * readBoost(this.groundCm) : 0)
     // On wall the label is the only word: it stays there; in Ground it fades (session 26: not while it says why)
-    this.callouts.setLabelSticky(!ground || this.labelWhy)
+    this.callouts.setLabelSticky(!ground || this.labelHeld())
     const glowScale = this.glowScale()
     const labelBox = s.glowHoldId ? this.labelBox(s.glowHoldId) : null
     if (ground) {
@@ -1416,11 +1430,33 @@ export class NextHoldMain extends BaseScriptComponent {
       for (const o of this.getProblemHolds()) {
         if (o !== id) m = Math.min(m, boxCircleGap(c, hw, hh, this.holds[o].x, this.holds[o].y, this.ringRadius(o) + line) - LABEL_GLOW_GAP)
       }
-      // a place slid into view must still keep off its own glow
-      if (this.labelWhy) m = Math.min(m, boxCircleGap(c, hw, hh, h.x, h.y, this.glowRadius(id)) - LABEL_GLOW_GAP)
+      // a place slid into view must still keep off its own ring. Session 28 (v7.3 P1-3): its own ring, not its whole glow:
+      // "within ~1.5 ring widths" of the hold is inside the glow's faint halo, and that is where it now belongs
+      if (this.labelWhy) {
+        // in ranks (the worst counts): over its own ring -50; farther than 1.5 ring widths -40; another hold nearer -30;
+        // over another problem ring, by how much (above)
+        const ownGap = boxCircleGap(c, hw, hh, h.x, h.y, this.ringRadius(id) + line) - LABEL_GLOW_GAP
+        if (ownGap < 0) m = Math.min(m, -50 + ownGap)
+        // session 28 (v7.3 P1-3): and stay its own hold's label. Within 1.5 ring widths of the hold (the box's nearest
+        // point within 3 ring radii of its centre), and no other hold of the wall nearer the label's box than its own
+        // (S06: it slid 3 ring radii up and right, next to two grey holds, and read as theirs)
+        // where the label points: its box's point nearest its own hold (from the mats it is drawn large, so its centre and
+        // its far edges say little); no other hold nearer that point than its own
+        const R = this.ringRadius(id)
+        const ax = Math.max(c.x - hw, Math.min(c.x + hw, h.x)), ay = Math.max(c.y - hh, Math.min(c.y + hh, h.y))
+        const own = Math.hypot(ax - h.x, ay - h.y)
+        if (own > 3 * R) m = Math.min(m, -40)
+        for (const o of this.getHoldIds()) if (o !== id && Math.hypot(ax - this.holds[o].x, ay - this.holds[o].y) < own) { m = Math.min(m, -30); break }
+      }
       return m
     }
-    const bases = [below, {x: h.x, y: h.y + glow + hh}, {x: h.x + glow + hw, y: h.y}, {x: h.x - glow - hw, y: h.y}]
+    const above = {x: h.x, y: h.y + glow + hh}
+    // session 28: rung 3 tries straight above first (designer, climber), just outside its own ring (on the glow's halo),
+    // then below and to either side; the bare label keeps its places
+    const near = inside + LABEL_GLOW_GAP
+    const bases = this.labelWhy
+      ? [{x: h.x, y: h.y + near + hh}, {x: h.x, y: h.y - near - hh}, {x: h.x + near + hw, y: h.y}, {x: h.x - near - hw, y: h.y}]
+      : [below, above, {x: h.x + glow + hw, y: h.y}, {x: h.x - glow - hw, y: h.y}]
     // session 26: rung 3's label also tries each place slid into view, and from there a little to either side
     const slid: WallPt[] = []
     if (this.labelWhy) {
@@ -1431,7 +1467,7 @@ export class NextHoldMain extends BaseScriptComponent {
       }
     }
     const cands = bases.concat(slid)
-    let best = below, bestClear = clearance(below)
+    let best = cands[0], bestClear = clearance(cands[0])
     for (const c of cands.slice(1)) {
       if (bestClear >= 0) break
       const m = clearance(c)

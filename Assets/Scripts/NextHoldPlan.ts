@@ -37,8 +37,12 @@ export function plan(a: MoveArgs): Plan {
  * Rung 3 (session 26): why the move works, in a few words, merged into the move's label ("R hand" over
  * "jug, in reach"). The hold's grip, then the one reason that matters most: it is the top; it saves a move
  * (the plan's move where the surer one costs a move); a high step; a stretch; a committing move; else in reach.
+ * Session 28 (v7.3 P1-3): "in reach" is what the green ring already says, so it is never the why: when nothing else
+ * applies, the plan's next move says what this one is for ("sets up LH to the pinch", "sets up LH to the top");
+ * `next` is that step (the plan's second move) with its hold's type, or null at the end of the plan.
  */
-export function moveWhy(m: ScoreResult, holdType: string | null | undefined, planned: boolean, top: string | null | undefined): string {
+export function moveWhy(m: ScoreResult, holdType: string | null | undefined, planned: boolean, top: string | null | undefined,
+    next: {limb: string; holdId: string; holdType: string | null | undefined} | null = null): string {
   const grip = holdType ? holdType : "hold"
   const topOut = top != null && m.holdId === top && (m.limb === "LH" || m.limb === "RH")
   const reason = topOut ? "the top"
@@ -46,6 +50,7 @@ export function moveWhy(m: ScoreResult, holdType: string | null | undefined, pla
     : m.parts.highStep < 1 ? "high step"
     : m.parts.reachFactor < 1 ? "a stretch"
     : m.parts.balanceFactor < 1 ? "committing"
+    : next ? `sets up ${next.limb} to the ${top != null && next.holdId === top ? "top" : next.holdType || "next hold"}`
     : "in reach"
   return `${grip}, ${reason}`
 }

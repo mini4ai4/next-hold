@@ -720,9 +720,28 @@ const N = await import("../Assets/Scripts/NextHoldPlan.ts");
   }
   check(`the 1-2-3 starts with the glow in every reachable state (${st} states at 150/175/200 cm), and a planned glow is secure`, bad === null && st > 100, bad);
   // rung 3's words
-  const w = (pos, cm, id, planned = false) => { const r = N.plan(args(cm, pos)); return N.moveWhy(r.glow, tp[r.glow.holdId], r.planned || planned, PRESET_TOP); };
-  check("rung 3 says why the move works: \"jug, in reach\" for the opening RH to up; \"the top\" for a top-out",
-    w({ ...PRESET_POSITION }, 175) === "jug, in reach" && w(k1pos, 175) === `${tp[PRESET_TOP]}, the top`, [w({ ...PRESET_POSITION }, 175), w(k1pos, 175)]);
+  // session 28: the Lens hands moveWhy the plan's second move (NextHoldMain.labelText)
+  const w = (pos, cm, id, planned = false) => {
+    const r = N.plan(args(cm, pos)); const n = r.steps[1];
+    return N.moveWhy(r.glow, tp[r.glow.holdId], r.planned || planned, PRESET_TOP, n ? { limb: n.limb, holdId: n.holdId, holdType: tp[n.holdId] } : null);
+  };
+  check("rung 3 says why the move works: the opening RH to up \"jug, sets up LH to the pinch\" (the plan's next move, not \"in reach\"); \"the top\" for a top-out",
+    w({ ...PRESET_POSITION }, 175) === "jug, sets up LH to the pinch" && w(k1pos, 175) === `${tp[PRESET_TOP]}, the top`, [w({ ...PRESET_POSITION }, 175), w(k1pos, 175)]);
+  // session 28: "in reach" is never the why while the plan has a next move; a next move onto the top says "the top"
+  {
+    let bad = null, n = 0;
+    for (const cm of [155, 175, 195]) for (const pos of [{ ...PRESET_POSITION }, { ...PRESET_POSITION, RH: "up" }, { ...PRESET_POSITION, RH: "up", LH: "h09" }, { ...PRESET_POSITION, RH: "up", LH: "h09", LF: "lh" }]) {
+      const r = N.plan(args(cm, pos)); if (!r.glow) continue; n++;
+      const s = w(pos, cm);
+      if (r.steps[1] && /in reach/.test(s)) bad = bad || { cm, pos, s };
+      if (r.steps[1] && r.steps[1].holdId === PRESET_TOP && /sets up/.test(s) && !/to the top$/.test(s)) bad = bad || { cm, pos, s };
+    }
+    check(`rung 3 never says "in reach" while the plan has a next move (${n} states at 155/175/195 cm)`, bad === null && n >= 9, bad);
+  }
+  check("moveWhy with nothing else to say: \"sets up LH to the pinch\", \"sets up LH to the top\", and \"in reach\" only with no next move",
+    N.moveWhy({ holdId: "x", limb: "RH", parts: { highStep: 1, reachFactor: 1, balanceFactor: 1 } }, "jug", false, "t", { limb: "LH", holdId: "p", holdType: "pinch" }) === "jug, sets up LH to the pinch" &&
+    N.moveWhy({ holdId: "x", limb: "LF", parts: { highStep: 1, reachFactor: 1, balanceFactor: 1 } }, "jug", false, "t", { limb: "LH", holdId: "t", holdType: "jug" }) === "jug, sets up LH to the top" &&
+    N.moveWhy({ holdId: "x", limb: "RH", parts: { highStep: 1, reachFactor: 1, balanceFactor: 1 } }, "jug", false, "t") === "jug, in reach");
   check("moveWhy: a planned move \"saves a move\"; a stretch; a high step; a committing move",
     N.moveWhy({ holdId: "x", limb: "LF", parts: { highStep: 1, reachFactor: 1, balanceFactor: 1 } }, "crimp", true, "t") === "crimp, saves a move" &&
     N.moveWhy({ holdId: "x", limb: "LH", parts: { highStep: 1, reachFactor: 0.8, balanceFactor: 1 } }, "pinch", false, "t") === "pinch, a stretch" &&
