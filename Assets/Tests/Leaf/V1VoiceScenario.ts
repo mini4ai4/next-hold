@@ -13,10 +13,45 @@
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
-import {boxesOverlap, camera, fmtBox, fmtPos, frames, getMain, mustFind, pinch, presetPosition, restorePreset, samePosition, screenBoxOf} from "./NextHoldTestKit"
+import {boxesOverlap, camera, fmtBox, fmtPos, frames, getMain, mustFind, pinch, presetPosition, renderedOuterRadius, restorePreset, samePosition, screenBoxOf} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
-import {CHIP_CM, CHIP_UP_DEG} from "../../Scripts/NextHoldMain"
+import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {PREVIEW_VOICE_LABEL} from "../../Scripts/NextHoldVoice"
+import {HOLDS, HOLD_SIZE} from "../../Scripts/Wall/WallLayout"
+
+/** Session 28 (v7.3 P1-4): the chip as drawn, from the real eye: attached to `button` (its box beside the button's, not
+ *  on it, within 0.04 of the frame; null: the button has gone with its press), whole in view, and over no ring of the
+ *  problem, not the glow, not the move's label (measured on screen); the Lens's own rank for its place is 3 or 2 */
+function checkChip(main: NextHoldMain, button: string | null, errs: string[], tag: string): void {
+  const cam = camera()
+  const cb = screenBoxOf("VoiceChip", cam)
+  if (!cb) { errs.push(`${tag}: the chip doesn't render`); return }
+  if (cb.x0 < 0 || cb.x1 > 1 || cb.y0 < 0 || cb.y1 > 1) errs.push(`${tag}: the chip isn't whole in view (${fmtBox(cb)})`)
+  if (button) {
+    if (main.getVoiceChipButton() !== button) errs.push(`${tag}: the chip is attached to "${main.getVoiceChipButton()}", want ${button}`)
+    const bb = screenBoxOf(button, cam, true)
+    if (bb) {
+      const gap = Math.max(bb.x0 - cb.x1, cb.x0 - bb.x1, bb.y0 - cb.y1, cb.y0 - bb.y1)
+      if (boxesOverlap(cb, bb)) errs.push(`${tag}: the chip (${fmtBox(cb)}) covers ${button} (${fmtBox(bb)})`)
+      else if (gap > 0.04) errs.push(`${tag}: the chip (${fmtBox(cb)}) is ${gap.toFixed(3)} of the frame from ${button} (${fmtBox(bb)}), want beside it`)
+    }
+  }
+  const wallRot = mustFind("ClimbingWall (stand-in)").getTransform().getWorldRotation()
+  const over: string[] = []
+  const circleOver = (c: vec3, r: number) => {
+    const s = cam.worldSpaceToScreenSpace(c), e = cam.worldSpaceToScreenSpace(c.add(wallRot.multiplyVec3(new vec3(r, 0, 0))))
+    const rx = Math.abs(e.x - s.x), ry = rx * cam.aspect
+    return Math.hypot(Math.max(0, cb.x0 - s.x, s.x - cb.x1) / rx, Math.max(0, cb.y0 - s.y, s.y - cb.y1) / ry) < 1
+  }
+  for (const h of HOLDS) if (main.isInProblem(h.id) && circleOver(mustFind("Hold_" + h.id).getTransform().getWorldPosition(), HOLD_SIZE[h.type].ringR)) over.push(h.id)
+  const glow = mustFind("SuggestGlow")
+  if (glow.isEnabledInHierarchy && circleOver(glow.getTransform().getWorldPosition(), renderedOuterRadius("SuggestGlow"))) over.push("the glow")
+  const lb = main.isLabelVisible() ? screenBoxOf("SuggestLabel", cam) : null
+  if (lb && boxesOverlap(lb, cb)) over.push("the move's label")
+  print(`[V1] ${tag}: chip ${fmtBox(cb)} on ${main.getVoiceChipButton()}, rank ${main.getVoiceChipRank()}${over.length ? ", over " + over.join(", ") : ", over nothing"}`)
+  if (over.length) errs.push(`${tag}: the chip (${fmtBox(cb)}) is over ${over.join(", ")}`)
+  if (main.getVoiceChipRank() < 2) errs.push(`${tag}: the Lens ranks the chip's place ${main.getVoiceChipRank()}`)
+}
 
 @component
 export class V1VoiceScenario extends Scenario {
@@ -70,23 +105,14 @@ export class V1VoiceScenario extends Scenario {
       const t0 = getTime()
       const r1 = await say("Next hold.")
       if (r1.cmd !== "nextHold" || main.getHintStep() !== 1 || main.getAskDots() !== "●○○" || main.getAskWord() !== "Move") errs.push(`"Next hold." -> ${r1.cmd}: ${state()}, word ${main.getAskWord()}, want rung 1 (●○○, Move)`)
-      // the chip, as drawn: its words, the preview line, in frame above the gaze, clear of the panel
+      // the chip, as drawn: its words, the preview line; session 28 (v7.3 P1-4): beside the "?" it pressed, whole in view,
+      // over no ring of the problem, not the glow, not the move's label
       const chip = main.getVoiceChip()
       const heard = (mustFind("VoiceChipHeard").getComponent("Component.Text") as Text).text
       const line = (mustFind("VoiceChipLabel").getComponent("Component.Text") as Text).text
       print(`[V1] chip: ${JSON.stringify(chip)}; drawn "${heard}" / "${line}", enabled ${mustFind("VoiceChip").isEnabledInHierarchy}`)
       if (!chip || heard !== "“next hold”" || line !== PREVIEW_VOICE_LABEL || !mustFind("VoiceChip").isEnabledInHierarchy) errs.push(`the chip after "next hold": ${JSON.stringify(chip)}, drawn "${heard}" / "${line}"`)
-      const cb = screenBoxOf("VoiceChip", camera()), rb = screenBoxOf("ControlRow", camera())
-      print(`[V1] chip ${fmtBox(cb)}, panel ${fmtBox(rb)}`)
-      if (!cb || cb.x0 < 0 || cb.x1 > 1 || cb.y0 < 0 || cb.y1 > 0.5) errs.push(`the chip isn't whole in the upper half of the frame: ${fmtBox(cb)}`)
-      if (cb && rb && boxesOverlap(cb, rb)) errs.push(`the chip (${fmtBox(cb)}) overlaps the panel (${fmtBox(rb)})`)
-      const cp = main.getVoiceChipWorldPosition()
-      if (cp) {
-        const local = camT.getInvertedWorldTransform().multiplyPoint(cp)
-        const up = Math.atan2(local.y, -local.z) * 180 / Math.PI
-        print(`[V1] chip ${local.length.toFixed(1)} cm out, ${up.toFixed(1)} deg above the gaze`)
-        if (Math.abs(local.length - CHIP_CM) > 0.5 || Math.abs(up - CHIP_UP_DEG) > 0.5) errs.push(`the chip sits ${local.length.toFixed(1)} cm out, ${up.toFixed(1)} deg up; want ${CHIP_CM} cm, ${CHIP_UP_DEG} deg`)
-      }
+      checkChip(main, "AskButton", errs, "after \"next hold\"")
       // shown for 1 s of Lens time, then gone
       while (getTime() < t0 + 0.6) await frames(1)
       if (!main.getVoiceChip()) errs.push(`the chip went before 0.6 s`)
@@ -101,6 +127,15 @@ export class V1VoiceScenario extends Scenario {
       if (r3.cmd !== "why" || main.getHintStep() !== 3 || main.getAskDots() !== "●●●") errs.push(`"Why?" -> ${r3.cmd}: ${state()}, want rung 3`)
       const chip3 = main.getVoiceChip()
       if (!chip3 || chip3.heard !== "“why”") errs.push(`the chip after "why": ${JSON.stringify(chip3)}`)
+      checkChip(main, "AskButton", errs, "after \"why\"")
+      // session 28 (P1-4): at rung 3 "next hold" is heard and presses "?", but changes nothing: no chip
+      {
+        const until = getTime() + 2
+        while (main.getVoiceChip() && getTime() < until) await frames(1)
+        const r4 = await say("next hold")
+        print(`[V1] "next hold" at rung 3 -> ${r4.cmd}, changed ${r4.changed}, chip ${JSON.stringify(main.getVoiceChip())}`)
+        if (r4.cmd !== "nextHold" || r4.changed || main.getVoiceChip()) errs.push(`"next hold" at rung 3: command ${r4.cmd}, state changed ${r4.changed}, chip ${JSON.stringify(main.getVoiceChip())}; want heard, nothing changed, no chip`)
+      }
 
       // ── "show my beta": shows it on the mats; said again it doesn't hide it ──
       const b1 = await say("show my beta")
@@ -127,6 +162,9 @@ export class V1VoiceScenario extends Scenario {
       if (ag.cmd !== "again" || !samePosition(pos, start) || main.isAgainVisible() || main.isCameOffVisible() || main.getMovesMade() !== 0) errs.push(`"again" -> ${ag.cmd}: ${fmtPos(pos)} (want ${fmtPos(start)}), Again ${main.isAgainVisible()}, card ${main.isCameOffVisible()}, moves ${main.getMovesMade()}`)
       const chipA = main.getVoiceChip()
       if (!chipA || chipA.heard !== "“again”" || chipA.label !== PREVIEW_VOICE_LABEL) errs.push(`the chip after "again": ${JSON.stringify(chipA)}`)
+      // beside where Again was (it goes with its press), over nothing of the problem
+      if (main.getVoiceChipButton() !== "AgainButton") errs.push(`the chip after "again" is attached to "${main.getVoiceChipButton()}"`)
+      checkChip(main, null, errs, "after \"again\"")
       if (main.getVoiceError()) errs.push(`voice error: ${main.getVoiceError()}`)
     } finally {
       camT.setWorldPosition(p0); camT.setWorldRotation(r0)

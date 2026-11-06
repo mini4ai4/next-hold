@@ -62,7 +62,8 @@ import {
 import {NextHoldControlRowUI, RowPage} from "./NextHoldControlRowUI"
 import {NextHoldTypePickerUI} from "./NextHoldTypePickerUI"
 import {
-  AGAIN_GAP, AGAIN_H, AGAIN_W, CARD_BUTTONS_Y, CARD_BUTTON_X, CARD_HALF_H, CARD_HALF_W, NextHoldCalloutUI, RESULT_HALF_H, RESULT_HALF_W,
+  AGAIN_GAP, AGAIN_H, AGAIN_W, BUTTON_H, BUTTON_W, CARD_BUTTONS_Y, CARD_BUTTON_X, CARD_HALF_H, CARD_HALF_W, CHIP_HALF_H, CHIP_HALF_W,
+  NextHoldCalloutUI, RESULT_HALF_H, RESULT_HALF_W,
   WHY_HALF_H, whyHalfWidth,
 } from "./NextHoldCalloutUI"
 import {
@@ -76,9 +77,6 @@ import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/
 import {CHIP_SECONDS, PREVIEW_VOICE_LABEL, VoiceCommand, VoiceContext, chipText, parseCommand} from "./NextHoldVoice"
 import {AsrVoiceSource, InjectedVoiceSource, VoiceSource} from "./NextHoldVoiceSource"
 
-/** session 27: the voice chip, head-locked: this far out along the gaze (cm), this far above it (degrees) */
-export const CHIP_CM = 70
-export const CHIP_UP_DEG = 13
 
 /** how far in front of the wall face the control row and the why-line stand (cm) */
 const PANEL_Z = 10
@@ -691,6 +689,9 @@ export class NextHoldMain extends BaseScriptComponent {
   private voice: VoiceSource | null = null
   private voiceChipUntil = -1
   private voiceChipCmd: VoiceCommand | null = null
+  /** session 28: the button the chip is attached to, and the rank of its place (panelPlaceScore) */
+  private voiceChipButton = ""
+  private voiceChipRank = -1
   private voiceLog: {text: string; isFinal: boolean; cmd: VoiceCommand | null; time: number}[] = []
   private voiceError = ""
 
@@ -714,38 +715,104 @@ export class NextHoldMain extends BaseScriptComponent {
     }
   }
 
-  /** a transcript from the voice source: act on it if it is a short final command on offer now, and echo it */
+  /** a transcript from the voice source: act on it if it is a short final command on offer now, and echo it. Session 28
+   *  (v7.3 P1-4): the chip shows only when the command did something (at rung 3 "next hold" changes nothing), and it is
+   *  attached to the button the word pressed */
   handleTranscript(text: string, isFinal: boolean): void {
     if (!this.ready) return
     const cmd = parseCommand(text, isFinal, this.voiceContext())
     this.voiceLog.push({text, isFinal, cmd, time: getTime()})
     if (!cmd) return
+    const button = cmd === "again" ? "AgainButton" : cmd === "showBeta" ? "ShowBetaButton" : "AskButton"
+    const anchor = this.buttonPlace(button)
+    const before = this.stateKey()
     if (cmd === "again") this.pressAgain()
     else if (cmd === "showBeta") this.pressShowBeta()
     else this.pressAsk() // "next hold" and "why" are both "?": the next rung (the why is rung 3)
+    if (this.stateKey() === before || !anchor) return
     this.voiceChipCmd = cmd
+    this.voiceChipButton = button
     this.voiceChipUntil = getTime() + CHIP_SECONDS
-    this.tickVoiceChip(getTime())
+    this.placeVoiceChip(anchor)
   }
 
-  /** the chip follows the head while it shows, and goes after CHIP_SECONDS */
+  /** what a command can change, for "did it do anything" */
+  private stateKey(): string {
+    const b = this.beta
+    return [b.hintStep, b.betaShown, b.cameOffMove, b.attempt, b.moves, positionKey(this.position), this.askArmed, !!this.result,
+      this.callouts.isAgainVisible()].join("|")
+  }
+
+  /** a button's place now (world centre, rotation, scale), or null if it isn't showing */
+  private buttonPlace(name: string): {pos: vec3; rot: quat; k: number} | null {
+    let so = this.uiObjects[name]
+    if (!so) {
+      so = findUnder(this.controlRow.getSceneObject(), name) || findUnder(this.callouts.getSceneObject(), name)
+      if (!so) return null
+      this.uiObjects[name] = so
+    }
+    if (!so.isEnabledInHierarchy) return null
+    const tr = so.getTransform()
+    return {pos: tr.getWorldPosition(), rot: tr.getWorldRotation(), k: tr.getWorldScale().x}
+  }
+
+  /** Session 28: the chip beside the button the word pressed, in the button's plane and size: above it, else below,
+   *  right or left, the first place whole in view that seen from the eye covers no ring, glow, label, tag or card
+   *  (panelPlaceScore rank 3), else the first over nothing of the problem (rank 2), else the best. It stays there its
+   *  one second. */
+  private placeVoiceChip(a: {pos: vec3; rot: quat; k: number}): void {
+    const camT = this.cameraTransform()
+    if (!camT) return
+    const finder = WorldCameraFinderProvider.getInstance()
+    const cam = finder ? finder.getComponent() : null
+    const eyeW = this.wall.getTransform().getInvertedWorldTransform().multiplyPoint(camT.getWorldPosition())
+    const right = a.rot.multiplyVec3(vec3.right()), up = a.rot.multiplyVec3(vec3.up())
+    const gap = 1.2
+    const offs: [number, number][] = [[0, BUTTON_H / 2 + gap + CHIP_HALF_H], [0, -(BUTTON_H / 2 + gap + CHIP_HALF_H)],
+      [BUTTON_W / 2 + gap + CHIP_HALF_W, 0], [-(BUTTON_W / 2 + gap + CHIP_HALF_W), 0]]
+    let best: {p: vec3; score: number; rank: number} | null = null
+    for (const [dx, dy] of offs) {
+      const p = a.pos.add(right.uniformScale(dx * a.k)).add(up.uniformScale(dy * a.k))
+      const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) =>
+        p.add(right.uniformScale(sx * CHIP_HALF_W * a.k)).add(up.uniformScale(sy * CHIP_HALF_H * a.k)))
+      const seen = this.seenOnWall(corners, eyeW)
+      const score = seen ? this.panelPlaceScore(seen.c, seen.hw, seen.hh, this.cardBoxes()) : -1e9
+      // whole in view, or no good (after "again" the place right of where Again was ran off the frame: v1)
+      const inView = !!cam && corners.every((w) => { const s = cam.worldSpaceToScreenSpace(w); return s.x >= 0 && s.x <= 1 && s.y >= 0 && s.y <= 1 })
+      const rank = inView ? Math.floor((score + PANEL_RANK / 2) / PANEL_RANK) : -2
+      if (!best || rank > best.rank) best = {p, score, rank}
+      if (rank >= 3) break
+    }
+    this.voiceChipRank = best ? best.rank : -1
+    const label = this.voice && this.voice.kind === "injected" ? PREVIEW_VOICE_LABEL : ""
+    this.callouts.showVoiceChip(best!.p.add(a.rot.multiplyVec3(vec3.forward()).uniformScale(0.5 * a.k)), a.rot, chipText(this.voiceChipCmd!), label, a.k)
+  }
+
+  /** a quad's corners seen from the eye (wall cm) on the wall plane, as a box: centre and half sizes; null if a corner
+   *  isn't in front of the wall */
+  private seenOnWall(corners: vec3[], eyeW: vec3): {c: WallPt; hw: number; hh: number} | null {
+    const toWall = this.wall.getTransform().getInvertedWorldTransform()
+    const x0 = this.wall.wallToLocal(0, 0).x
+    const pts: WallPt[] = []
+    for (const w of corners) {
+      const c = toWall.multiplyPoint(w)
+      if (eyeW.z <= c.z + 1e-3) return null
+      const t = eyeW.z / (eyeW.z - c.z)
+      pts.push({x: eyeW.x + t * (c.x - eyeW.x) - x0, y: eyeW.y + t * (c.y - eyeW.y)})
+    }
+    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y)
+    const bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys)
+    return {c: {x: (bx0 + bx1) / 2, y: (by0 + by1) / 2}, hw: (bx1 - bx0) / 2, hh: (by1 - by0) / 2}
+  }
+
+  /** the chip goes after CHIP_SECONDS */
   private tickVoiceChip(now: number): void {
     if (this.voiceChipCmd === null) return
     if (now >= this.voiceChipUntil) {
       this.voiceChipCmd = null
+      this.voiceChipButton = ""
       this.callouts.hideVoiceChip()
-      return
     }
-    const camT = this.cameraTransform()
-    if (!camT) return
-    const eye = camT.getWorldPosition()
-    const rot = camT.getWorldRotation()
-    const fwd = rot.multiplyVec3(vec3.forward()).uniformScale(-1)
-    const up = rot.multiplyVec3(vec3.up())
-    const a = CHIP_UP_DEG * Math.PI / 180
-    const dir = fwd.uniformScale(Math.cos(a)).add(up.uniformScale(Math.sin(a)))
-    const label = this.voice && this.voice.kind === "injected" ? PREVIEW_VOICE_LABEL : ""
-    this.callouts.showVoiceChip(eye.add(dir.uniformScale(CHIP_CM)), rot, chipText(this.voiceChipCmd), label, CHIP_CM / 110)
   }
 
   /** "Show my beta" / "Hide beta" (session 24: a toggle). Showing it marks the go "with beta"; hiding it again
@@ -2218,6 +2285,9 @@ export class NextHoldMain extends BaseScriptComponent {
     return this.callouts.getVoiceChip() ? this.callouts.getVoiceChipTransform().getWorldPosition() : null
   }
   getVoiceChipScale(): number { return this.callouts.getVoiceChipTransform().getWorldScale().x }
+  /** session 28: the button the chip is attached to ("" when none), and its place's rank (3 covers nothing) */
+  getVoiceChipButton(): string { return this.voiceChipButton }
+  getVoiceChipRank(): number { return this.voiceChipRank }
 }
 
 /** gap (cm) between a box (centre c, half sizes hw x hh) and a circle; < 0 when they overlap */

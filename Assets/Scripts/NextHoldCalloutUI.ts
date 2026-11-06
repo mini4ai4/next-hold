@@ -76,8 +76,9 @@ export const RESULT_BODY_CAP = 1.0
 export const RESULT_HERO_CAP = 3.0
 export const CARD_HEAD_CAP = 1.8
 export const BUTTON_CAP = 2.2
-/** session 27: half the voice chip (cm, at its 110 cm size): the words heard over the preview's line */
-export const CHIP_HALF_W = 16
+/** session 27: half the voice chip (cm, at its 110 cm size): the words heard over the preview's line. Session 28: drawn
+ *  beside the button it pressed, in that button's size, so a little narrower (it was 32 cm across, head-locked) */
+export const CHIP_HALF_W = 11
 export const CHIP_HALF_H = 4
 
 /** the why-line text's width (cm, at its 110 cm size): as wide as its words, at most WHY_W (longer lines shrink) */
