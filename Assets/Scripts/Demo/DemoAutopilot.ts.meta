@@ -29,6 +29,7 @@
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
     hideChrome: false
+    legacyV4Take: false
     main: false
     playOnStart: false
     startAt: false
@@ -47,6 +48,7 @@
       timeScale: !<float> 1.000000
       startAt: !<float> 0.000000
       hideChrome: true
+      legacyV4Take: false
   ScriptTypes:
     -
       {}
