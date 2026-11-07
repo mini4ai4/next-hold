@@ -2340,6 +2340,11 @@ export class NextHoldMain extends BaseScriptComponent {
   getVoiceChipScale(): number { return this.callouts.getVoiceChipTransform().getWorldScale().x }
   /** session 28: the button the chip is attached to ("" when none), and its place's rank (3 covers nothing) */
   getVoiceChipButton(): string { return this.voiceChipButton }
+  /** Session 28, the screenshot driver only (x1, S12): keep the chip now showing up for `seconds` (the Lens shows it for
+   *  CHIP_SECONDS); a still can't be taken inside one second here. Changes nothing else. */
+  holdVoiceChipForCapture(seconds: number): void {
+    if (this.voiceChipOn) this.voiceChipUntil = getTime() + seconds
+  }
   getVoiceChipRank(): number { return this.voiceChipRank }
 }
 

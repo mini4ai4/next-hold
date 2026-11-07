@@ -19,15 +19,15 @@ import {PREVIEW_VOICE_LABEL} from "../../Scripts/NextHoldVoice"
 import {camera, climbByRule, fmtPos, frames, getMain, mustFind, pinch, presetPosition, samePosition} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 
-export const CAPTURE_KEY = "nh.capture.s28"
+export const CAPTURE_KEY = "nh.capture.s28c"
 /** older counters, removed on sight */
-const OLD_KEYS = ["nh.capture.next", "nh.capture.shot", "nh.capture.s27", "nh.capture.s27b"]
+const OLD_KEYS = ["nh.capture.next", "nh.capture.shot", "nh.capture.s27", "nh.capture.s27b", "nh.capture.s28", "nh.capture.s28b"]
 /** the shot a missing counter starts at */
 const FIRST_SHOT = 1
 export const SHOTS = 12
 /** every shot holds its state this long: LEAF's PASSED banner covers the top of the frame once a run ends, so the
  *  shot is taken while the run is still holding (the run tool times out first) */
-const HOLD_S = 90
+const HOLD_S = 5 // session 28: the still is taken after the run (the editor is frozen during it)
 /** the mats shots: 4.25 m out, 37.5 cm right, pitch -2 (the whole problem and the panel; 2.5 m cuts the top off) */
 const MATS: [number, number, number] = [425, 37.5, -2]
 
@@ -120,20 +120,20 @@ export class X1CaptureScenario extends Scenario {
       const hidden = ["LeafDebugUICamera", "RightHandModel", "LeftHandModel"].map((n) => findSceneObjectByName(n)).filter((so) => !!so && so.enabled)
       for (const so of hidden) so.enabled = false
       await frames(2)
-      print(`[X1] shot ${shot}: holding for ${HOLD_S} s, hidden: ${hidden.map((so) => so.name).join(", ")}; shoot now`)
-      const until = getTime() + HOLD_S
-      while (getTime() < until) {
-        if (shot === 12) {
-          // session 28: the chip shows only when a word changed something, so to hold it for a still: back to no hint
-          // (resetBetaForTests, a test hook) and "next hold" again, in the same frame: rung 1 and its chip, every 0.8 s
-          main.resetBetaForTests(false)
-          main.injectVoice("next hold")
-          const chip = main.getVoiceChip()
-          if (!chip || chip.label !== PREVIEW_VOICE_LABEL || main.getHintStep() !== 1) { errs.push(`chip ${JSON.stringify(chip)}, rung ${main.getHintStep()}`); break }
-        }
-        await sleep(800)
+      if (shot === 12) {
+        // session 28: "next hold" said once at rung 0 (typed: the preview's voice input), then the chip it raised is kept
+        // up for the still (holdVoiceChipForCapture, a capture-only hook; the Lens shows it for 1 s)
+        main.injectVoice("next hold")
+        main.holdVoiceChipForCapture(600)
+        await frames(2)
+        const chip = main.getVoiceChip()
+        if (!chip || chip.label !== PREVIEW_VOICE_LABEL || main.getHintStep() !== 1) errs.push(`chip ${JSON.stringify(chip)}, rung ${main.getHintStep()}`)
       }
-      for (const so of hidden) so.enabled = true
+      print(`[X1] shot ${shot}: holding for ${HOLD_S} s, hidden: ${hidden.map((so) => so.name).join(", ")}; shoot after the run`)
+      const until = getTime() + HOLD_S
+      while (getTime() < until) await sleep(500)
+      // session 28: left hidden when the run ends (the editor is frozen while a run is going, so the still is taken after
+      // it); the next refresh brings them back
     }
     // the next shot only once this one has held to the end (a reset mid-hold runs it again)
     if (!errs.length) {
