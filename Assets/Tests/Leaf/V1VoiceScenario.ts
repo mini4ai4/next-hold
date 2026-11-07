@@ -12,7 +12,7 @@
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
-import {sleep} from "Leaf.lspkg/Utils/common/Utils"
+import {findSceneObjectByName, sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {boxesOverlap, camera, fmtBox, fmtPos, frames, getMain, mustFind, pinch, presetPosition, renderedOuterRadius, restorePreset, samePosition, screenBoxOf} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
@@ -36,6 +36,14 @@ function checkChip(main: NextHoldMain, button: string | null, errs: string[], ta
       if (boxesOverlap(cb, bb)) errs.push(`${tag}: the chip (${fmtBox(cb)}) covers ${button} (${fmtBox(bb)})`)
       else if (gap > 0.04) errs.push(`${tag}: the chip (${fmtBox(cb)}) is ${gap.toFixed(3)} of the frame from ${button} (${fmtBox(bb)}), want beside it`)
     }
+  }
+  // session 28 (the S12 retake): never over another button of the panel (on the wall it sat on Body)
+  for (const n of ["ShowBetaButton", "AskButton", "BodyButton", "SetupButton", "AgainButton"]) {
+    if (n === button) continue
+    const so = findSceneObjectByName(n)
+    if (!so || !so.isEnabledInHierarchy) continue
+    const ob = screenBoxOf(n, cam, true)
+    if (ob && boxesOverlap(cb, ob)) errs.push(`${tag}: the chip (${fmtBox(cb)}) covers ${n} (${fmtBox(ob)})`)
   }
   const wallRot = mustFind("ClimbingWall (stand-in)").getTransform().getWorldRotation()
   const over: string[] = []
@@ -169,6 +177,18 @@ export class V1VoiceScenario extends Scenario {
       await at(60)
       if (main.getView() !== "wall") errs.push(`at 60 cm the view is ${main.getView()}`)
       await noOp("show my beta", "not on the wall's strip")
+      // session 28 (the S12 retake): "next hold" on the wall at the take's pose (1.05 m, 4.5 cm right, 2° up): the chip
+      // by "?", whole in view, not on Body, over no ring
+      {
+        camT.setWorldPosition(new vec3(4.5, 0, face.z + 105))
+        camT.setWorldRotation(quat.angleAxis(2 * Math.PI / 180, vec3.right()))
+        await frames(4)
+        const w = await say("next hold")
+        if (w.cmd !== "nextHold" || main.getHintStep() !== 1 || main.getView() !== "wall") errs.push(`"next hold" on the wall -> ${w.cmd}: ${state()}, view ${main.getView()}`)
+        else checkChip(main, "AskButton", errs, "on the wall")
+        camT.setWorldRotation(r0)
+        await at(60)
+      }
 
       // ── a fall: the card takes the panel's place; only "again" is on offer ──
       const start = presetPosition()

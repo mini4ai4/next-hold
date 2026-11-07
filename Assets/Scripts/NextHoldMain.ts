@@ -80,6 +80,8 @@ import {AsrVoiceSource, InjectedVoiceSource, VoiceSource, lensAsr} from "./NextH
 
 /** how far in front of the wall face the control row and the why-line stand (cm) */
 const PANEL_Z = 10
+/** session 28: the voice chip is never placed over one of these (the panel's buttons and Again) */
+const CHIP_KEEP_OFF_BUTTONS = ["ShowBetaButton", "AskButton", "BodyButton", "SetupButton", "AgainButton"]
 /** On wall: gap (cm, as the eye sees it on the wall) between the suggested ring's glow and the control row */
 const ROW_RING_GAP = 3
 /** the why-line: gap (cm, as seen) from the asked hold's ring, and the least clearance from any other ring or text */
@@ -758,7 +760,8 @@ export class NextHoldMain extends BaseScriptComponent {
     this.voiceChipCmd = cmd
     this.voiceChipButton = button
     this.voiceChipUntil = getTime() + CHIP_SECONDS
-    this.placeVoiceChip(anchor, chipText(cmd), this.voice && this.voice.kind === "injected" ? PREVIEW_VOICE_LABEL : "")
+    // session 28: a button that went with its press (Again) leaves its place, which was kept clear of the problem
+    this.placeVoiceChip(anchor, chipText(cmd), this.voice && this.voice.kind === "injected" ? PREVIEW_VOICE_LABEL : "", !this.buttonPlace(button))
   }
 
   /** what a command can change, for "did it do anything" */
@@ -781,11 +784,13 @@ export class NextHoldMain extends BaseScriptComponent {
     return {pos: tr.getWorldPosition(), rot: tr.getWorldRotation(), k: tr.getWorldScale().x}
   }
 
-  /** Session 28: the chip beside the button the word pressed, in the button's plane and size: above it, else below,
-   *  right or left, the first place whole in view that seen from the eye covers no ring, glow, label, tag or card
+  /** Session 28: the chip beside the button the word pressed, in the button's plane and size: above it (centred, then
+   *  flush with its left or right edge), else below the same way, else right or left, else corner to corner; never over
+   *  another of the panel's buttons as the eye sees it (a button gone with its press, Again: its own place first); the
+   *  first place whole in view that seen from the eye covers no ring, glow, label, tag or card
    *  (panelPlaceScore rank 3), else the first over nothing of the problem (rank 2), else the best. It stays there its
    *  one second. */
-  private placeVoiceChip(a: {pos: vec3; rot: quat; k: number}, heard: string, label: string): void {
+  private placeVoiceChip(a: {pos: vec3; rot: quat; k: number}, heard: string, label: string, buttonGone = false): void {
     this.voiceChipOn = true
     const camT = this.cameraTransform()
     if (!camT) return
@@ -794,11 +799,41 @@ export class NextHoldMain extends BaseScriptComponent {
     const eyeW = this.wall.getTransform().getInvertedWorldTransform().multiplyPoint(camT.getWorldPosition())
     const right = a.rot.multiplyVec3(vec3.right()), up = a.rot.multiplyVec3(vec3.up())
     const gap = 1.2
-    const offs: [number, number][] = [[0, BUTTON_H / 2 + gap + CHIP_HALF_H], [0, -(BUTTON_H / 2 + gap + CHIP_HALF_H)],
-      [BUTTON_W / 2 + gap + CHIP_HALF_W, 0], [-(BUTTON_W / 2 + gap + CHIP_HALF_W), 0]]
+    // session 28 (the S12 retake): above and below also edge-aligned with the button (the chip is twice its width, and
+    // centred over "?" at the strip's left it ran off the view, so it went right of "?", onto Body)
+    const ay = BUTTON_H / 2 + gap + CHIP_HALF_H, ax = CHIP_HALF_W - BUTTON_W / 2, sx0 = BUTTON_W / 2 + gap + CHIP_HALF_W
+    // session 28 (v1 on the mats): then corner to corner with the button (on the mats "?" is the panel's top-right
+    // cell: below is Setup, left is Show my beta, and above reached the rh ring; below-right of it is clear)
+    const offs: [number, number][] = [[0, ay], [ax, ay], [-ax, ay], [0, -ay], [ax, -ay], [-ax, -ay],
+      [sx0, 0], [-sx0, 0], [sx0, ay], [sx0, -ay], [-sx0, ay], [-sx0, -ay]]
+    // session 28 (v1, "again"): the pressed button went with its press: its own place first, flush with its right edge
+    // (Again is the right end of its card, so the chip stays inside where the card was), then centred, then flush left
+    if (buttonGone) offs.unshift([-ax, 0], [0, 0], [ax, 0])
+    // a quad (centre, rotation, half sizes in cm) as the eye sees it: a box on the screen
+    const screenBox = (c: vec3, rot: quat, hw: number, hh: number) => {
+      const r = rot.multiplyVec3(vec3.right()), u = rot.multiplyVec3(vec3.up())
+      const s = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => cam!.worldSpaceToScreenSpace(c.add(r.uniformScale(sx * hw)).add(u.uniformScale(sy * hh))))
+      return {x0: Math.min(...s.map((v) => v.x)), x1: Math.max(...s.map((v) => v.x)), y0: Math.min(...s.map((v) => v.y)), y1: Math.max(...s.map((v) => v.y))}
+    }
+    // the panel's other buttons as the eye sees them: the chip never covers one. Session 28 (v1, "again"): judged on
+    // the screen, not in the pressed button's plane: Again stands on the wall at the card's scale and the panel 60 cm
+    // from the eye at its own, so their planes say nothing about what overlaps in view
+    const others: {x0: number; x1: number; y0: number; y1: number}[] = []
+    if (cam) for (const n of CHIP_KEEP_OFF_BUTTONS) {
+      const o = this.buttonPlace(n)
+      if (!o || o.pos.distance(a.pos) < 1e-3) continue
+      others.push(screenBox(o.pos, o.rot, BUTTON_W / 2 * o.k, BUTTON_H / 2 * o.k))
+    }
     let best: {p: vec3; score: number; rank: number} | null = null
     for (const [dx, dy] of offs) {
       const p = a.pos.add(right.uniformScale(dx * a.k)).add(up.uniformScale(dy * a.k))
+      if (cam) {
+        const cb = screenBox(p, a.rot, CHIP_HALF_W * a.k, CHIP_HALF_H * a.k)
+        if (others.some((o) => cb.x0 < o.x1 && o.x0 < cb.x1 && cb.y0 < o.y1 && o.y0 < cb.y1)) {
+          if (!best) best = {p, score: -1e9, rank: -3}
+          continue
+        }
+      }
       const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) =>
         p.add(right.uniformScale(sx * CHIP_HALF_W * a.k)).add(up.uniformScale(sy * CHIP_HALF_H * a.k)))
       const seen = this.seenOnWall(corners, eyeW)
