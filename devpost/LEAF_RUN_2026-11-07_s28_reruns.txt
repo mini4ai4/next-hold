@@ -1,0 +1,152 @@
+03:14:56.136 [LeafPlugin][PluginViewModel] Loaded 38 scenario(s) from preview.
+03:14:56.138 [LeafPlugin][PluginViewModel] Running scenario: v1-voice
+03:24:53.578 [  0.000s]RUNS: v1-voice with args: []
+03:24:53.579 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+03:24:56.172 [V1] "next hold" (partial) -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:24:56.252 [V1] "why'd you go left there mate" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:24:56.334 [V1] "next hold why" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:24:56.411 [V1] "why" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:24:56.494 [V1] "again" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:24:56.579 [V1] "don’t show my beta" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:24:56.663 [V1] "that's not the next hold" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:24:56.835 [V1] recognition error: chip {"heard":"voice paused","label":"no network"} on AskButton, error "no network"
+03:24:56.872 [V1] voice paused: chip x 0.345..0.619 y 0.557..0.644 on AskButton, rank 1, over rh
+03:24:58.865 [V1] "Next hold." -> nextHold; step 1, dots ●○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:24:58.869 [V1] chip: {"heard":"“next hold”","label":"Preview: typed text stands in for speech"}; drawn "“next hold”" / "Preview: typed text stands in for speech", enabled true
+03:24:58.888 [V1] after "next hold": chip x 0.345..0.619 y 0.557..0.644 on AskButton, rank 1, over rh
+03:25:00.183 [V1] "next hold please" -> nextHold; step 2, dots ●●○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:25:00.393 [V1] "Why?" -> why; step 3, dots ●●●, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:25:00.430 [V1] after "why": chip x 0.345..0.619 y 0.557..0.644 on AskButton, rank 1, over rh
+03:25:01.395 [V1] "next hold" -> nextHold; step 3, dots ●●●, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:25:01.396 [V1] "next hold" at rung 3 -> nextHold, changed false, chip null
+03:25:01.600 [V1] "show my beta" -> showBeta; step 3, dots , beta true, Again false, LH=lh RH=rh LF=lf RF=rf
+03:25:02.510 [V1] "show my beta" -> null; step 3, dots , beta true, Again false, LH=lh RH=rh LF=lf RF=rf
+03:25:03.617 [V1] "show my beta" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:25:03.960 [V1] "next hold" -> nextHold; step 1, dots ●○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:25:03.991 [V1] on the wall: chip x 0.070..0.475 y 0.444..0.573 on AskButton, rank 3, over nothing
+03:25:08.213 [V1] "next hold" -> null; step 0, dots , beta false, Again true, LH=h09 RH=up LF=lf RF=rf
+03:25:08.286 [V1] "show my beta" -> null; step 0, dots , beta false, Again true, LH=h09 RH=up LF=lf RF=rf
+03:25:08.472 [V1] "again" -> again; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:25:08.505 [V1] after "again": chip x 0.183..0.546 y 0.832..0.948 on AgainButton, rank 3, over nothing
+03:25:09.527 [ 15.950s]FAILED: v1-voice - AssertionError: voice, injected path: voice paused: the chip (x 0.345..0.619 y 0.557..0.644) is over rh voice paused: the Lens ranks the chip's place 1 after "next hold": the chip (x 0.345..0.619 y 0.557..0.644) is over rh after "next hold": the Lens ranks the chip's place 1 after "why": the chip (x 0.345..0.619 y 0.557..0.644) is over rh after "why": the Lens ranks the chip's place 1 after "again": the chip (x 0.183..0.546 y 0.832..0.948) covers BodyButton (x 0.237..0.377 y 0.797..0.911) after "again": the chip (x 0.183..0.546 y 0.832..0.948) covers SetupButton (x 0.412..0.551 y 0.797..0.911) Expected: "0" - Received: "8"
+03:25:09.528 [ 15.951s][v1-voice] FAILED - AssertionError: voice, injected path: voice paused: the chip (x 0.345..0.619 y 0.557..0.644) is over rh voice paused: the Lens ranks the chip's place 1 after "next hold": the chip (x 0.345..0.619 y 0.557..0.644) is over rh after "next hold": the Lens ranks the chip's place 1 after "why": the chip (x 0.345..0.619 y 0.557..0.644) is over rh after "why": the Lens ranks the chip's place 1 after "again": the chip (x 0.183..0.546 y 0.832..0.948) covers BodyButton (x 0.237..0.377 y 0.797..0.911) after "again": the chip (x 0.183..0.546 y 0.832..0.948) covers SetupButton (x 0.412..0.551 y 0.797..0.911) Expected: "0" - Received: "8"
+03:27:39.742 Lens has been reset
+03:27:39.809 Lens has been reset
+03:27:40.510 Lens has been reset
+03:27:47.364 Lens has been reset
+03:27:47.389 Lens has been reset
+03:28:12.202 [LeafPlugin][PluginViewModel] Loaded 38 scenario(s) from preview.
+03:28:12.205 [LeafPlugin][PluginViewModel] Running scenario: v1-voice
+03:38:13.655 [  0.000s]RUNS: v1-voice with args: []
+03:38:13.656 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+03:38:25.674 [V1] "next hold" (partial) -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:25.758 [V1] "why'd you go left there mate" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:25.848 [V1] "next hold why" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:25.928 [V1] "why" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:26.012 [V1] "again" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:26.098 [V1] "don’t show my beta" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:26.181 [V1] "that's not the next hold" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:26.290 [V1] recognition error: chip {"heard":"voice paused","label":"no network"} on AskButton, error "no network"
+03:38:26.327 [V1] voice paused: chip x 0.565..0.840 y 0.780..0.867 on AskButton, rank 3, over nothing
+03:38:28.417 [V1] "Next hold." -> nextHold; step 1, dots ●○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:28.424 [V1] chip: {"heard":"“next hold”","label":"Preview: typed text stands in for speech"}; drawn "“next hold”" / "Preview: typed text stands in for speech", enabled true
+03:38:28.456 [V1] after "next hold": chip x 0.565..0.840 y 0.780..0.867 on AskButton, rank 3, over nothing
+03:38:29.755 [V1] "next hold please" -> nextHold; step 2, dots ●●○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:30.054 [V1] "Why?" -> why; step 3, dots ●●●, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:30.090 [V1] after "why": chip x 0.565..0.840 y 0.780..0.867 on AskButton, rank 3, over nothing
+03:38:30.975 [V1] "next hold" -> nextHold; step 3, dots ●●●, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:30.975 [V1] "next hold" at rung 3 -> nextHold, changed false, chip null
+03:38:31.190 [V1] "show my beta" -> showBeta; step 3, dots , beta true, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:32.065 [V1] "show my beta" -> null; step 3, dots , beta true, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:33.063 [V1] "show my beta" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:33.412 [V1] "next hold" -> nextHold; step 1, dots ●○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:33.442 [V1] on the wall: chip x 0.070..0.475 y 0.444..0.573 on AskButton, rank 3, over nothing
+03:38:37.743 [V1] "next hold" -> null; step 0, dots , beta false, Again true, LH=h09 RH=up LF=lf RF=rf
+03:38:37.824 [V1] "show my beta" -> null; step 0, dots , beta false, Again true, LH=h09 RH=up LF=lf RF=rf
+03:38:38.026 [V1] "again" -> again; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:38:38.060 [V1] after "again": chip x 0.566..0.929 y 0.685..0.800 on AgainButton, rank 1, over nothing
+03:38:39.062 [ 25.407s]FAILED: v1-voice - AssertionError: voice, injected path: after "again": the Lens ranks the chip's place 1 Expected: "0" - Received: "1"
+03:38:39.062 [ 25.408s][v1-voice] FAILED - AssertionError: voice, injected path: after "again": the Lens ranks the chip's place 1 Expected: "0" - Received: "1"
+03:39:09.063 Lens has been reset
+03:39:09.122 Lens has been reset
+03:39:09.721 Lens has been reset
+03:39:16.438 Lens has been reset
+03:39:16.466 Lens has been reset
+03:39:42.006 [LeafPlugin][PluginViewModel] Loaded 38 scenario(s) from preview.
+03:39:42.008 [LeafPlugin][PluginViewModel] Running scenario: v1-voice
+03:49:49.911 [  0.000s]RUNS: v1-voice with args: []
+03:49:49.911 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+03:50:02.078 [V1] "next hold" (partial) -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:02.157 [V1] "why'd you go left there mate" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:02.240 [V1] "next hold why" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:02.322 [V1] "why" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:02.407 [V1] "again" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:02.495 [V1] "don’t show my beta" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:02.576 [V1] "that's not the next hold" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:02.677 [V1] recognition error: chip {"heard":"voice paused","label":"no network"} on AskButton, error "no network"
+03:50:02.713 [V1] voice paused: chip x 0.565..0.840 y 0.780..0.867 on AskButton, rank 3, over nothing
+03:50:04.804 [V1] "Next hold." -> nextHold; step 1, dots ●○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:04.810 [V1] chip: {"heard":"“next hold”","label":"Preview: typed text stands in for speech"}; drawn "“next hold”" / "Preview: typed text stands in for speech", enabled true
+03:50:04.841 [V1] after "next hold": chip x 0.565..0.840 y 0.780..0.867 on AskButton, rank 3, over nothing
+03:50:06.135 [V1] "next hold please" -> nextHold; step 2, dots ●●○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:06.338 [V1] "Why?" -> why; step 3, dots ●●●, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:06.373 [V1] after "why": chip x 0.565..0.840 y 0.780..0.867 on AskButton, rank 3, over nothing
+03:50:07.351 [V1] "next hold" -> nextHold; step 3, dots ●●●, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:07.351 [V1] "next hold" at rung 3 -> nextHold, changed false, chip null
+03:50:07.558 [V1] "show my beta" -> showBeta; step 3, dots , beta true, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:08.448 [V1] "show my beta" -> null; step 3, dots , beta true, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:09.527 [V1] "show my beta" -> null; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:09.847 [V1] "next hold" -> nextHold; step 1, dots ●○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:09.874 [V1] on the wall: chip x 0.070..0.475 y 0.444..0.573 on AskButton, rank 3, over nothing
+03:50:14.096 [V1] "next hold" -> null; step 0, dots , beta false, Again true, LH=h09 RH=up LF=lf RF=rf
+03:50:14.178 [V1] "show my beta" -> null; step 0, dots , beta false, Again true, LH=h09 RH=up LF=lf RF=rf
+03:50:14.341 [V1] "again" -> again; step 0, dots ○○○, beta false, Again false, LH=lh RH=rh LF=lf RF=rf
+03:50:14.373 [V1] after "again": chip x 0.566..0.929 y 0.832..0.948 on AgainButton, rank 2, over nothing
+03:50:15.324 [ 25.415s]PASSED: v1-voice
+03:50:15.324 [ 25.415s][v1-voice] PASSED
+03:51:02.057 Lens has been reset
+03:51:02.238 Lens has been reset
+03:51:02.488 Lens has been reset
+03:51:09.206 Lens has been reset
+03:51:09.238 Lens has been reset
+03:51:35.226 [LeafPlugin][PluginViewModel] Loaded 38 scenario(s) from preview.
+03:51:35.229 [LeafPlugin][PluginViewModel] Running scenario: x1-capture
+04:02:03.853 [  0.000s]RUNS: x1-capture with args: []
+04:02:03.854 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+04:02:14.730 [X1] shot 12; the Lens as opened: LH=lh RH=rh LF=lf RF=rf, beta false, 175 cm, go 1, mode climb
+04:02:15.580 [X1] shot 12 (voice chip, on the wall): LH=lh RH=rh LF=lf RF=rf, view wall, page climb, step 0 ○○○, beta false, 175 cm, panel hidden false 9.2 deg down
+04:02:15.887 [X1] shot 12: holding for 5 s, hidden: LeafDebugUICamera, RightHandModel, LeftHandModel; shoot after the run
+04:02:21.087 [ 17.235s]PASSED: x1-capture
+04:02:21.088 [ 17.236s][x1-capture] PASSED
+04:02:41.409 Lens has been reset
+04:02:41.587 Lens has been reset
+04:02:41.852 Lens has been reset
+04:02:48.257 Lens has been reset
+04:02:48.281 Lens has been reset
+04:03:13.789 [LeafPlugin][PluginViewModel] Loaded 38 scenario(s) from preview.
+04:03:13.791 [LeafPlugin][PluginViewModel] Running scenario: d2-demo-v7
+04:13:10.431 [  0.000s]RUNS: d2-demo-v7 with args: []
+04:13:10.431 [  0.002s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+04:13:40.341 [d2] s0-hidden-read t=2.8: ok
+04:13:40.342 [d2] s1-beta t=12.1: ok
+04:13:40.342 [d2] s2-setup t=15.7: ok
+04:13:40.342 [d2] s2-155 t=22.6: ok
+04:13:40.342 [d2] s2-195 t=33.2: ok
+04:13:40.342 [d2] s2-175 t=37.5: ok
+04:13:40.342 [d2] s3-quiet-wall t=46.0: ok
+04:13:40.342 [d2] s4-voice t=49.4: ok
+04:13:40.343 [d2] s5-move t=56.1: ok
+04:13:40.343 [d2] s5-why t=61.1: ok
+04:13:40.343 [d2] s6-moved t=70.0: ok
+04:13:40.343 [d2] s6-came-off t=79.4: ok
+04:13:40.343 [d2] s7-hint t=85.2: ok
+04:13:40.344 [d2] s7-again t=90.1: ok
+04:13:40.344 [d2] s8-pin t=101.0: ok
+04:13:40.344 [d2] s8-lh t=108.2: ok
+04:13:40.344 [d2] s8-topped t=111.8: ok
+04:13:40.344 [d2] s8-card t=114.8: ok
+04:13:40.344 [d2] end t=120.2: ok
+04:13:40.344 [d2] the card up from t=114.3 to 120 (5.7 s of the take), the gate waited 2.1 s real
+04:13:40.345 [d2] ripples ShowBetaButton,SetupButton,HeightDown,HeightDown,HeightDown,HeightDown,HeightUp,HeightUp,HeightUp,HeightUp,HeightUp,HeightUp,HeightUp,HeightUp,HeightDown,HeightDown,HeightDown,HeightDown,SetupButton,ShowBetaButton,AskButton,AskButton,AskButton,up,h09,CameOffCard,AgainButton,up,h09,lh,h20
+04:13:41.317 [ 30.888s]PASSED: d2-demo-v7
+04:13:41.318 [ 30.889s][d2-demo-v7] PASSED
