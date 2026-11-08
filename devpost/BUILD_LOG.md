@@ -5,7 +5,7 @@ Lens Studio MCP. Times and costs are from each session's own log.
 
 | # | Date | What we asked | What CLAD did | Tools used | Time | Cost |
 |---|---|---|---|---|---|---|
-| 0 | 27 Oct | Plan the lens with `plan-lens` from our interview answers | Eight-turn interview; caught four real gaps (limbs need a stand-in; scoring per limb vs best move across all four; occupied holds; what "done" means). Wrote `devpost/design-brief.md` (status: approved) | — | — | ~$6 |
+| 0 | 27 Oct | Plan the lens with `plan-lens` from our interview answers | Eight-turn interview; caught four real gaps (limbs need a stand-in; scoring per limb vs best move across all four; occupied holds; what "done" means; asking "why" by pinch-and-hold clashed with pinch-to-move, so it got its own "?" button; and "safe" became "a secure grip for you, from where you are now"). Our prepared answers are in `devpost/interview-answers.md`. Wrote `devpost/design-brief.md` (status: approved) | — | — | ~$6 |
 | 1 | 27 Oct | Build the brief | Stopped at the readiness gate: Lens Studio wasn't signed in, and SIK, UI Kit and LEAF need it. No files changed | 7 | 0.4 min | $0.62 |
 | 2 | 27 Oct | Build the brief (signed in) | Built the lens: wall, holds, rings, limb markers, control row, type picker, why-line, off-view arrow. Ported the scoring reference to TypeScript (18 checks pass). Wrote one LEAF scenario per done criterion plus an IK reach scenario. **6 of 6 pass** | 302 | 49.8 min | $17.42 |
 | 3 | 27 Oct | Frame the start pose in view | Measured the preview's field of view (about ±18° vertical, ±16° horizontal). Moved the wall to 320 cm, which broke 2 LEAF tests, so it left the change uncommitted for us to decide | 44 | 6.8 min | $2.39 |

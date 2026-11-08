@@ -1,3 +1,5 @@
+> The original idea, 27 Oct, before the plan-lens interview and the live review. The current design is in `design-brief.md` and `DEVPOST.md`.
+
 # Next Hold — a climbing coach on SPECS
 
 ## The one spatial moment

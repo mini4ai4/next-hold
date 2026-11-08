@@ -1,7 +1,17 @@
 # Next Hold
 
-A bouldering coach for SPECS that colours the holds you can reach next, right on the wall: green, yellow or red,
-worked out from where your body is right now. One ring glows with a short label, "R hand": that's the move.
+A bouldering coach Lens for SPECS. It plans your next moves for your own height and keeps them to itself until you ask.
+
+- **From the mats** you read the problem yourself; pinch "Show my beta" and the holds get grip rings (green, yellow,
+  red) worked out from where your body is, the best move glows, and the next two are tagged "2 · LH", "3 · LF".
+- **On the wall** it stays quiet. "?" gives as little as you need: the holds in reach, then the move, then why.
+  Come off, and it offers a hint for just that move, or Again. Four short phrases ("next hold", "why", "show my beta",
+  "again") press the same buttons.
+- **A top** ends in climbing's own words (ONSIGHT, FLASH or SEND) with your moves against the shortest route for you.
+
+![From the mats, beta shown](devpost/visual/v7_3/S02_mats_beta_shown.png)
+
+The Devpost story is `devpost/DEVPOST.md`; the demo video is https://youtu.be/k9QVM-SRolc.
 
 Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Studio MCP.
 

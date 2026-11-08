@@ -1,3 +1,5 @@
+> Superseded: this is the v4 video plan (29 Oct). The current demo is the v7 take, `Assets/Scripts/Demo/` (checked beat by beat by LEAF d2), video https://youtu.be/k9QVM-SRolc.
+
 # Next Hold: video plan (v4, 29.10, after session 19). Under 3:00, public YouTube. Roma approves the cut before upload.
 
 v4 (session 19, for the re-record after the 7.7 judge, `VIDEO_JUDGE_2026-10-29_nh_v4.md`): a new scene 8 climbs to the
