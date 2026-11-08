@@ -29,6 +29,13 @@ const banned = [
   [/learns your climbing|remembers how you climb|gets smarter/i, "a stored record plus a recomputed search"],
   [/time trials?|race the clock|beat your time/i, "how long it took, after you're down"],
   [/\d:\d\d on the wall|time on the wall/i, "'start to top', not 'on the wall'"],
+  // session 31 (CHANGES_V8_FIX1 items 1-3, 6): the words the built v8's judges found wrong or unclear
+  [/split at move|· split\b/i, "the card says '4 is possible · rethink move 4' (\"split\" is jargon, and the splits are a stem)"],
+  [/(is possible|shortest \d|shortest for you: \d)[^\n]{0,80}Pick something harder/i, "an onsight over the shortest says 'Onsight: first go, no hints.'"],
+  [/start to top · (new )?best|new best\b/i, "the time line says 'fastest' (best is the go ranking, which time never decides); the first time has no suffix"],
+  [/the camera's height stands in"|Preview: the camera's height/, "the preview's line is 'from your eye height (preview camera)'"],
+  [/always says where it came from/i, "only an eye height says where it came from"],
+  [/crouch[^.]{0,30}is ignored|crouch(ing)? (is|are) ignored/i, "a still crouch proposes low, and it corrects when you stand"],
 ]
 let hits = 0
 for (const f of files) {

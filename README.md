@@ -40,11 +40,13 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    position until you make that move, and Again stays where it was. Top out and, once "TOPPED" fades, the result card
    takes the panel's place, with Again on its plate: "SEND · go 2" (ONSIGHT, FLASH or SEND on your first top of the
    problem, REPEAT after), "4 moves · the shortest for you" (nobody can beat the shortest secure route; over it the
-   line says where you left it, "5 moves · shortest 4 · split at move 4": the first move that didn't bring the top a
-   move closer, against any shortest route, with no hold or limb named), your hints with a nudge on a first top ("1 hint · sent! Again without it?")
-   or the problem's tick on a repeat, and under them your time from the go's first move to the top, "0:05 start to
-   top · new best" or "0:14 start to top · best 0:05" (only after a top from the start; the fastest is kept per
-   problem and height, and time never decides which go is your best). Goes are counted per
+   line says where to look again, "5 moves · 4 is possible · rethink move 4": the first move that didn't bring the top a
+   move closer, against any shortest route, with no hold or limb named; an onsight, climbed blind on your first go,
+   gets "5 moves · 4 is possible" with no move number and "Onsight: first go, no hints."), your hints with a nudge on a first top ("1 hint · sent! Again without it?")
+   or the problem's tick on a repeat, and under them your time from the go's first move to the top: the first time
+   kept reads just "0:05 start to top", later ones "0:14 start to top · fastest 0:05", or "· fastest yet" when it beats
+   the kept one (only after a top from the start; the fastest is kept per problem and height, and time never decides
+   which go is your best). Goes are counted per
    problem; your best is kept per problem and height. Climbing on after a fall without going back to the start
    holds tops out as "TOPPED · not from the start", with no tick. Pinch a hold: the best limb for it moves there (on
    the glowing hold, the glow's limb), and every ring recolours. Green is a solid ring, yellow
@@ -55,10 +57,14 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    "Mark holds" marks your problem (pinch a hold to add it, set its type, Start and Top in any order, then Done; pinch
    it again to change or Remove it), the Ground / On wall switch, Done, and − and + for your height over the line
    "Your height: 175 cm" (150–200 cm, kept for next time; the climb page says "Planned for 175 cm"). With no height
-   kept, the Lens proposes one from your eye height: stand level and still on the mats for 2 s and it plans for
-   eye height ÷ 0.935, snapped to 5 cm ("Planned for 175 cm" / "from your eye height"; in the preview the second line
-   is "Preview: the camera's height stands in"). A crouch or a tilted head is ignored, it only ever revises up,
-   − / + override it, and your first move keeps it. Reach follows the height, so the colours and the 1-2-3
+   kept, the Lens proposes one from your eye height: stand level and still on the mats for 2 s ("Reading your eye
+   height…") and it plans for eye height ÷ 0.935, snapped to 5 cm ("Planned for 175 cm" / "from your eye height"; in
+   the preview "from your eye height (preview camera)"), and Setup reads "Your height: 175 cm" / "from your eye
+   height · − / + to change". A tilted head is ignored. A still crouch proposes low, and it corrects when you stand
+   (it only ever revises up, by 4 cm of eye or more, before your first move). A stature outside 140–210 cm is no
+   proposal; 140–149 and 201–210 are clamped to the Lens's 150–200 cm range. − / + override it, and your first move
+   keeps it. In the preview, the proposal the Lens makes at open (from the preview camera's 166 cm, so 180 cm) is shown
+   but never kept, because the preview camera isn't a measurement. Reach follows the height, so the colours and the 1-2-3
    change for a taller or shorter climber (at 155 cm step 2 is the pinch h09, from 185 cm the jug h10).
 3. Walk back with WASD past 1.2 m and the Lens shows **Ground**; with your beta shown that is every ring of the
    problem, the next moves as "2 · LH", "3 · LF" (each tag its own blue badge, so a ring's colour only ever means the
@@ -73,12 +79,16 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    here"), the card's hint, Again, go 2 to the top, and the card "SEND · go 2 / 4 moves · the shortest for you /
    1 hint · sent! Again without it?" for the last 5.7 s. Untick it when done. It starts from 175 cm with a fresh
    in-memory store, so nothing kept in the preview changes the take, and the take keeps nothing. (The older v4 take,
-   the full read from its first frame, is kept for LEAF d1: tick **Legacy V4 Take**.) Session 30: tick **V8 Take**
-   as well for the v8 take (`Assets/Scripts/Demo/DemoTimelineV8.ts`, 2:10). It opens with 8 s for the eye height: the
-   eye 3 cm under the preview's own (163 cm over the stand-in's floor), the proposal turned on, and "Planned for
-   175 cm" / "Preview: the camera's height stands in" by about 3.6 s, held. Then comes the v7 take, 8 s later, except
-   that go 2 goes one move over the shortest (RF to rh), so the card reads "5 moves · shortest 4 · split at move 4" over
-   its time line. That time is the take's scripted timing, not a climber's: caption it "(demo timing)".
+   the full read from its first frame, is kept for LEAF d1: tick **Legacy V4 Take**.) Tick **V8 Take** as well for
+   the v8 take (`Assets/Scripts/Demo/DemoTimelineV8.ts`, 2:10 after the 3 s pre-roll), which has no − / + at all. It
+   opens with 8 s for the eye height: the eye 3 cm under the preview's own (163 cm over the stand-in's floor), the
+   proposal turned on at 1.5 s, "Reading your eye height…" for 2 s, then "Planned for 175 cm" / "from your eye height
+   (preview camera)", held. Then the v7 take, 8 s later, except that Setup's − / + are replaced by two other climbers
+   read by their eye height with no pinch (session 31): a fresh store, the eye 21 cm lower (155 cm), then 16 cm higher
+   (195 cm), the beta redrawn for each, then back to 175 cm for the rest; and go 2 goes one hand move over the shortest
+   (LH to h10), so the card reads "5 moves · 4 is possible · rethink move 4" over its time line. In the preview the
+   camera's height stands in for each climber's eyes, and that time is the take's scripted timing, not a climber's:
+   caption them so.
 
 ## Tests
 - LEAF: open the LEAF panel and run all forty-one scenarios (session 29 added m1 for the eye height, k6 for the split
@@ -120,8 +130,10 @@ gates, the up-only rule, − / + and a kept height winning, and the first move k
 SPECS: there the floor is meant to come from WorldQueryModule hit tests on the mats you stand on (the mat's top, not
 the gym floor), and that code has been compiled but never run on a device. Eyes sit at about 93.5% of stature, for men
 and women alike (adult tables give 0.933–0.937), a centimetre or so either way between people; what mats, posture and
-shoes add on a device is unmeasured. It's a starting number you can change with − / +, and the planned line always
-says where it came from. Reach comes from height (× 0.44 for the arms, the legs a share of that); arm span isn't
+shoes add on a device is unmeasured. It's a starting number you can change with − / +, and while the height comes from
+your eye height the planned line (and Setup) says so; a height you set or kept shows just the number. On SPECS the
+floor's hit tests are taken looking 20–75° down, within 3 m, the median of 15 with any more than 8 cm off it dropped,
+and taken again after you move a metre (from the gym floor onto the mats); that is compiled, never run. Reach comes from height (× 0.44 for the arms, the legs a share of that); arm span isn't
 modelled. Weight, strength and flexibility aren't modelled, and they change what's secure for you. "Shortest" on the
 card means the fewest moves the Lens's planner finds for your height, within its search limit (it stops after 6,000
 positions or 8 moves, and then the card says "no shortest found"), not the best or the right way to climb.
