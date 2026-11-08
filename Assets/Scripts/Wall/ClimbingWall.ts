@@ -127,7 +127,11 @@ export class ClimbingWall extends BaseScriptComponent {
   private buildPanel() {
     const g = new Geo();
     const hw = WALL_WIDTH / 2, H = WALL_HEIGHT, T = WALL_THICKNESS;
-    addBox(g, [0, H / 2, -T / 2], [hw, H / 2, T / 2], PANEL_COLOR);
+    // session 30: the box's front sits PANEL_BACK cm behind the wall's plane. It was at 0, only 0.02 cm under the
+    // textured face (buildFace), and from the mats (4 m) the two fought in the depth buffer at some eye heights:
+    // horizontal bands across the wall in the preview with the eye 3 cm lower (the v8 eye beat). Nothing else moves.
+    const PANEL_BACK = 0.5;
+    addBox(g, [0, H / 2, -(T + PANEL_BACK) / 2], [hw, H / 2, (T - PANEL_BACK) / 2], PANEL_COLOR);
 
     // sheet seams: real walls are bolted from 120 x 100 cm sheets
     const seamHalf = 0.14, seamZ = 0.05;

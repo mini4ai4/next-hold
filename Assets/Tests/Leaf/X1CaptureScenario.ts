@@ -16,15 +16,17 @@ import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {findSceneObjectByName, sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {TOPPED_FADE_SECONDS, TOPPED_SECONDS} from "../../Scripts/NextHoldMain"
 import {PREVIEW_VOICE_LABEL} from "../../Scripts/NextHoldVoice"
-import {camera, climbByRule, fmtPos, frames, getMain, mustFind, pinch, presetPosition, samePosition} from "./NextHoldTestKit"
+import {camera, climbByRule, fmtBox, fmtPos, frames, getMain, mustFind, pinch, presetPosition, samePosition, screenBoxOf} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 
-export const CAPTURE_KEY = "nh.capture.s28c"
+export const CAPTURE_KEY = "nh.capture.s30"
 /** older counters, removed on sight */
-const OLD_KEYS = ["nh.capture.next", "nh.capture.shot", "nh.capture.s27", "nh.capture.s27b", "nh.capture.s28", "nh.capture.s28b"]
-/** the shot a missing counter starts at */
-const FIRST_SHOT = 1
-export const SHOTS = 12
+const OLD_KEYS = ["nh.capture.next", "nh.capture.shot", "nh.capture.s27", "nh.capture.s27b", "nh.capture.s28", "nh.capture.s28b", "nh.capture.s28c"]
+/** the shot a missing counter starts at (session 30: the v8 shots, 13-16; set 1 for the v7_3 set) */
+const FIRST_SHOT = 13
+export const SHOTS = 16
+/** session 30, v8: k6's off-plan climb (split at move 4) */
+const SPLIT_PATH = ["up", "h09", "lh", "rh", "h20"]
 /** every shot holds its state this long: LEAF's PASSED banner covers the top of the frame once a run ends, so the
  *  shot is taken while the run is still holding (the run tool times out first) */
 const HOLD_S = 5 // session 28: the still is taken after the run (the editor is frozen during it)
@@ -57,8 +59,8 @@ export class X1CaptureScenario extends Scenario {
     const face = mustFind("Hold_lh").getTransform().getWorldPosition()
     /** the eye `cm` from the wall face, `x` cm across (from the preview's reset eye), pitched `pitch` degrees (up +); set
      *  absolutely (session 28: not from the preview camera's own pose, which now looks up) */
-    const pose = async (cm: number, x = 0, pitch = 0) => {
-      camT.setWorldPosition(new vec3(x, 0, face.z + cm))
+    const pose = async (cm: number, x = 0, pitch = 0, y = 0) => {
+      camT.setWorldPosition(new vec3(x, y, face.z + cm))
       camT.setWorldRotation(quat.angleAxis(pitch * Math.PI / 180, vec3.right()))
       await frames(4)
     }
@@ -74,6 +76,41 @@ export class X1CaptureScenario extends Scenario {
       await pinch("ShowBetaButton"); await frames(3) // closes Setup on the way (a pinch on Setup), then shows the beta
     }
     let what = ""
+    /** session 30, v8: the eye at y = −3 (163 cm over the stand-in's floor) proposes 175, as m1 and the take do */
+    const eyeProposal = async () => {
+      await pose(MATS[0], MATS[1], MATS[2], -3)
+      main.enableEyeProposal()
+      const t0 = getTime()
+      while (getTime() - t0 < 4 && main.getHeightSource() !== "eye") await frames(1)
+      await frames(3)
+      if (main.getHeightSource() !== "eye" || main.getHeightCm() !== 175) errs.push(`eye proposal: ${main.getHeightCm()} cm (${main.getHeightSource()}) "${main.getHeightSourceLine()}"`)
+    }
+    /** session 30, v8: each result line as drawn from the eye: degrees tall, inside the plate, the clear gap to the next */
+    const cardMeasure = () => {
+      const cam = camera()
+      const tanV = Math.tan(cam.fov / 2)
+      const deg = (y0: number, y1: number) => (Math.atan((0.5 - y0) * 2 * tanV) - Math.atan((0.5 - y1) * 2 * tanV)) * 180 / Math.PI
+      const plate = screenBoxOf("ResultPlate", cam)
+      const out: string[] = []
+      let prev: {y1: number; name: string} | null = null
+      for (let i = 1; i <= 4; i++) {
+        const t = mustFind("ResultLine_" + i).getComponent("Component.Text") as Text
+        if (!t.getSceneObject().isEnabledInHierarchy || !t.text) continue
+        const b = screenBoxOf("ResultLine_" + i, cam)
+        if (!b) { errs.push(`line ${i} doesn't render`); continue }
+        const d = deg(b.y0, b.y1)
+        out.push(`${i} "${t.text}" ${d.toFixed(2)}° tall, x ${b.x0.toFixed(3)}..${b.x1.toFixed(3)}` + (prev ? `, ${deg(prev.y1, b.y0).toFixed(2)}° clear of line ${prev.name}` : ""))
+        if (i > 1 && d < 0.5) errs.push(`line ${i} is ${d.toFixed(2)}° tall as drawn`)
+        if (plate && (b.x0 < plate.x0 || b.x1 > plate.x1 || b.y0 < plate.y0 || b.y1 > plate.y1)) errs.push(`line ${i} isn't inside the plate (${fmtBox(b)} vs ${fmtBox(plate)})`)
+        if (prev && b.y0 < prev.y1) errs.push(`line ${i} overlaps line ${prev.name}`)
+        prev = {y1: b.y1, name: String(i)}
+      }
+      print(`[X1] card lines as drawn (plate ${fmtBox(plate)}):\n  ` + out.join("\n  "))
+    }
+    const waitCard = async (topTime: number) => {
+      while (getTime() - topTime < TOPPED_SECONDS + TOPPED_FADE_SECONDS + 0.5) await frames(1)
+      await frames(3)
+    }
 
     if (shot === 1) { await pose(...MATS); what = "mats, beta hidden" }
     else if (shot === 2) { await pose(...MATS); await pinch("ShowBetaButton"); await frames(3); what = "mats, beta shown"; if (!main.isBetaShown()) errs.push("beta not shown") }
@@ -108,6 +145,35 @@ export class X1CaptureScenario extends Scenario {
       what = "voice chip, on the wall"
       if (main.getVoiceKind() !== "injected") errs.push(`voice source ${main.getVoiceKind()}`)
       if (main.getView() !== "wall") errs.push(`view ${main.getView()}`)
+    } else if (shot === 13 || shot === 16) {
+      // session 30, v8: S01's pose with the eye 3 cm lower: "Planned for 175 cm" / the preview's eye line; 16 opens Setup
+      await eyeProposal()
+      if (shot === 16) { await pinch("SetupButton"); await frames(3); if (main.getPage() !== "settings") errs.push(`page ${main.getPage()}`) }
+      what = shot === 13 ? `mats, the eye line: "${main.getPlannedLine()}" / "${main.getHeightSourceLine()}"` : `Setup after the eye's proposal: ${main.getHeightCm()} cm`
+    } else if (shot === 14) {
+      // session 30, v8: k6's climb (off the plan at move 4), on the wall, then read from 2.5 m
+      await pose(60)
+      let topTime = -1
+      for (const h of SPLIT_PATH) { await pinch("Hold_" + h); await frames(2); if (main.isTopped() && topTime < 0) topTime = getTime() }
+      await pose(250)
+      if (topTime < 0) errs.push("the split climb didn't top out"); else await waitCard(topTime)
+      what = "over-par card: " + main.getResultLines().concat([main.getResultTimeLine()]).join(" | ")
+      if (main.getResultLines()[1] !== "5 moves · shortest 4 · split at move 4") errs.push(`card: ${main.getResultLines().join(" | ")}`)
+      if (!/^\d:\d\d start to top · new best$/.test(main.getResultTimeLine())) errs.push(`time line "${main.getResultTimeLine()}"`)
+      cardMeasure()
+    } else if (shot === 15) {
+      // session 30, v8: S08 again (go 1 came off; Again; go 2 with one hint to the top): now with the time line
+      await fall()
+      await pinch("AgainButton"); await frames(3)
+      await pose(60)
+      await ask(1)
+      const g = await climbByRule(main, errs, "go 2")
+      await pose(250)
+      await waitCard(g.time)
+      what = "four-line card: " + main.getResultLines().concat([main.getResultTimeLine()]).join(" | ")
+      if (!main.isResultVisible() || main.getResultLines()[0] !== "SEND · go 2") errs.push(`card ${main.isResultVisible()}: ${main.getResultLines().join(" | ")}`)
+      if (!/^\d:\d\d start to top · new best$/.test(main.getResultTimeLine())) errs.push(`time line "${main.getResultTimeLine()}"`)
+      cardMeasure()
     } else errs.push(`no shot ${shot}`)
 
     // let the panel settle on its lazy follow
