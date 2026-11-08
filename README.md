@@ -7,7 +7,9 @@ A bouldering coach Lens for SPECS. It plans your next moves for your own height 
 - **On the wall** it stays quiet. "?" gives as little as you need: the holds in reach, then the move, then why.
   Come off, and it offers a hint for just that move, or Again. Four short phrases ("next hold", "why", "show my beta",
   "again") press the same buttons.
-- **A top** ends in climbing's own words (ONSIGHT, FLASH or SEND) with your moves against the shortest route for you.
+- **A top** ends in climbing's own words (ONSIGHT, FLASH or SEND) with your moves against the shortest route for you,
+  the move where you left it if you did, and your time from the first move to the top. There's no clock while you
+  climb.
 
 ![From the mats, beta shown](devpost/visual/v7_3/S02_mats_beta_shown.png)
 
@@ -37,9 +39,12 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    side, [Hint · move N] and [Again], while the hold you came off from pulses; a hint taken there stays with that
    position until you make that move, and Again stays where it was. Top out and, once "TOPPED" fades, the result card
    takes the panel's place, with Again on its plate: "SEND · go 2" (ONSIGHT, FLASH or SEND on your first top of the
-   problem, REPEAT after), "4 moves · the shortest for you" (nobody can beat the shortest secure route, so over it the
-   line says "shortest for you: 4"), and your hints with a nudge on a first top ("1 hint · sent! Again without it?")
-   or the problem's tick on a repeat. Goes are counted per
+   problem, REPEAT after), "4 moves · the shortest for you" (nobody can beat the shortest secure route; over it the
+   line says where you left it, "5 moves · shortest 4 · split at move 4": the first move that didn't bring the top a
+   move closer, against any shortest route, with no hold or limb named), your hints with a nudge on a first top ("1 hint · sent! Again without it?")
+   or the problem's tick on a repeat, and under them your time from the go's first move to the top, "0:05 start to
+   top · new best" or "0:14 start to top · best 0:05" (only after a top from the start; the fastest is kept per
+   problem and height, and time never decides which go is your best). Goes are counted per
    problem; your best is kept per problem and height. Climbing on after a fall without going back to the start
    holds tops out as "TOPPED · not from the start", with no tick. Pinch a hold: the best limb for it moves there (on
    the glowing hold, the glow's limb), and every ring recolours. Green is a solid ring, yellow
@@ -49,7 +54,11 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    panel shows "Limb override: LF" until the next move; it too moves only on green or yellow). Setup holds the rest:
    "Mark holds" marks your problem (pinch a hold to add it, set its type, Start and Top in any order, then Done; pinch
    it again to change or Remove it), the Ground / On wall switch, Done, and − and + for your height over the line
-   "Your height: 175 cm" (150–200 cm, kept for next time; the climb page says "Planned for 175 cm"). Reach follows the height, so the colours and the 1-2-3
+   "Your height: 175 cm" (150–200 cm, kept for next time; the climb page says "Planned for 175 cm"). With no height
+   kept, the Lens proposes one from your eye height: stand level and still on the mats for 2 s and it plans for
+   eye height ÷ 0.93, snapped to 5 cm ("Planned for 175 cm" / "from your eye height"; in the preview the second line
+   is "Preview: the camera's height stands in"). A crouch or a tilted head is ignored, it only ever revises up,
+   − / + override it, and your first move keeps it. Reach follows the height, so the colours and the 1-2-3
    change for a taller or shorter climber (at 155 cm step 2 is the pinch h09, from 185 cm the jug h10).
 3. Walk back with WASD past 1.2 m and the Lens shows **Ground**; with your beta shown that is every ring of the
    problem, the next moves as "2 · LH", "3 · LF" (each tag its own blue badge, so a ring's colour only ever means the
@@ -67,13 +76,14 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    the full read from its first frame, is kept for LEAF d1: tick **Legacy V4 Take**.)
 
 ## Tests
-- LEAF: open the LEAF panel and run all thirty-seven scenarios (one per done criterion in `devpost/design-brief.md`, one per review fix, h1–h5 and e1 for beta on request and the tag's outline, g1 for the control count, k1–k3 for the result card, Again, the pinned hint and what is kept, the k4/k5 pair for a kept height on reopen (run k4, refresh, then k5), v1 for voice on the preview's typed path, d1 for the v4 demo autopilot and d2 for the v7 one).
+- LEAF: open the LEAF panel and run all forty scenarios (session 29 added m1 for the eye height, k6 for the split and
+  k7 for the time after the top; the full run below is still session 28's thirty-seven; one per done criterion in `devpost/design-brief.md`, one per review fix, h1–h5 and e1 for beta on request and the tag's outline, g1 for the control count, k1–k3 for the result card, Again, the pinned hint and what is kept, the k4/k5 pair for a kept height on reopen (run k4, refresh, then k5), v1 for voice on the preview's typed path, d1 for the v4 demo autopilot and d2 for the v7 one).
   `x1-capture` is also listed: it is the screenshot driver for `devpost/visual/v7_3/`, not a test.
   The raw output of the last full run (37 of 37 pass, session 28, one clean run on one build): `devpost/LEAF_RUN_2026-11-06_s28.txt`, copied out of
   the Lens Studio log with `node tests/extract_leaf_run.mjs <log> <first line>`. `node tests/leaf_wait.mjs <id>` waits
   for one scenario's result in the log when the run call times out; `node tests/leaf_status.mjs <first line>` lists
   every scenario's last verdict since then. Run LEAF in the preview (`onDevice: false`).
-- Scoring port, plan, beta and attempt logic: `node tests/scoring.port.test.mjs` (182 checks, including the voice parser, the 1-2-3 search
+- Scoring port, plan, beta and attempt logic: `node tests/scoring.port.test.mjs` (212 checks; session 29 added the eye-height sampler, the split against any shortest route and the clock, including the voice parser, the 1-2-3 search
   against a brute force, following the glow = par at all 11 heights from 150 to 200 cm (`NextHoldPlan.ts`), the hint
   ladder, cue, came-off, goes and pinned-hint rules of `NextHoldBeta.ts`, and the ticks, card lines, best and fail-safe
   store of `NextHoldAttempt.ts`). The store keeps about 70 bytes a record, so the preview's 100 KB store holds about
@@ -97,6 +107,15 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
 The preview can't see a real wall or track a body, so hold recognition is a setup mode and body position is stood in by
 pinches: pinch a hold and the limb with the best move to it goes there (LH/RH/LF/RF, behind Body, are an override).
 Coming off is stood in by the eye: on the wall (under 80 cm) and then back past 120 cm. The logic is proven in tests and the preview; how it feels on a real wall needs real SPECS.
+
+The eye height is checked as logic only. In the preview the eye is wherever the scene puts it (166 cm over the
+stand-in wall's floor, which reads as 180 cm), so LEAF's m1 moves the camera to test the window, the crouch and tilt
+gates, the up-only rule, − / + and a kept height winning, and the first move keeping it. Measuring a real body needs
+SPECS: there the floor is meant to come from WorldQueryModule hit tests on the mats you stand on (the mat's top, not
+the gym floor), and that code has been compiled but never run on a device. Eye height ≈ 0.93 × stature is an average,
+good to about ±3–4 cm, inside the 5 cm step. Reach comes from height alone (× 0.44 for the arms, the legs a share of
+that); arm span and weight are not modelled. "Shortest" on the card means the fewest moves under the Lens's own model,
+not the best or the right way to climb.
 
 Voice is four words, each a button already on screen: "next hold" and "why" (both "?"; "why" while "?" reads Why),
 "show my beta", "again". Only short, final phrases count, and only while that button is showing; "don't…", "not…"
