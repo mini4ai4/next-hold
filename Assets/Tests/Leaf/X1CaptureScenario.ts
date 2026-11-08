@@ -19,14 +19,18 @@ import {PREVIEW_VOICE_LABEL} from "../../Scripts/NextHoldVoice"
 import {camera, climbByRule, fmtBox, fmtPos, frames, getMain, mustFind, pinch, presetPosition, samePosition, screenBoxOf} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
 
-export const CAPTURE_KEY = "nh.capture.s30"
+export const CAPTURE_KEY = "nh.capture.s31"
 /** older counters, removed on sight */
-const OLD_KEYS = ["nh.capture.next", "nh.capture.shot", "nh.capture.s27", "nh.capture.s27b", "nh.capture.s28", "nh.capture.s28b", "nh.capture.s28c"]
+const OLD_KEYS = ["nh.capture.next", "nh.capture.shot", "nh.capture.s27", "nh.capture.s27b", "nh.capture.s28", "nh.capture.s28b", "nh.capture.s28c", "nh.capture.s30"]
 /** the shot a missing counter starts at (session 30: the v8 shots, 13-16; set 1 for the v7_3 set) */
 const FIRST_SHOT = 13
 export const SHOTS = 16
-/** session 30, v8: k6's off-plan climb (split at move 4) */
-const SPLIT_PATH = ["up", "h09", "lh", "rh", "h20"]
+/** session 31, v8: the take's go 2, one hand move off the shortest (LH to h10 at move 4) */
+const SPLIT_PATH = ["up", "h09", "lh", "h10", "h20"]
+/** the spec's words (CHANGES_V8_FIX1 items 1-3), fixed here */
+const EYE_LINE_PREVIEW = "from your eye height (preview camera)"
+const SETUP_LINE = "from your eye height · − / + to change"
+const FIRST_TIME = /^\d:\d\d start to top$/
 /** every shot holds its state this long: LEAF's PASSED banner covers the top of the frame once a run ends, so the
  *  shot is taken while the run is still holding (the run tool times out first) */
 const HOLD_S = 5 // session 28: the still is taken after the run (the editor is frozen during it)
@@ -149,17 +153,22 @@ export class X1CaptureScenario extends Scenario {
       // session 30, v8: S01's pose with the eye 3 cm lower: "Planned for 175 cm" / the preview's eye line; 16 opens Setup
       await eyeProposal()
       if (shot === 16) { await pinch("SetupButton"); await frames(3); if (main.getPage() !== "settings") errs.push(`page ${main.getPage()}`) }
+      if (shot === 13 && (main.getPlannedLine() !== "Planned for 175 cm" || main.getHeightSourceLine() !== EYE_LINE_PREVIEW)) errs.push(`eye line "${main.getPlannedLine()}" / "${main.getHeightSourceLine()}"`)
+      if (shot === 16 && (main.getPlannedLine() !== "Your height: 175 cm" || main.getHeightSourceLine() !== SETUP_LINE)) errs.push(`Setup "${main.getPlannedLine()}" / "${main.getHeightSourceLine()}"`)
       what = shot === 13 ? `mats, the eye line: "${main.getPlannedLine()}" / "${main.getHeightSourceLine()}"` : `Setup after the eye's proposal: ${main.getHeightCm()} cm`
     } else if (shot === 14) {
-      // session 30, v8: k6's climb (off the plan at move 4), on the wall, then read from 2.5 m
+      // session 31, v8: as the take's go 2: go 1 comes off; Again; go 2 one hand move off the plan (LH h10 at move 4),
+      // on the wall, then read from 2.5 m (a SEND, so the card says where to rethink; an onsight wouldn't)
+      await fall()
+      await pinch("AgainButton"); await frames(3)
       await pose(60)
       let topTime = -1
       for (const h of SPLIT_PATH) { await pinch("Hold_" + h); await frames(2); if (main.isTopped() && topTime < 0) topTime = getTime() }
       await pose(250)
       if (topTime < 0) errs.push("the split climb didn't top out"); else await waitCard(topTime)
       what = "over-par card: " + main.getResultLines().concat([main.getResultTimeLine()]).join(" | ")
-      if (main.getResultLines()[1] !== "5 moves · shortest 4 · split at move 4") errs.push(`card: ${main.getResultLines().join(" | ")}`)
-      if (!/^\d:\d\d start to top · new best$/.test(main.getResultTimeLine())) errs.push(`time line "${main.getResultTimeLine()}"`)
+      if (main.getResultLines().join(" | ") !== "SEND · go 2 | 5 moves · 4 is possible · rethink move 4 | No hints · sent! Again in 4?") errs.push(`card: ${main.getResultLines().join(" | ")}`)
+      if (!FIRST_TIME.test(main.getResultTimeLine())) errs.push(`time line "${main.getResultTimeLine()}"`)
       cardMeasure()
     } else if (shot === 15) {
       // session 30, v8: S08 again (go 1 came off; Again; go 2 with one hint to the top): now with the time line
@@ -172,7 +181,7 @@ export class X1CaptureScenario extends Scenario {
       await waitCard(g.time)
       what = "four-line card: " + main.getResultLines().concat([main.getResultTimeLine()]).join(" | ")
       if (!main.isResultVisible() || main.getResultLines()[0] !== "SEND · go 2") errs.push(`card ${main.isResultVisible()}: ${main.getResultLines().join(" | ")}`)
-      if (!/^\d:\d\d start to top · new best$/.test(main.getResultTimeLine())) errs.push(`time line "${main.getResultTimeLine()}"`)
+      if (!FIRST_TIME.test(main.getResultTimeLine())) errs.push(`time line "${main.getResultTimeLine()}"`)
       cardMeasure()
     } else errs.push(`no shot ${shot}`)
 

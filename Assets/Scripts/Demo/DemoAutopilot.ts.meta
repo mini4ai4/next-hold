@@ -34,6 +34,7 @@
     playOnStart: false
     startAt: false
     timeScale: false
+    v8Take: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -49,6 +50,7 @@
       startAt: !<float> 0.000000
       hideChrome: true
       legacyV4Take: false
+      v8Take: false
   ScriptTypes:
     -
       {}
@@ -61,3 +63,4 @@
     - '// @input float startAt {"hint":"Start the take here (timeline s) to rehearse or tweak one scene: every action before it runs at once, so the state is the same as in the full take. 0 for recording", "widget":"slider", "min":0, "max":141, "step":0.5}'
     - "// @input bool hideChrome = true {\"hint\":\"Hide what isn't the product while playing: the LEAF banner, SIK's cursor and hand visuals, collider wireframes\"}"
     - '// @input bool legacyV4Take {"hint":"Play the legacy v4 take (the full read from the first frame) instead of the v7 take. OFF for the video"}'
+    - "// @input bool v8Take {\"hint\":\"Session 30: play the v8 take (DemoTimelineV8: the eye's height beat first, then the v7 take 8 s later, go 2 one move over the shortest) instead of the v7 take\"}"
