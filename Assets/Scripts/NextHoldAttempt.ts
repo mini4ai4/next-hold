@@ -16,11 +16,15 @@
 // first top: that is the problem's tick, and every later top is a REPEAT. Goes are counted per problem (a new
 // height is the same problem, so it brings no fresh ONSIGHT); the best is kept per problem and height and ranked
 // tick, then go (first tops only), then hints, then moves. A top climbed on from a fall, not from the start, gets
-// no tick (resumedLines). No timer, no points.
+// no tick (resumedLines). No points. v8 (session 29): no clock while you climb; the card shows your time after the
+// top, as a fourth line (timeLine), only for a top from the start, and time never ranks a go.
+// v8 change 2: over the shortest, line 2 says at which move the go left it ("5 moves · shortest 4 · split at move 4",
+// NextHoldPlan.splitMove); it never names the move's hold or limb (that would be the answer key).
 //
 // Kept (each read and write in try/catch, so a bad value or a full store never stops the Lens):
 //   nh.goes.<hash of the problem>          {"g": goes ended, "b": the tick {"t", "n": go, "m": moves, "h": hints} | null}
-//   nh.best.<hash of problem@height>       {"g": 0, "b": the best top at this height | null}
+//   nh.best.<hash of problem@height>       {"g": 0, "b": the best top at this height | null, "s": fastest top from the
+//                                          start at this height, seconds (v8; optional, older records have none)}
 //   nh.height                              the climber's height, cm
 // Before each write the store's size is checked against getMaxSizeInBytes() (a store reporting 0 gets our own
 // 10 KB cap); if the store can't be read, or the write would pass 90% of the cap, nothing is written. A record is
@@ -30,7 +34,7 @@
 export type Tick = "ONSIGHT" | "FLASH" | "SEND" | "REPEAT"
 
 export interface Go { tick: Tick; go: number; moves: number; hints: number }
-export interface ProblemRecord { goes: number; best: Go | null }
+export interface ProblemRecord { goes: number; best: Go | null; secs?: number }
 
 export const HEIGHT_KEY = "nh.height"
 export const BEST_PREFIX = "nh.best."
@@ -83,9 +87,11 @@ export function heroLine(g: Go): string {
  *  secure moves, so it can be tied, never beaten: line 2 says "the shortest for you" (over it, "shortest for you: N");
  *  "ticked on this go" repeated the first line and is gone; a first top that isn't an onsight gets one line that
  *  points at the next go (SEND is the most common result, and got nothing). */
-export function cardLines(g: Go, par: number | null, ticked: Go | null): string[] {
+export function cardLines(g: Go, par: number | null, ticked: Go | null, split: number | null = null): string[] {
   const l2 = par === null ? `${movesText(g.moves)} · no par for your body`
-    : g.moves <= par ? `${movesText(g.moves)} · the shortest for you` : `${movesText(g.moves)} · shortest for you: ${par}`
+    : g.moves <= par ? `${movesText(g.moves)} · the shortest for you`
+    : split !== null ? `${movesText(g.moves)} · shortest ${par} · split at move ${split}`
+    : `${movesText(g.moves)} · shortest for you: ${par}`
   const l3 = g.tick === "ONSIGHT" ? ONSIGHT_LINE
     : ticked ? `${hintsText(g.hints)} · ticked: ${ticked.tick.toLowerCase()} (go ${ticked.go})`
     : firstTopLine(g, par)
@@ -98,6 +104,24 @@ export function firstTopLine(g: Go, par: number | null): string {
   if (g.hints > 0) return `${hintsText(g.hints)} · ${done}! Again without ${g.hints === 1 ? "it" : "them"}?`
   if (par !== null && g.moves > par) return `No hints · ${done}! Again in ${par}?`
   return g.tick === "FLASH" ? "No hints · flashed with your beta" : "No hints · clean send!"
+}
+
+/** v8 (session 29): seconds as m:ss ("1:42", "0:07"); whole seconds, never tenths (tenths say "race") */
+export function clockText(sec: number): string {
+  const t = Math.max(0, Math.floor(isFinite(sec) ? sec : 0))
+  const m = Math.floor(t / 60), r = t % 60
+  return `${m}:${r < 10 ? "0" : ""}${r}`
+}
+
+/** v8: is `sec` a new best time against the kept one (none kept, or faster) */
+export function isNewBestTime(sec: number, best: number | null | undefined): boolean {
+  return best === null || best === undefined || sec < best
+}
+
+/** v8: the card's fourth line after a top from the start: "1:42 start to top · best 1:31", or "· new best" when it
+ *  is the first or the fastest at this problem and height. `best` is the kept best before this go. */
+export function timeLine(sec: number, best: number | null | undefined): string {
+  return `${clockText(sec)} start to top · ` + (isNewBestTime(sec, best) ? "new best" : `best ${clockText(best as number)}`)
 }
 
 /** Session 26: the card for a top climbed on from a fall (not from the start holds): no tick, no best. */
@@ -146,7 +170,10 @@ export interface KVStore {
 }
 
 export function encodeRecord(r: ProblemRecord): string {
-  return JSON.stringify({g: r.goes, b: r.best ? {t: r.best.tick, n: r.best.go, m: r.best.moves, h: r.best.hints} : null})
+  const o: {g: number; b: {t: Tick; n: number; m: number; h: number} | null; s?: number} =
+    {g: r.goes, b: r.best ? {t: r.best.tick, n: r.best.go, m: r.best.moves, h: r.best.hints} : null}
+  if (typeof r.secs === "number" && isFinite(r.secs) && r.secs >= 0) o.s = Math.round(r.secs * 10) / 10
+  return JSON.stringify(o)
 }
 
 /** a stored record, or the empty one if it is missing or not a record */
@@ -157,7 +184,10 @@ export function decodeRecord(s: string): ProblemRecord {
     if (!o || typeof o.g !== "number" || o.g < 0 || !isFinite(o.g)) return empty
     const b = o.b
     const ok = b && RANK[b.t] !== undefined && [b.n, b.m, b.h].every((v) => typeof v === "number" && isFinite(v) && v >= 0)
-    return {goes: Math.floor(o.g), best: ok ? {tick: b.t as Tick, go: b.n, moves: b.m, hints: b.h} : null}
+    const r: ProblemRecord = {goes: Math.floor(o.g), best: ok ? {tick: b.t as Tick, go: b.n, moves: b.m, hints: b.h} : null}
+    // v8: the fastest top from the start, if kept (older records have none and read as before)
+    if (typeof o.s === "number" && isFinite(o.s) && o.s >= 0) r.secs = o.s
+    return r
   } catch (e) {
     return empty
   }

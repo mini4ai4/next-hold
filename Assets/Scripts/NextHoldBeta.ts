@@ -55,6 +55,12 @@ export interface BetaState {
   here: string
   /** session 26: this go began at the start holds; false after a fall or a top until the climber is back on them */
   fromStart: boolean
+  /** v8 (session 29): the position keys after each move since the position was last the start (path[k-1] is the
+   *  position after move k; the go's start is not in it). Kept through a fall and a top; reset where `moves` is. */
+  path: string[]
+  /** v8 (session 29): the time of this go's first move from the start; null before it, after a fall, Again or back on
+   *  the start holds. The card's time is the top's time minus this. */
+  goFrom: number | null
 }
 
 export const CUE_SECONDS = 20
@@ -62,7 +68,7 @@ export const CUE_TEXT = "? for a hint"
 
 export function initialBeta(betaShown: boolean, now: number, attempt = 1, here = ""): BetaState {
   return {betaShown, hintStep: 0, attempt, moves: 0, cameOffMove: null, fellAtMoves: 0, idleFrom: now,
-    hintsThisGo: 0, betaSeenThisGo: betaShown, pin: null, here, fromStart: true}
+    hintsThisGo: 0, betaSeenThisGo: betaShown, pin: null, here, fromStart: true, path: [], goFrom: null}
 }
 
 /** a position as a key: which hold each limb is on */
@@ -121,8 +127,11 @@ export function takeHint(s: BetaState): BetaState {
  */
 export function moved(s: BetaState, now: number, to = "", start?: string): BetaState {
   const pin = s.pin && s.pin.at === s.here ? null : s.pin
-  let next: BetaState = {...s, moves: s.moves + 1, hintStep: 0, cameOffMove: null, idleFrom: now, here: to, pin}
-  if (!s.fromStart && start !== undefined && to === start) next = {...next, moves: 0, fellAtMoves: 0, fromStart: true}
+  // v8: the go's first move from the start starts its clock; the path grows by the position reached
+  const goFrom = s.fromStart && s.goFrom === null && !isLive(s) ? now : s.goFrom
+  let next: BetaState = {...s, moves: s.moves + 1, hintStep: 0, cameOffMove: null, idleFrom: now, here: to, pin,
+    path: s.path.concat([to]), goFrom}
+  if (!s.fromStart && start !== undefined && to === start) next = {...next, moves: 0, fellAtMoves: 0, fromStart: true, path: [], goFrom: null}
   return pin && pin.at === to ? showPin(next) : next
 }
 
@@ -144,8 +153,8 @@ export function isLive(s: BetaState): boolean {
 export function steppedBack(s: BetaState, topped: boolean): BetaState {
   if (topped || !isLive(s)) return s
   const card = s.betaShown ? null : s.moves + 1
-  if (!s.fromStart) return {...s, fellAtMoves: s.moves, hintStep: 0, cameOffMove: card}
-  return {...nextGo(s), fromStart: false, cameOffMove: card}
+  if (!s.fromStart) return {...s, fellAtMoves: s.moves, hintStep: 0, cameOffMove: card, goFrom: null}
+  return {...nextGo(s), fromStart: false, cameOffMove: card, goFrom: null}
 }
 
 /** A hand reached the top hold. From the start: the go ends (its result is read from `s` before this). Not from
@@ -182,8 +191,8 @@ export function again(s: BetaState, betaDefault: boolean, now: number, start: st
  *  not from the start; otherwise nothing changes here (Main re-reads the go's number for the problem). */
 export function heightChanged(s: BetaState): BetaState {
   if (!isLive(s)) return s
-  if (!s.fromStart) return {...s, fellAtMoves: s.moves}
-  return {...nextGo(s), fromStart: false}
+  if (!s.fromStart) return {...s, fellAtMoves: s.moves, goFrom: null}
+  return {...nextGo(s), fromStart: false, goFrom: null}
 }
 
 /** A cue only: it changes no state and nothing in reveal(). */

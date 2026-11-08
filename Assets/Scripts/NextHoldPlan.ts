@@ -11,7 +11,7 @@
 // first move of the shortest route. Following the glow then takes par moves at every height, and the opening glow
 // (RH to up) is unchanged. The 1-2-3 is the plan's first three moves.
 
-import {type MoveArgs, type ScoreResult, bestMove, fullRoute, routeToTop, sequence} from "./NextHoldScoring"
+import {type MoveArgs, type ScoreResult, HANDS, bestMove, fullRoute, routeToTop, sequence} from "./NextHoldScoring"
 
 export interface Plan {
   /** the move the glow shows; null if no limb has a move */
@@ -53,4 +53,32 @@ export function moveWhy(m: ScoreResult, holdType: string | null | undefined, pla
     : next ? `sets up ${next.limb} to the ${top != null && next.holdId === top ? "top" : next.holdType || "next hold"}`
     : "in reach"
   return `${grip}, ${reason}`
+}
+
+/**
+ * v8 change 2 (session 29): where a go left the shortest. `positions[0]` is the go's start, `positions[k]` the
+ * position after move k; `distTo(p)` is the number of moves of the shortest secure route to the top from p (0 when a
+ * hand is already on the top, Infinity when there is no route). The split is the first move that doesn't bring the
+ * top at least one move closer: the first k with distTo(positions[k]) >= distTo(positions[k-1]). That holds against
+ * any shortest route, not just the one the planner prints (shortest routes aren't unique, and a climber on another
+ * one must not be told they left it). null when every move brought the top closer (at par there is never a split;
+ * over par there always is one).
+ */
+export function splitMove<T>(positions: T[], distTo: (p: T) => number): number | null {
+  if (positions.length < 2) return null
+  let prev = distTo(positions[0])
+  for (let k = 1; k < positions.length; k++) {
+    const d = distTo(positions[k])
+    if (!(d < prev)) return k
+    prev = d
+  }
+  return null
+}
+
+/** v8: the moves of the shortest secure route to the top from `a.position`: 0 when a hand is already on the top
+ *  (routeToTop from a topped position plans a new climb and says 2), Infinity when there is none */
+export function routeDist(a: MoveArgs): number {
+  if (a.top != null && HANDS.some((l) => a.position[l] === a.top)) return 0
+  const r = routeToTop(a)
+  return r ? r.length : Infinity
 }

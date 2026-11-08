@@ -603,7 +603,10 @@ import * as A from "../Assets/Scripts/NextHoldAttempt.ts";
     A.cardLines(send3, null, null)[1] === "7 moves · no par for your body" && A.movesText(1) === "1 move" && A.hintsText(0) === "0 hints" && A.hintsText(1) === "1 hint");
   check("session 26 (hound 3a): a top climbed on from a fall: no tick, it says so",
     A.resumedLines(2).join(" | ") === "TOPPED · not from the start | A tick needs a go from the start | 2 hints · Again to go from the start");
-  check("no timer and no points anywhere on the card", !A.cardLines(send4, 5, send3).concat(repCard, A.resumedLines(1)).join(" ").match(/\d:\d\d|point|pts/i));
+  // v8 (session 29): rewritten from "no timer and no points anywhere on the card": no clock on any of the card's three
+  // lines (the split line too) and no points; the time is its own fourth line, only after a top from the start (section 10)
+  check("v8: no clock on any card line and no points; the time line only after a top from the start",
+    !A.cardLines(send4, 5, send3).concat(repCard, A.resumedLines(1), A.cardLines(send4, 4, null, 3)).join(" ").match(/\d:\d\d|point|pts/i));
   check("FNV-1a known values", A.fnv1a("") === "811c9dc5" && A.fnv1a("a") === "e40c292c", [A.fnv1a(""), A.fnv1a("a")]);
   const pk = B.problemKey(PRESET_PROBLEM, PRESET_START, PRESET_TOP);
   check("the best's key covers the problem and the height",
@@ -862,6 +865,181 @@ const VS = await import("../Assets/Scripts/NextHoldVoiceSource.ts");
   check("ASR (fake module): after stop() nothing listens again", calls.filter((c) => c === "start").length === nStart && queue.length === 0);
   const e2 = []; new VS.AsrVoiceSource(null, schedule).start(() => {}, (w) => e2.push(w));
   check("ASR: where the module can't load, it says so", e2.join() === "speech recognition isn't available here", e2);
+}
+
+// ---- 10. v8 (session 29): height from eye height, your path against the shortest, your time after the top -----
+const E = await import("../Assets/Scripts/NextHoldEyeHeight.ts");
+{
+  // the ratio and the snapping (engineer §1): 163 -> 175, 166 -> 180 (the preview's own eye), 157 -> 170
+  const p = (eye) => E.proposeHeight(E.statureFromEye(eye));
+  check("eye height: 163 cm -> 175, 166 -> 180, 157 -> 170 (stature = eye / 0.93, snapped to 5 cm)",
+    p(163).cm === 175 && p(166).cm === 180 && p(157).cm === 170 && !p(163).clamped, [p(163), p(166), p(157)]);
+  check("eye height: outside 140-210 cm of stature is no proposal (sitting, crouching, a bench); inside it, held to 150-200",
+    p(120) === null && p(125) === null && E.proposeHeight(139.9) === null && E.proposeHeight(210.1) === null && E.proposeHeight(NaN) === null &&
+    E.proposeHeight(142).cm === 150 && E.proposeHeight(142).clamped && E.proposeHeight(208).cm === 200 && E.proposeHeight(208).clamped,
+    [p(120), E.proposeHeight(142), E.proposeHeight(208)]);
+  // the sampler, fed at 30 frames a second
+  const feed = (st, from, secs, f) => {
+    let s = st;
+    for (let t = from; t < from + secs - 1e-9; t += 1 / 30) s = E.pushSample(s, { t, pitchDeg: 0, rollDeg: 0, onMats: true, goLive: false, x: 0, z: 250, ...f(t) });
+    return s;
+  };
+  const lvl = (eye) => () => ({ eyeCm: eye });
+  const s19 = feed(E.initialEye(), 0, 1.9, lvl(163));
+  const s21 = feed(s19, 1.9, 0.2, lvl(163));
+  check("sampler: nothing before the 2.0 s window is full; then 175 from a level, still head at 163 cm",
+    s19.proposal === null && s19.last === "window filling" && s21.proposal === 175 && Math.abs(s21.eyeCm - 163) < 1e-9, [s19.proposal, s21.proposal]);
+  const pitched = feed(E.initialEye(), 0, 4, () => ({ eyeCm: 163, pitchDeg: 15 }));
+  const rolled = feed(E.initialEye(), 0, 4, () => ({ eyeCm: 163, rollDeg: 10 }));
+  const pitch10 = feed(E.initialEye(), 0, 2.2, () => ({ eyeCm: 163, pitchDeg: -10 }));
+  check("sampler: a head pitched 15° or rolled 10° is ignored (4 s of it); 10° of pitch still counts",
+    pitched.proposal === null && pitched.last === "head pitched" && rolled.proposal === null && rolled.last === "head rolled" && pitch10.proposal === 175,
+    [pitched.last, rolled.last, pitch10.proposal]);
+  const bob = feed(E.initialEye(), 0, 4, (t) => ({ eyeCm: 163 + 2 * Math.sin(t * 6) }));
+  const walk = feed(E.initialEye(), 0, 4, (t) => ({ eyeCm: 163, x: 10 * t }));
+  const stroll = feed(E.initialEye(), 0, 2.2, (t) => ({ eyeCm: 163, x: 3 * t }));
+  check("sampler: a moving head (±2 cm) or walking (10 cm/s) gives nothing; 3 cm/s of sway still counts",
+    bob.proposal === null && bob.last === "head moving" && walk.proposal === null && walk.last === "walking" && stroll.proposal === 175, [bob.last, walk.last, stroll.proposal]);
+  const crouch = feed(E.initialEye(), 0, 4, lvl(106));
+  check("sampler: a steady crouch (eye 106 cm, stature 114) changes nothing", crouch.proposal === null && crouch.last === "implausible", crouch.last);
+  const low = feed(E.initialEye(), 0, 2.5, lvl(140));
+  const up = feed(low, 2.5, 3, (t) => ({ eyeCm: t < 3 ? 140 + (t - 2.5) * 46 : 163 }));
+  const up3 = feed(low, 2.5, 3, lvl(143));
+  const down = feed(s21, 2.1, 3, lvl(150));
+  check("sampler: after a half crouch (140 cm: 150) standing up to 163 revises to 175; under 4 cm higher or any lower never revises",
+    low.proposal === 150 && up.proposal === 175 && up3.proposal === 150 && down.proposal === 175, [low.proposal, up.proposal, up3.proposal, down.proposal]);
+  const frozen = feed(E.freezeEye(s19), 1.9, 3, lvl(163));
+  const frozenAfter = feed(E.freezeEye(s21), 2.1, 3, lvl(180));
+  check("sampler: frozen (the first move, a manual − / +) it takes nothing more, before or after a proposal",
+    frozen.proposal === null && frozen.frozen && frozenAfter.proposal === 175, [frozen.proposal, frozenAfter.proposal]);
+  const live = feed(E.initialEye(), 0, 4, () => ({ eyeCm: 163, goLive: true }));
+  const wall = feed(E.initialEye(), 0, 4, () => ({ eyeCm: 163, onMats: false }));
+  const broken = feed(feed(E.initialEye(), 0, 1.5, lvl(163)), 1.5, 0.1, () => ({ eyeCm: 163, pitchDeg: 30 }));
+  const restart = feed(broken, 1.6, 1.9, lvl(163));
+  check("sampler: nothing while a go is under way or off the mats; a pitched frame starts the window again",
+    live.proposal === null && live.last === "go under way" && wall.proposal === null && restart.proposal === null && feed(restart, 3.5, 0.2, lvl(163)).proposal === 175);
+  check("precedence: kept > manual this session > eye > Inspector (kept 165 plus a proposal of 180 gives 165)",
+    E.heightSource(165, null, 180, 175).cm === 165 && E.heightSource(165, null, 180, 175).source === "kept" &&
+    E.heightSource(null, 170, 180, 175).source === "manual" && E.heightSource(null, null, 180, 175).cm === 180 &&
+    E.heightSource(null, null, 180, 175).source === "eye" && E.heightSource(null, null, null, 175).source === "inspector");
+  check("the planned line: \"Planned for 175 cm\" / \"from your eye height\"; in the preview \"Preview: the camera's height stands in\"; any other source one line",
+    E.plannedText(175, "eye", false) === "Planned for 175 cm\nfrom your eye height" &&
+    E.plannedText(175, "eye", true) === "Planned for 175 cm\nPreview: the camera's height stands in" &&
+    ["kept", "manual", "inspector"].every((src) => E.plannedText(165, src, true) === "Planned for 165 cm"));
+}
+{
+  // change 2: where a go left the shortest (NextHoldPlan.splitMove over routeDist)
+  const ph = {}, tp = {};
+  for (const h of HOLDS) if (PRESET_PROBLEM.includes(h.id)) { ph[h.id] = { x: h.x, y: h.y }; tp[h.id] = h.type; }
+  const args = (cm, position) => ({ holds: ph, holdTypes: tp, position, reach: cm * 0.44, top: PRESET_TOP });
+  const memo = new Map();
+  const dist = (cm) => (pos) => {
+    const k = cm + ":" + B.positionKey(pos);
+    if (!memo.has(k)) memo.set(k, N.routeDist(args(cm, pos)));
+    return memo.get(k);
+  };
+  const walkMoves = (moves) => { const out = [{ ...PRESET_POSITION }]; for (const [l, h] of moves) out.push({ ...out[out.length - 1], [l]: h }); return out; };
+  const greedy = (cm) => {
+    const out = [{ ...PRESET_POSITION }];
+    for (let i = 0; i < 12; i++) {
+      const pos = out[out.length - 1];
+      if (P.HANDS.some((l) => pos[l] === PRESET_TOP)) break;
+      const g = P.bestMove(args(cm, pos)); if (!g) break;
+      out.push({ ...pos, [g.limb]: g.holdId });
+    }
+    return out;
+  };
+  const toppedPos = { ...PRESET_POSITION, LH: PRESET_TOP };
+  const raw = P.routeToTop(args(155, toppedPos));
+  check("routeDist: topped counts 0 (routeToTop from a topped position plans another climb)",
+    N.routeDist(args(155, toppedPos)) === 0 && raw && raw.length > 0 && N.routeDist(args(175, { ...PRESET_POSITION })) === 4, raw && raw.length);
+  const g155 = greedy(155), g175 = greedy(175), g195 = greedy(195);
+  const seqOf = (ps, cm) => ps.map((q) => dist(cm)(q));
+  console.log(`  old greedy line, distance to the top after each move: 155 cm ${seqOf(g155, 155).join(",")}, 175 cm ${seqOf(g175, 175).join(",")}, 195 cm ${seqOf(g195, 195).join(",")}`);
+  check("split: 155 cm following the old greedy glow is at par (5): no split, though its last step reads 1 -> topped",
+    g155.length - 1 === dist(155)(g155[0]) && N.splitMove(g155, dist(155)) === null, seqOf(g155, 155));
+  check("split: 175 cm and 195 cm following the old greedy glow (one over par): split at move 4",
+    g175.length - 1 === 5 && N.splitMove(g175, dist(175)) === 4 && N.splitMove(g195, dist(195)) === 4, [seqOf(g175, 175), seqOf(g195, 195)]);
+  const k6 = walkMoves([["RH", "up"], ["LH", "h09"], ["LF", "lh"], ["RF", "rh"], ["LH", "h20"]]);
+  check("split: k6's climb at 175 (RH up, LH h09, LF lh, RF rh, LH h20) splits at move 4 (RF to rh)",
+    N.splitMove(k6, dist(175)) === 4 && dist(175)(k6[5]) === 0, seqOf(k6, 175));
+  // every secure climb of exactly par moves from the start (each move green or yellow, a pinch could make it):
+  // none is told it split, whichever shortest route it took
+  const secureFrom = (cm, pos) => {
+    const out = [];
+    for (const l of P.LIMBS) for (const id of Object.keys(ph)) {
+      if (Object.values(pos).includes(id)) continue;
+      const r = P.scoreHold({ limb: l, holdId: id, holds: ph, holdTypes: tp, position: pos, reach: cm * 0.44, top: PRESET_TOP });
+      if (r.colour !== "red") out.push({ ...pos, [l]: id });
+    }
+    return out;
+  };
+  let parClimbs = 0, parSplits = 0, routesSeen = new Set(), overClimbs = 0, overNoSplit = 0;
+  for (const cm of [155, 175, 195]) {
+    const par = dist(cm)(PRESET_POSITION);
+    const go = (path) => {
+      const pos = path[path.length - 1], n = path.length - 1;
+      if (dist(cm)(pos) === 0) {
+        if (n === par) { parClimbs++; routesSeen.add(cm + ":" + path.map((q) => B.positionKey(q)).join(">")); if (N.splitMove(path, dist(cm)) !== null) parSplits++; }
+        else { overClimbs++; if (N.splitMove(path, dist(cm)) === null) overNoSplit++; }
+        return;
+      }
+      if (n >= par + 1) return;
+      // only moves that can still top out within par + 1 (the search is exhaustive within that budget)
+      for (const q of secureFrom(cm, pos)) if (dist(cm)(q) <= par - n) go(path.concat([q]));
+    };
+    go([{ ...PRESET_POSITION }]);
+  }
+  console.log(`  secure climbs from the start at 155/175/195 cm: ${parClimbs} at par (${routesSeen.size} distinct), ${overClimbs} one over par`);
+  check("split: every secure climb at par (any shortest route, not just the planner's) has no split; every one over par has one",
+    parClimbs > 3 && parSplits === 0 && overClimbs > 0 && overNoSplit === 0, { parClimbs, parSplits, overClimbs, overNoSplit });
+  const D = { a: 3, b: Infinity, c: 2, d: 1, e: 0 };
+  check("split: a dead end (no route from there) is the split; fewer than two positions has none",
+    N.splitMove(["a", "b", "c", "d", "e"], (k) => D[k]) === 1 && N.splitMove(["a", "c", "d", "e"], (k) => D[k]) === null && N.splitMove(["a"], (k) => D[k]) === null);
+  const over = A.cardLines({ tick: "SEND", go: 2, moves: 5, hints: 0 }, 4, null, 4);
+  check("card over the shortest: \"5 moves · shortest 4 · split at move 4\"; at par unchanged (\"4 moves · the shortest for you\"), with or without a split",
+    over[1] === "5 moves · shortest 4 · split at move 4" && over[2] === "No hints · sent! Again in 4?" &&
+    A.cardLines({ tick: "SEND", go: 2, moves: 4, hints: 0 }, 4, null, null)[1] === "4 moves · the shortest for you" &&
+    A.cardLines({ tick: "SEND", go: 2, moves: 4, hints: 0 }, 4, null, 2)[1] === "4 moves · the shortest for you", over);
+  const holdNames = Object.keys(ph).concat(["LH", "RH", "LF", "RF", "L hand", "R hand", "L foot", "R foot", "jug", "pinch", "crimp", "sloper", "pocket"]);
+  check("card: the split line names no move, hold or limb, and fits one line (under 40 characters)",
+    !holdNames.some((w) => new RegExp("\\b" + w + "\\b").test(over[1])) && over[1].length < 40, over[1].length);
+}
+{
+  // change 3: the time after the top
+  check("clock: m:ss in whole seconds: 102 -> 1:42, 7 -> 0:07, 59.9 -> 0:59, 600 -> 10:00",
+    A.clockText(102) === "1:42" && A.clockText(7) === "0:07" && A.clockText(59.9) === "0:59" && A.clockText(600) === "10:00" && A.clockText(-3) === "0:00");
+  check("time line: \"1:42 start to top · best 1:31\"; the first or a faster one \"· new best\"",
+    A.timeLine(102, 91) === "1:42 start to top · best 1:31" && A.timeLine(102, null) === "1:42 start to top · new best" &&
+    A.timeLine(80, 91) === "1:20 start to top · new best" && A.timeLine(91, 91) === "1:31 start to top · best 1:31");
+  const withS = { goes: 0, best: { tick: "SEND", go: 2, moves: 4, hints: 0 }, secs: 91.24 };
+  check("the best record keeps the fastest time as \"s\" (0.1 s), and reads it back",
+    A.encodeRecord(withS) === '{"g":0,"b":{"t":"SEND","n":2,"m":4,"h":0},"s":91.2}' && A.decodeRecord(A.encodeRecord(withS)).secs === 91.2);
+  check("a legacy record (no \"s\") reads as before, and a record with no time encodes exactly as before",
+    A.decodeRecord('{"g":0,"b":{"t":"SEND","n":2,"m":4,"h":0}}').secs === undefined &&
+    A.encodeRecord({ goes: 3, best: { tick: "SEND", go: 3, moves: 7, hints: 1 } }) === '{"g":3,"b":{"t":"SEND","n":3,"m":7,"h":1}}' &&
+    A.decodeRecord('{"g":0,"b":null,"s":"x"}').secs === undefined && A.decodeRecord('{"g":0,"b":null,"s":-1}').secs === undefined);
+  check("time never ranks a go: better() is unchanged by time (a slower clean send still beats a faster beta'd one)",
+    A.better({ tick: "SEND", go: 2, moves: 4, hints: 0 }, { tick: "SEND", go: 2, moves: 4, hints: 1 }) && A.isNewBestTime(80, 91) && !A.isNewBestTime(95, 91) && A.isNewBestTime(95, undefined));
+  // the clock and the path in the beta module
+  const s0 = B.initialBeta(false, 0, 1, "S");
+  const m1 = B.moved(s0, 10, "P1", "S"), m2 = B.moved(m1, 14, "P2", "S");
+  check("go clock: starts at the go's first move from the start, not at the open (10 s, not 0), and doesn't restart on later moves",
+    s0.goFrom === null && m1.goFrom === 10 && m2.goFrom === 10, [s0.goFrom, m1.goFrom, m2.goFrom]);
+  check("path: grows by the position after each move", JSON.stringify(m2.path) === '["P1","P2"]' && s0.path.length === 0, m2.path);
+  const fell = B.steppedBack(m2, false);
+  const on = B.moved(fell, 30, "P3", "S");
+  check("a fall stops the clock (a top climbed on from there gets no time) and keeps the path",
+    fell.goFrom === null && on.goFrom === null && !on.fromStart && JSON.stringify(on.path) === '["P1","P2","P3"]', [fell.goFrom, on.goFrom, on.path]);
+  const back = B.moved(on, 40, "S", "S"), first = B.moved(back, 45, "P1", "S");
+  check("back on the start holds: a fresh go, path empty, clock starts again on its first move",
+    back.fromStart && back.path.length === 0 && back.goFrom === null && first.goFrom === 45 && JSON.stringify(first.path) === '["P1"]');
+  const ag = B.again(m2, false, 50, "S"), ag1 = B.moved(ag, 52, "P1", "S");
+  const top = B.toppedOut(m2);
+  check("Again clears the clock and the path; the next go's clock starts on its first move; a top keeps the path",
+    ag.goFrom === null && ag.path.length === 0 && ag1.goFrom === 52 && JSON.stringify(top.path) === '["P1","P2"]');
+  const hc = B.heightChanged(m2);
+  check("a height change mid-go stops the clock (that go ended)", hc.goFrom === null && !hc.fromStart);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
