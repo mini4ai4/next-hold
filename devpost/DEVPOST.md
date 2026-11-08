@@ -68,5 +68,5 @@ We planned it with the `plan-lens` skill. Its interview changed our plan before 
 Real hold detection and body tracking on SPECS, trying voice on the device, saving marked problems so a gym's problems are set up once, and the honest test: real climbers on a real wall, and whether asking Next Hold gets them to the top in fewer goes.
 
 ## Video and code
-- Demo video (a screen recording of the Lens Studio preview, not real glasses; the climber shots are AI-generated; speed-ups and stand-ins labelled): https://youtu.be/k9QVM-SRolc
+- Demo video (a screen recording of the Lens Studio preview, not real glasses; the climber shots are AI-generated; speed-ups and stand-ins labelled): https://youtu.be/qGVF7aD3VEE
 - Code, with the Lens Studio project and the `devpost/` folder (design brief, build log, LEAF runs): https://github.com/mini4ai4/next-hold
