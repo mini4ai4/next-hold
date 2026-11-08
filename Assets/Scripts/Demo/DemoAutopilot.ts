@@ -27,9 +27,12 @@ import {NextHoldMain} from "../NextHoldMain"
 import {Limb} from "../NextHoldScoring"
 import {CameraKey, DemoAction, DemoTake, FADE_SECONDS, HIDE_WHILE_PLAYING, OVERLAYS_FROM, START_DELAY, V4_TAKE} from "./DemoTimeline"
 import {V7_TAKE} from "./DemoTimelineV7"
+import {V8_TAKE} from "./DemoTimelineV8"
 
 /** after END the last pose holds this long (timeline s) before tracking comes back */
 const END_HOLD = 2
+/** session 30: the eye gate gives up after this long (real s): a take never stalls on it (d3 fails it instead) */
+const EYE_GATE_MAX_S = 6
 
 /** one overlay alpha the autopilot scales (a colour's alpha, or UI Kit's opacityFactor): the Lens's
  *  own value (base) and what the autopilot last wrote */
@@ -65,9 +68,15 @@ export class DemoAutopilot extends BaseScriptComponent {
   @hint("Play the legacy v4 take (the full read from the first frame) instead of the v7 take. OFF for the video")
   legacyV4Take: boolean = false
 
+  @input
+  @hint("Session 30: play the v8 take (DemoTimelineV8: the eye's height beat first, then the v7 take 8 s later, go 2 one move over the shortest) instead of the v7 take")
+  v8Take: boolean = false
+
   private take: DemoTake = V7_TAKE
   /** the card gate's wait so far (real s), for the log */
   private waited = 0
+  /** session 30: the eye gate's wait so far (real s) */
+  private eyeWaited = 0
   private playing = false
   private scale = 1
   /** the timeline time play() started from, and the getTime() it is reached at (after the pre-roll) */
@@ -102,9 +111,10 @@ export class DemoAutopilot extends BaseScriptComponent {
       print("[DemoAutopilot] ERROR: NextHoldMain not wired or not ready")
       return
     }
-    this.take = take || (this.legacyV4Take ? V4_TAKE : V7_TAKE)
+    this.take = take || (this.legacyV4Take ? V4_TAKE : this.v8Take ? V8_TAKE : V7_TAKE)
     const END = this.take.end
     this.waited = 0
+    this.eyeWaited = 0
     this.scale = Math.max(0.01, scale)
     this.from = Math.max(0, Math.min(END, from))
     this.t0 = getTime() + START_DELAY / Math.max(1, this.scale)
@@ -168,6 +178,8 @@ export class DemoAutopilot extends BaseScriptComponent {
   /** session 28: the take playing (or last played), and how long its card gate waited (real s) */
   getTake(): DemoTake { return this.take }
   getCardWait(): number { return this.waited }
+  /** session 30: how long the eye gate waited (real s) */
+  getEyeWait(): number { return this.eyeWaited }
   /** fn(key) runs at each CHECKS entry's time, late in that frame; returns an unsubscribe */
   addCheckListener(fn: (key: string) => void): () => void {
     this.checkListeners.push(fn)
@@ -185,6 +197,12 @@ export class DemoAutopilot extends BaseScriptComponent {
       const before = this.t0
       this.t0 = getTime() - (gate.t - this.from) / this.scale
       this.waited += Math.max(0, this.t0 - before)
+    }
+    // session 30: the eye gate, the same way, until the proposal has landed (or EYE_GATE_MAX_S)
+    if (gate && gate.do === "waitEye" && this.getTimelineTime() >= gate.t && this.eyeGateHolds()) {
+      const before = this.t0
+      this.t0 = getTime() - (gate.t - this.from) / this.scale
+      this.eyeWaited += Math.max(0, this.t0 - before)
     }
     const t = this.getTimelineTime()
     // the pre-roll holds the start point's pose and overlay alpha
@@ -205,6 +223,7 @@ export class DemoAutopilot extends BaseScriptComponent {
       } else if (a === first) {
         // the card gate holds everything after it until the card is up
         if (ACTIONS[this.nextAction].do === "waitCard" && !this.main.isResultVisible()) break
+        if (ACTIONS[this.nextAction].do === "waitEye" && this.eyeGateHolds()) break
         this.run(ACTIONS[this.nextAction++])
       } else {
         // a check reads what is drawn: it runs late in this frame, after the alpha is applied, and
@@ -251,7 +270,18 @@ export class DemoAutopilot extends BaseScriptComponent {
       case "pressBody": m.pressBody(); break
       case "say": if (!m.injectVoice(String(a.arg))) print(`[DemoAutopilot] "say" needs the preview's typed voice source (it is ${m.getVoiceKind()})`); break
       case "waitCard": if (this.waited > 0) print(`[DemoAutopilot] the card gate waited ${this.waited.toFixed(1)} s for the card`); break
+      // session 30 (v8 take)
+      case "enableEye": m.enableEyeProposal(); break
+      case "waitEye":
+        print(`[DemoAutopilot] the eye gate waited ${this.eyeWaited.toFixed(1)} s: ${m.getHeightCm()} cm from ${m.getHeightSource()}` +
+          (m.getHeightSource() === "eye" ? "" : " (the proposal didn't land: the take goes on without it)"))
+        break
     }
+  }
+
+  /** session 30: the eye gate holds while no proposal has landed, for at most EYE_GATE_MAX_S real seconds */
+  private eyeGateHolds(): boolean {
+    return this.main.getHeightSource() !== "eye" && this.eyeWaited < EYE_GATE_MAX_S
   }
 
   // ── camera ────────────────────────────────────────────────────────────────

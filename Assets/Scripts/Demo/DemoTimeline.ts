@@ -26,7 +26,11 @@ export interface CameraKey { t: number; x: number; y: number; z: number; pitch: 
 // time, so at real speed the card is already up and nothing waits, while a sped-up run waits for it)
 export type DemoActionName = "pressLimb" | "pressHold" | "pressHeight" | "pressAsk" | "pressMode" | "pressView" |
   "pickType" | "pressStart" | "pressTop" | "pressDone" | "pressRemove" | "showLabel" | "pressSetup" |
-  "pressShowBeta" | "pressCameOffHint" | "pressAgain" | "pressBody" | "say" | "waitCard"
+  "pressShowBeta" | "pressCameOffHint" | "pressAgain" | "pressBody" | "say" | "waitCard" |
+  // session 30 (v8 take): enableEye turns the eye's height proposal on (as an open with no kept height does); waitEye is
+  // a gate like waitCard: the timeline stops until the proposal has landed (its 2.0 s window runs in real Lens time, so
+  // a sped-up run waits for it), at most EYE_GATE_MAX_S real seconds
+  "enableEye" | "waitEye"
 export interface DemoAction { t: number; do: DemoActionName; arg?: string | number }
 export interface DemoCheck { t: number; key: string }
 /** session 28: one whole take */

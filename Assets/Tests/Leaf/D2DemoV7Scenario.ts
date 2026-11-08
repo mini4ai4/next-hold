@@ -28,7 +28,7 @@ const SPEED = 8
 /** the card's lines at the end of the take */
 export const D2_CARD = ["SEND · go 2", "4 moves · the shortest for you", "1 hint · sent! Again without it?"]
 
-function rippleTarget(a: DemoAction): string | null {
+export function rippleTarget(a: DemoAction): string | null {
   switch (a.do) {
     case "pressHold": return String(a.arg)
     case "pressHeight": return (a.arg as number) > 0 ? "HeightUp" : "HeightDown"
@@ -48,7 +48,7 @@ function badge(main: NextHoldMain, n: number): string {
   return so.enabled ? `${(so.getComponent("Component.Text") as Text).text} on ${main.getGhostHold(n)}` : "none"
 }
 
-function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string[] {
+export function checkKey(key: string, main: NextHoldMain, pilot: DemoAutopilot): string[] {
   const e: string[] = []
   const want = (c: boolean, m: string) => { if (!c) e.push(m) }
   const d = eyeToWallCm(camera())

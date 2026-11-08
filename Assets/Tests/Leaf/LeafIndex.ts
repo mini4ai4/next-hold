@@ -41,6 +41,7 @@ import {D2DemoV7Scenario} from "./D2DemoV7Scenario"
 import {M1EyeHeightScenario} from "./M1EyeHeightScenario"
 import {K6PathSplitScenario} from "./K6PathSplitScenario"
 import {K7TimeAfterTopScenario} from "./K7TimeAfterTopScenario"
+import {D3DemoV8Scenario} from "./D3DemoV8Scenario"
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -87,6 +88,8 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "m1-eye-height", typename: M1EyeHeightScenario.getTypeName()},
     {id: "k6-path-split", typename: K6PathSplitScenario.getTypeName()},
     {id: "k7-time-after-top", typename: K7TimeAfterTopScenario.getTypeName()},
+    // session 30 (v8 take)
+    {id: "d3-demo-v8", typename: D3DemoV8Scenario.getTypeName()},
     // session 27: the screenshot driver for devpost/visual/v7_2, not a test (see X1CaptureScenario.ts)
     {id: "x1-capture", typename: X1CaptureScenario.getTypeName()},
   ]
