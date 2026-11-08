@@ -1,0 +1,179 @@
+06:30:11.044 Lens has been reset
+06:30:11.111 Lens has been reset
+06:30:11.672 Lens has been reset
+06:30:24.395 Lens has been reset
+06:30:24.990 Lens has been reset
+06:31:45.262 Lens has been reset
+06:31:45.358 Lens has been reset
+06:31:45.845 Lens has been reset
+06:31:49.017 Lens has been reset
+06:31:49.021 Lens has been reset
+06:31:50.116 [LeafPlugin][PluginViewModel] Loaded 40 scenario(s) from preview.
+06:31:50.116 [LeafPlugin][PluginViewModel] Running scenario: k6-path-split
+06:31:50.870 [  0.000s]RUNS: k6-path-split with args: []
+06:31:50.870 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:32:01.224 [K6] par 4; the test's distance to the top after each move: 4, 3, 2, 1, 1, 0; split at move 4
+06:32:03.559 [K6] the card: ONSIGHT · go 1 | 5 moves · shortest 4 · split at move 4 | Clean onsight. Pick something harder?
+06:32:03.560 [K6] line 2 drawn 21.2 x 1.56 cm (line 34 cm, cap 1 cm), 0.62° tall from the eye
+06:32:14.558 [K6] at par (RH->up, LH->h09, LF->lh, LH->h20): REPEAT · go 2 | 4 moves · the shortest for you | 0 hints · ticked: onsight (go 1)
+06:32:23.342 [K6] came off after move 4: ["Came off from here","Hint · move 5"]
+06:32:23.513 [ 32.644s]PASSED: k6-path-split
+06:32:23.513 [ 32.644s][k6-path-split] PASSED
+06:32:23.515 [LeafPlugin][PluginViewModel] ✅ Scenario k6-path-split completed successfully.
+06:32:33.211 Lens has been reset
+06:32:33.649 Lens has been reset
+06:32:34.916 Lens has been reset
+06:32:34.921 Lens has been reset
+06:32:36.031 [LeafPlugin][PluginViewModel] Loaded 40 scenario(s) from preview.
+06:32:36.031 [LeafPlugin][PluginViewModel] Running scenario: k6-path-split
+06:32:36.844 [  0.000s]RUNS: k6-path-split with args: []
+06:32:36.844 [  0.000s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:32:47.207 [K6] par 4; the test's distance to the top after each move: 4, 3, 2, 1, 1, 0; split at move 4
+06:32:49.539 [K6] the card: ONSIGHT · go 1 | 5 moves · shortest for you: 4 | Clean onsight. Pick something harder?
+06:32:49.541 [K6] line 2 drawn 16.4 x 1.59 cm (line 34 cm, cap 1 cm), 0.63° tall from the eye
+06:33:00.516 [K6] at par (RH->up, LH->h09, LF->lh, LH->h20): REPEAT · go 2 | 4 moves · the shortest for you | 0 hints · ticked: onsight (go 1)
+06:33:09.299 [K6] came off after move 4: ["Came off from here","Hint · move 5"]
+06:33:09.469 [ 32.625s]FAILED: k6-path-split - AssertionError: path split: line 2 reads "5 moves · shortest for you: 4", want "5 moves · shortest 4 · split at move 4" the Lens's own split: null Expected: "0" - Received: "2"
+06:33:09.469 [ 32.625s][k6-path-split] FAILED - AssertionError: path split: line 2 reads "5 moves · shortest for you: 4", want "5 moves · shortest 4 · split at move 4" the Lens's own split: null Expected: "0" - Received: "2"
+06:33:09.471 [LeafPlugin][PluginViewModel] ❌ Scenario k6-path-split failed.
+06:33:14.108 Lens has been reset
+06:33:14.611 Lens has been reset
+06:33:18.362 Lens has been reset
+06:33:18.370 Lens has been reset
+06:33:19.523 [LeafPlugin][PluginViewModel] Loaded 40 scenario(s) from preview.
+06:33:19.523 [LeafPlugin][PluginViewModel] Running scenario: k6-path-split
+06:33:20.393 [  0.000s]RUNS: k6-path-split with args: []
+06:33:20.393 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:33:30.758 [K6] par 4; the test's distance to the top after each move: 4, 3, 2, 1, 1, 0; split at move 4
+06:33:33.091 [K6] the card: ONSIGHT · go 1 | 5 moves · shortest 4 · split at move 4 | Clean onsight. Pick something harder?
+06:33:33.093 [K6] line 2 drawn 21.2 x 1.56 cm (line 34 cm, cap 1 cm), 0.62° tall from the eye
+06:33:44.070 [K6] at par (RH->up, LH->h09, LF->lh, LH->h20): REPEAT · go 2 | 4 moves · the shortest for you | 0 hints · ticked: onsight (go 1)
+06:33:52.853 [K6] came off after move 4: ["Came off from here","Hint · move 5"]
+06:33:53.029 [ 32.637s]PASSED: k6-path-split
+06:33:53.029 [ 32.637s][k6-path-split] PASSED
+06:33:53.032 [LeafPlugin][PluginViewModel] ✅ Scenario k6-path-split completed successfully.
+06:33:53.087 Lens has been reset
+06:33:53.094 Lens has been reset
+06:33:54.391 [LeafPlugin][PluginViewModel] Loaded 40 scenario(s) from preview.
+06:33:54.391 [LeafPlugin][PluginViewModel] Running scenario: k1-result-card
+06:33:55.353 [  0.000s]RUNS: k1-result-card with args: []
+06:33:55.353 [  0.000s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:34:03.950 [K1] go 1: RH->up, LH->h09, LF->lh, LH->h20; top frame {"pos":{"LH":"h20","RH":"up","LF":"lh","RF":"rf"},"topped":true,"result":true,"card":false,"again":false}
+06:34:06.349 [K1] go 1 card: ONSIGHT · go 1 | 4 moves · the shortest for you | Clean onsight. Pick something harder? (par from the test: 4)
+06:34:06.353 [K1] go 1: AgainButton 11.4 across, 0.0 up from ResultCard: edge gap 1.3 cm (want 1.3)
+06:34:06.354 [K1] kept: nh.goes.58cdcd57 {"g":1,"b":{"t":"ONSIGHT","n":1,"m":4,"h":0}}; nh.best.de635afc {"g":0,"b":{"t":"ONSIGHT","n":1,"m":4,"h":0}}
+06:34:08.039 [K1] Again: {"pos":{"LH":"lh","RH":"rh","LF":"lf","RF":"rf"},"card":false,"go":2,"beta":false,"moves":0,"row":false}
+06:34:19.111 [K1] go 2 card: REPEAT · go 2 | 4 moves · the shortest for you | 0 hints · ticked: onsight (go 1)
+06:34:33.556 [K1] go 3 card: REPEAT · go 3 | 4 moves · the shortest for you | 2 hints · ticked: onsight (go 1)
+06:34:44.001 [K1] 195 cm: go 4, goes key nh.goes.58cdcd57, best key nh.best.f2546fee
+06:34:53.125 [LeafPlugin][PluginViewModel] There is already a scenario running. The scene will be reset.
+06:34:53.131 Lens has been reset
+06:34:53.138 Lens has been reset
+06:34:54.426 [LeafPlugin][PluginViewModel] Loaded 40 scenario(s) from preview.
+06:34:54.426 [LeafPlugin][PluginViewModel] Running scenario: t1-top-out
+06:34:55.439 [  0.000s]RUNS: t1-top-out with args: []
+06:34:55.439 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:35:04.129 [T1] followed the plan: RH->up (green), LH->h09 (green), LF->lh (green), LH->h20 (yellow) -> TOPPED; 4 moves, par 4 (the Lens says 4)
+06:35:06.653 [T1] TOPPED: full in 88 frames to 2 s true, fading in 18 true, gone in 18 true
+06:35:08.391 [T1] LH back down to h10: topped false, glow true, h20 tag "TOP"
+06:35:08.556 [ 13.118s]PASSED: t1-top-out
+06:35:08.556 [ 13.118s][t1-top-out] PASSED
+06:35:08.558 [LeafPlugin][PluginViewModel] ✅ Scenario t1-top-out completed successfully.
+06:35:08.615 Lens has been reset
+06:35:08.623 Lens has been reset
+06:35:09.776 [LeafPlugin][PluginViewModel] Loaded 40 scenario(s) from preview.
+06:35:09.776 [LeafPlugin][PluginViewModel] Running scenario: d1-demo-autopilot
+06:35:10.740 [  0.000s]RUNS: d1-demo-autopilot with args: []
+06:35:10.740 [  0.000s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:35:22.072 [d1] s4-155: row x 0.036..0.187 y 0.708..0.826 .. x 0.212..0.360 y 0.708..0.826, badge 2 x 0.570..0.649 y 0.449..0.475
+06:35:22.073 [d1] s4-155: glow of up x 0.727..0.959 y 0.361..0.560
+06:35:23.331 [d1] s4-195: row x 0.036..0.187 y 0.708..0.826 .. x 0.212..0.360 y 0.708..0.826, badge 2 x 0.506..0.584 y 0.442..0.468
+06:35:23.332 [d1] s4-195: glow of up x 0.727..0.959 y 0.361..0.560
+06:35:25.205 [d1] s5-lf: glow of lh x 0.071..0.340 y 0.464..0.699
+06:35:25.933 [d1] s5-why: why "POCKET HOLD · HIGH STEP" on h11 (override LF), ring red; plate x 0.520..0.949 y 0.340..0.412; nearest h11 0.007, rh 0.110
+06:35:26.830 [d1] s6-away: arrow at -0.78,-0.46 toward lh at -2.03,-1.19 (0° off, mesh 0°); row x 0.427..0.948 y 0.543..0.993
+06:35:29.436 [d1] s8-plan: glow of lh x 0.067..0.360 y 0.705..0.968
+06:35:29.708 [d1] s8-lh: glow of h20 x 0.146..0.422 y 0.113..0.345
+06:35:30.718 [d1] s0-ground-read t=2.6: ok
+06:35:30.718 [d1] s1-lower t=17.5: ok
+06:35:30.718 [d1] s1-upper t=27.1: ok
+06:35:30.718 [d1] s2-still-ground t=36.1: ok
+06:35:30.718 [d1] s2-on-wall t=47.2: ok
+06:35:30.718 [d1] s3-after-pinch t=54.6: ok
+06:35:30.718 [d1] s3-ground-again t=61.3: ok
+06:35:30.718 [d1] s4-start t=68.1: ok
+06:35:30.718 [d1] s4-155 t=74.1: ok
+06:35:30.718 [d1] s4-195 t=84.1: ok
+06:35:30.718 [d1] s5-lf t=99.1: ok
+06:35:30.718 [d1] s5-why t=104.7: ok
+06:35:30.718 [d1] s6-away t=112.1: ok
+06:35:30.718 [d1] s6-back t=116.6: ok
+06:35:30.718 [d1] s7-picker t=120.9: ok
+06:35:30.718 [d1] s7-crimp t=122.5: ok
+06:35:30.718 [d1] s7-start t=123.9: ok
+06:35:30.719 [d1] s7-done t=125.7: ok
+06:35:30.719 [d1] s7-reopened t=127.5: ok
+06:35:30.719 [d1] s7-removed t=129.1: ok
+06:35:30.719 [d1] s8-plan t=132.9: ok
+06:35:30.719 [d1] s8-lh t=135.1: ok
+06:35:30.719 [d1] s8-topped t=136.6: ok
+06:35:30.719 [d1] s8-card t=139.7: ok
+06:35:30.719 [d1] end t=141.1: ok
+06:35:30.719 [d1] every frame: 103 On wall frames, panel vs ring clear; 12 height changes in scene 4, the −/+ row in shot at each
+06:35:30.719 [d1] ripples: 36 of 36 pinches; on holds, on screen at: up@50.9 (scene 3) centre 0.50,0.50 ±0.30; rh@66.6 (scene 4) centre 0.89,0.61 ±0.08; up@94.4 (scene 5) centre 0.50,0.38 ±0.09; h09@96.6 (scene 5) centre 0.35,0.38 ±0.08; h11@100.9 (scene 5) centre 0.74,0.47 ±0.08; h12@119.8 (scene 7) centre 0.89,0.66 ±0.12; h12@126.2 (scene 7) centre 0.90,0.67 ±0.12; lh@133.3 (scene 8) centre 0.21,0.83 ±0.10; h20@135.6 (scene 8) centre 0.28,0.23 ±0.10
+06:35:30.719 [d1] scenes 0@0.1 1@8.2 2@30.2 3@48.1 4@65.1 5@90.2 6@105.1 7@117.1 8@130.1
+06:35:32.395 [d1] the take's card, 1.6 s after it ended: "SEND · go 2 | 4 moves · the shortest for you | No hints · clean send!", row hidden true, Again true
+06:35:32.397 [d1] the take's card: AgainButton 11.4 across, 0.0 up from ResultCard: edge gap 1.3 cm (want 1.3)
+06:35:32.628 [ 21.888s]PASSED: d1-demo-autopilot
+06:35:32.628 [ 21.888s][d1-demo-autopilot] PASSED
+06:35:32.629 [LeafPlugin][PluginViewModel] ✅ Scenario d1-demo-autopilot completed successfully.
+06:35:32.687 Lens has been reset
+06:35:32.696 Lens has been reset
+06:35:33.852 [LeafPlugin][PluginViewModel] Loaded 40 scenario(s) from preview.
+06:35:33.852 [LeafPlugin][PluginViewModel] Running scenario: d2-demo-v7
+06:35:34.843 [  0.000s]RUNS: d2-demo-v7 with args: []
+06:35:34.843 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:35:54.303 [d2] s0-hidden-read t=2.7: ok
+06:35:54.303 [d2] s1-beta t=12.1: ok
+06:35:54.303 [d2] s2-setup t=15.6: ok
+06:35:54.303 [d2] s2-155 t=21.1: ok
+06:35:54.303 [d2] s2-195 t=29.1: ok
+06:35:54.303 [d2] s2-175 t=34.0: ok
+06:35:54.303 [d2] s3-quiet-wall t=46.1: ok
+06:35:54.303 [d2] s4-voice t=48.6: ok
+06:35:54.303 [d2] s5-move t=56.1: ok
+06:35:54.303 [d2] s5-why t=61.1: ok
+06:35:54.303 [d2] s6-moved t=70.1: ok
+06:35:54.303 [d2] s6-came-off t=79.2: ok
+06:35:54.303 [d2] s7-hint t=85.0: ok
+06:35:54.303 [d2] s7-again t=90.1: ok
+06:35:54.303 [d2] s8-pin t=101.1: ok
+06:35:54.303 [d2] s8-lh t=108.0: ok
+06:35:54.303 [d2] s8-topped t=111.6: ok
+06:35:54.303 [d2] s8-card t=114.6: ok
+06:35:54.303 [d2] end t=120.0: ok
+06:35:54.303 [d2] the card up from t=114.2 to 120 (5.8 s of the take), the gate waited 2.1 s real
+06:35:54.303 [d2] ripples ShowBetaButton,SetupButton,HeightDown,HeightDown,HeightDown,HeightDown,HeightUp,HeightUp,HeightUp,HeightUp,HeightUp,HeightUp,HeightUp,HeightUp,HeightDown,HeightDown,HeightDown,HeightDown,SetupButton,ShowBetaButton,AskButton,AskButton,AskButton,up,h09,CameOffCard,AgainButton,up,h09,lh,h20
+06:35:54.513 [ 19.671s]PASSED: d2-demo-v7
+06:35:54.513 [ 19.671s][d2-demo-v7] PASSED
+06:35:54.514 [LeafPlugin][PluginViewModel] ✅ Scenario d2-demo-v7 completed successfully.
+06:36:03.506 Lens has been reset
+06:36:03.516 Lens has been reset
+06:36:04.817 [LeafPlugin][PluginViewModel] Loaded 40 scenario(s) from preview.
+06:36:04.817 [LeafPlugin][PluginViewModel] Running scenario: k1-result-card
+06:36:06.049 [  0.000s]RUNS: k1-result-card with args: []
+06:36:06.050 [  0.000s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:36:14.621 [K1] go 1: RH->up, LH->h09, LF->lh, LH->h20; top frame {"pos":{"LH":"h20","RH":"up","LF":"lh","RF":"rf"},"topped":true,"result":true,"card":false,"again":false}
+06:36:17.021 [K1] go 1 card: ONSIGHT · go 1 | 4 moves · the shortest for you | Clean onsight. Pick something harder? (par from the test: 4)
+06:36:17.025 [K1] go 1: AgainButton 11.4 across, 0.0 up from ResultCard: edge gap 1.3 cm (want 1.3)
+06:36:17.026 [K1] kept: nh.goes.58cdcd57 {"g":1,"b":{"t":"ONSIGHT","n":1,"m":4,"h":0}}; nh.best.de635afc {"g":0,"b":{"t":"ONSIGHT","n":1,"m":4,"h":0}}
+06:36:18.713 [K1] Again: {"pos":{"LH":"lh","RH":"rh","LF":"lf","RF":"rf"},"card":false,"go":2,"beta":false,"moves":0,"row":false}
+06:36:29.803 [K1] go 2 card: REPEAT · go 2 | 4 moves · the shortest for you | 0 hints · ticked: onsight (go 1)
+06:36:44.240 [K1] go 3 card: REPEAT · go 3 | 4 moves · the shortest for you | 2 hints · ticked: onsight (go 1)
+06:36:56.433 [K1] 195 cm: go 4, goes key nh.goes.58cdcd57, best key nh.best.f2546fee
+06:37:09.741 [K1] 195 cm card: REPEAT · go 4 | 4 moves · the shortest for you | 0 hints · ticked: onsight (go 1) (par from the test: 4)
+06:37:18.932 [K1] one move into go 5, then − to 190 cm: go 6, from the start false; kept {"g":5,"b":{"t":"ONSIGHT","n":1,"m":4,"h":0}}
+06:37:26.485 [K1] climbed on to the top: TOPPED · not from the start | A tick needs a go from the start | 0 hints · Again to go from the start
+06:37:28.474 [ 82.425s]PASSED: k1-result-card
+06:37:28.475 [ 82.425s][k1-result-card] PASSED
+06:37:28.477 [LeafPlugin][PluginViewModel] ✅ Scenario k1-result-card completed successfully.

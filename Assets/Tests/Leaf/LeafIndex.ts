@@ -39,6 +39,7 @@ import {V1VoiceScenario} from "./V1VoiceScenario"
 import {X1CaptureScenario} from "./X1CaptureScenario"
 import {D2DemoV7Scenario} from "./D2DemoV7Scenario"
 import {M1EyeHeightScenario} from "./M1EyeHeightScenario"
+import {K6PathSplitScenario} from "./K6PathSplitScenario"
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -83,6 +84,7 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "d2-demo-v7", typename: D2DemoV7Scenario.getTypeName()},
     // session 29 (v8)
     {id: "m1-eye-height", typename: M1EyeHeightScenario.getTypeName()},
+    {id: "k6-path-split", typename: K6PathSplitScenario.getTypeName()},
     // session 27: the screenshot driver for devpost/visual/v7_2, not a test (see X1CaptureScenario.ts)
     {id: "x1-capture", typename: X1CaptureScenario.getTypeName()},
   ]
