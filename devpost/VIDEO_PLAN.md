@@ -1,4 +1,4 @@
-> Superseded: this is the v4 video plan (29 Oct). The current demo is the v7 take, `Assets/Scripts/Demo/` (checked beat by beat by LEAF d2), video https://youtu.be/qGVF7aD3VEE.
+> Superseded: this is the v4 video plan (29 Oct). The current demo is the v7 take, `Assets/Scripts/Demo/` (checked beat by beat by LEAF d2), video https://youtu.be/OkD-7XvJYnE.
 
 # Next Hold: video plan (v4, 29.10, after session 19). Under 3:00, public YouTube. Roma approves the cut before upload.
 

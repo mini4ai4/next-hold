@@ -4,7 +4,7 @@
 // author's own text and isn't checked here.
 import {readFileSync, existsSync} from "node:fs"
 
-const files = ["README.md", "devpost/visual/v7_3/INDEX.md", "devpost/visual/v8/INDEX.md"].filter((f) => existsSync(f))
+const files = ["README.md", "devpost/DEVPOST.md", "devpost/visual/v7_3/INDEX.md", "devpost/visual/v8/INDEX.md"].filter((f) => existsSync(f))
 const banned = [
   [/every button is 11 × 10 cm with a 2\.2 cm label/, "label sizes: '?' and −/+ are 4 cm, Show my beta 1.7 cm"],
   [/needs a network connection/, "voice: the API reports NoInternet; Snap's page doesn't say it always needs one"],

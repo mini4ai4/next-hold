@@ -13,7 +13,7 @@ A bouldering coach Lens for SPECS. It plans your next moves for your own height 
 
 ![From the mats, beta shown](devpost/visual/v7_3/S02_mats_beta_shown.png)
 
-The Devpost story is `devpost/DEVPOST.md`; the demo video is https://youtu.be/qGVF7aD3VEE.
+The Devpost story is `devpost/DEVPOST.md`; the demo video is https://youtu.be/OkD-7XvJYnE.
 
 Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Studio MCP.
 
