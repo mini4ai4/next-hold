@@ -72,6 +72,8 @@ export const CARD_HINT_X = -CARD_HALF_W + 1 + HINT_W / 2
 export const CARD_BUTTON_X = CARD_HALF_W - 1 - BUTTON_W / 2
 /** the result card (cm, at the 110 cm size); Again stands AGAIN_GAP to its right as its own button */
 export const RESULT_HALF_W = 18
+/** v8 (session 29): unchanged; the fourth line (the time) fits inside it. A taller plate (9.0, then 8.0) put the card
+ *  over lh's and rh's rings from the preset pose (k1, k7), so the lines moved closer instead */
 export const RESULT_HALF_H = 7.5
 export const AGAIN_W = BUTTON_W
 export const AGAIN_H = BUTTON_H
@@ -159,6 +161,9 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
   get onAgainPressed(): PublicApi<void> { return this._onAgainPressed.publicApi() }
   private resultRoot: SceneObject
   private resultLines: Text[] = []
+  /** v8: the fourth line, the time after a top from the start ("1:42 start to top · best 1:31"); not in resultLines,
+   *  so getResultLines() stays three lines */
+  private timeLine: Text
   private resultWanted = false
   private resultReady = false
   private againRoot: SceneObject
@@ -265,8 +270,11 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
     const plate = plateSO.createComponent(BackPlate.getTypeName()) as BackPlate
     plate.size = new vec2(plateW, 2 * RESULT_HALF_H)
     const caps = [RESULT_HERO_CAP, RESULT_BODY_CAP, RESULT_BODY_CAP]
-    const ys = [3.4, -2.0, -4.9]
-    for (let i = 0; i < 3; i++) {
+    // v8: four lines on the same plate (was 3.4 / -2.0 / -4.9): body lines 2.3 cm apart at their 1 cm cap (was 2.9),
+    // the time under them, at the body cap
+    const ys = [4.0, -1.0, -3.3, -5.6]
+    for (let i = 0; i < 4; i++) {
+      if (i === 3) caps.push(RESULT_BODY_CAP)
       const t = this.obj(this.resultRoot, "ResultLine_" + (i + 1), new vec3(0, ys[i], 0.8)).createComponent("Component.Text") as Text
       t.depthTest = true
       t.size = caps[i] * TEXT_PER_CM
@@ -276,7 +284,8 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
       t.horizontalOverflow = HorizontalOverflow.Shrink
       t.verticalOverflow = VerticalOverflow.Overflow
       t.layoutRect = Rect.create(-RESULT_HALF_W + 1, RESULT_HALF_W - 1, -1.8, 1.8)
-      this.resultLines.push(t)
+      if (i < 3) this.resultLines.push(t)
+      else { this.timeLine = t; t.getSceneObject().enabled = false }
     }
     plate.onInitialized.add(() => {
       this.resultReady = true
@@ -365,9 +374,12 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
   getCameOffHintText(): string { return this.cardWanted && this.hintText ? this.hintText.text : "" }
 
   /** Session 24: the result card's three lines at worldPos; scale 1 = its 110 cm size. */
-  showResult(worldPos: vec3, worldRot: quat, lines: string[], scale = 1): void {
+  showResult(worldPos: vec3, worldRot: quat, lines: string[], scale = 1, time = ""): void {
     this.place(this.resultRoot, worldPos, worldRot, scale)
     for (let i = 0; i < 3; i++) this.resultLines[i].text = lines[i] || ""
+    // v8: the time line only when there is one (an empty Text reports an unbounded box)
+    this.timeLine.text = time
+    this.timeLine.getSceneObject().enabled = time !== ""
     this.resultWanted = true
     if (this.resultReady) this.resultRoot.enabled = true
   }
@@ -379,6 +391,8 @@ export class NextHoldCalloutUI extends BaseScriptComponent {
 
   isResultVisible(): boolean { return this.resultWanted }
   getResultLines(): string[] { return this.resultWanted ? this.resultLines.map((t) => t.text) : [] }
+  /** v8: the card's fourth line as shown ("" when there is none) */
+  getResultTimeLine(): string { return this.resultWanted && this.timeLine && this.timeLine.getSceneObject().enabled ? this.timeLine.text : "" }
 
   showAgain(worldPos: vec3, worldRot: quat, scale = 1): void {
     this.place(this.againRoot, worldPos, worldRot, scale)

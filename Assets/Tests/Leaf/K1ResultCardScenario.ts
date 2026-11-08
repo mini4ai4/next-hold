@@ -13,7 +13,7 @@
 //   the goes key the same, the best key another: "REPEAT · go 4" with 195's par.
 // - A height change in the middle of a go ends that go (engineer bug 2), and climbing on to the top is not from
 //   the start: "TOPPED · not from the start", no tick, nothing kept for it (hound 3a).
-// No timer and no points on any card.
+// No clock and no points on the card's three lines (session 29, v8: the time is its own fourth line, k7).
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"

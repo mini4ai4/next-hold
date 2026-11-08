@@ -54,7 +54,7 @@ import {
   Evaluation, HoldTypes, Holds, LEG_REACH, LIMBS, Limb, Position, ScoreResult, bestMove, bestPerHold, centreOfMass,
   evaluate, hipOf, pinchMove, routeToTop, sequence, shoulderOf,
 } from "./NextHoldScoring"
-import {Go, KVStore, NextHoldSave, bestKey, better, cardLines, goesKey, resumedLines, tickOf} from "./NextHoldAttempt"
+import {Go, KVStore, NextHoldSave, bestKey, better, cardLines, goesKey, isNewBestTime, resumedLines, tickOf, timeLine} from "./NextHoldAttempt"
 import {Plan, moveWhy, plan as planFrom, routeDist, splitMove} from "./NextHoldPlan"
 import {
   DESIGN_VIEW_CM, FigureBody, NextHoldWallVisuals, OverlayState, RingColour, TOPPED_TEXT, WallPt, minReadSize, readBoost, ringLineWidth,
@@ -296,7 +296,7 @@ export class NextHoldMain extends BaseScriptComponent {
   /** session 24 (B, C): the store door, the position this go's count started from, the last top's card */
   private save: NextHoldSave = new NextHoldSave(null)
   private startPos: Position = {LH: null, RH: null, LF: null, RF: null}
-  private result: {go: Go; par: number | null; lines: string[]; key: string; resumed: boolean; split?: number | null} | null = null
+  private result: {go: Go; par: number | null; lines: string[]; key: string; resumed: boolean; split?: number | null; secs?: number | null; time?: string} | null = null
   /** the height read from the store at open (null: none kept) */
   private storedHeight: number | null = null
   /** v8 (session 29): the height from the eye. On only at an open with no kept height (or enableEyeProposal());
@@ -597,13 +597,21 @@ export class NextHoldMain extends BaseScriptComponent {
       const go: Go = {tick: tickOf(prob.best, b.attempt, b.betaSeenThisGo, b.hintsThisGo), go: b.attempt, moves: b.moves, hints: b.hintsThisGo}
       this.save.writeRecord(gk, {goes: Math.max(prob.goes, b.attempt), best: prob.best || go})
       const rec = this.save.readRecord(key)
-      this.save.writeRecord(key, {goes: 0, best: better(go, rec.best) ? go : rec.best})
+      // v8 change 3: the time from the go's first move to this top; the fastest is kept beside the best (time never
+      // ranks a go: the best go is still better()'s)
+      const secs = b.goFrom !== null ? Math.max(0, getTime() - b.goFrom) : null
+      const keptSecs = rec.secs
+      const bestSecs = secs !== null && isNewBestTime(secs, keptSecs) ? secs : keptSecs
+      const next: {goes: number; best: Go | null; secs?: number} = {goes: 0, best: better(go, rec.best) ? go : rec.best}
+      if (typeof bestSecs === "number") next.secs = bestSecs
+      this.save.writeRecord(key, next)
       // v8 change 2: over the shortest, the move where this go left it (against any shortest route)
       const split = par !== null && go.moves > par ? this.splitOfGo(b) : null
-      this.result = {go, par, lines: cardLines(go, par, prob.best, split), key, resumed: false, split}
+      this.result = {go, par, lines: cardLines(go, par, prob.best, split), key, resumed: false, split, secs,
+        time: secs !== null ? timeLine(secs, keptSecs) : ""}
     }
     this.againOffered = true
-    print(`[NextHold] topped: ${this.result.lines.join(" | ")} (${this.save.lastWrite})`)
+    print(`[NextHold] topped: ${this.result.lines.join(" | ")}${this.result.time ? " | " + this.result.time + " (" + this.result.secs!.toFixed(2) + " s)" : ""} (${this.save.lastWrite})`)
     this.beta = toppedOut(b)
   }
 
@@ -1516,13 +1524,13 @@ export class NextHoldMain extends BaseScriptComponent {
       const slot = this.groundSlot(hw, hh, [])
       if (slot) {
         const across = slot.rot.multiplyVec3(vec3.right())
-        this.callouts.showResult(slot.pos.add(across.uniformScale((RESULT_HALF_W - hw) * slot.scale)), slot.rot, this.result!.lines, slot.scale)
+        this.callouts.showResult(slot.pos.add(across.uniformScale((RESULT_HALF_W - hw) * slot.scale)), slot.rot, this.result!.lines, slot.scale, this.result!.time || "")
         this.callouts.showAgain(slot.pos.add(across.uniformScale((hw - AGAIN_W / 2) * slot.scale)), slot.rot, slot.scale)
         return
       }
       const cw = RESULT_HALF_W * k, aw = (AGAIN_W / 2) * k, g = AGAIN_GAP * k
       const c = this.toWall(this.placeResultBlock(cw + g / 2 + aw, RESULT_HALF_H * k))
-      this.callouts.showResult(this.wall.wallToWorld(c.x - g / 2 - aw, c.y, PANEL_Z), rot, this.result!.lines, k)
+      this.callouts.showResult(this.wall.wallToWorld(c.x - g / 2 - aw, c.y, PANEL_Z), rot, this.result!.lines, k, this.result!.time || "")
       this.callouts.showAgain(this.wall.wallToWorld(c.x + cw + g / 2, c.y, PANEL_Z), rot, k)
       return
     }
@@ -2458,7 +2466,9 @@ export class NextHoldMain extends BaseScriptComponent {
   getResultLines(): string[] { return this.callouts.getResultLines() }
   isAgainVisible(): boolean { return this.callouts.isAgainVisible() }
   /** the last top's result (kept until a move, Again or setup), whether or not its card is on show */
-  getLastResult(): {go: Go; par: number | null; lines: string[]; key: string; resumed: boolean; split?: number | null} | null { return this.result }
+  getLastResult(): {go: Go; par: number | null; lines: string[]; key: string; resumed: boolean; split?: number | null; secs?: number | null; time?: string} | null { return this.result }
+  /** v8: the result card's fourth line as shown: the time after a top from the start ("" for none) */
+  getResultTimeLine(): string { return this.callouts.getResultTimeLine() }
   /** par for your body: the planner's shortest secure route to the top from this go's start position, at this height */
   getPar(): number | null {
     const top = this.getTopHold()

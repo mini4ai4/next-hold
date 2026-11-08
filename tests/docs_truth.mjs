@@ -16,6 +16,8 @@ const banned = [
   [/"jug, in reach"/, "rung 3 now says what the move sets up"],
   [/no capture script calling NextHoldMain/, "the capture calls useStore and injectVoice"],
   [/refreshed once at the start/, "LEAF resets the Lens before every scenario"],
+  // session 29 (v8 change 3): the card shows your time after a top from the start (never a clock while you climb)
+  [/There's no timer|There is no timer|No timer, no points/i, "v8: no clock while you climb; the card shows your time after the top"],
 ]
 let hits = 0
 for (const f of files) {
