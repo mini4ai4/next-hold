@@ -599,8 +599,8 @@ import * as A from "../Assets/Scripts/NextHoldAttempt.ts";
     A.cardLines({ tick: "ONSIGHT", go: 1, moves: 5, hints: 0 }, 5, null).join(" | ") === "ONSIGHT · go 1 | 5 moves · the shortest for you | Clean onsight. Pick something harder?");
   check("session 28: no card line says \"par\" or \"ticked on this go\"",
     [sendCard, repCard, A.cardLines({ tick: "SEND", go: 2, moves: 4, hints: 0 }, 4, null)].flat().every((l) => !/\bpar\b|ticked on this go/.test(l)));
-  check("no par reads so; one move and one hint in the singular",
-    A.cardLines(send3, null, null)[1] === "7 moves · no par for your body" && A.movesText(1) === "1 move" && A.hintsText(0) === "0 hints" && A.hintsText(1) === "1 hint");
+  check("no par (the search gave up or ran past 8 moves) reads \"no shortest found\", never \"no par for your body\"; one move and one hint in the singular",
+    A.cardLines(send3, null, null)[1] === "7 moves · no shortest found" && A.movesText(1) === "1 move" && A.hintsText(0) === "0 hints" && A.hintsText(1) === "1 hint");
   check("session 26 (hound 3a): a top climbed on from a fall: no tick, it says so",
     A.resumedLines(2).join(" | ") === "TOPPED · not from the start | A tick needs a go from the start | 2 hints · Again to go from the start");
   // v8 (session 29): rewritten from "no timer and no points anywhere on the card": no clock on any of the card's three
@@ -872,8 +872,12 @@ const E = await import("../Assets/Scripts/NextHoldEyeHeight.ts");
 {
   // the ratio and the snapping (engineer §1): 163 -> 175, 166 -> 180 (the preview's own eye), 157 -> 170
   const p = (eye) => E.proposeHeight(E.statureFromEye(eye));
-  check("eye height: 163 cm -> 175, 166 -> 180, 157 -> 170 (stature = eye / 0.93, snapped to 5 cm)",
+  check("eye height: 163 cm -> 175, 166 -> 180, 157 -> 170 (stature = eye / 0.935, snapped to 5 cm)",
     p(163).cm === 175 && p(166).cm === 180 && p(157).cm === 170 && !p(163).clamped, [p(163), p(166), p(157)]);
+  // session 30 (the hound): the ratio is 0.935 (adult tables 0.933-0.937), not 0.93; 161 cm tells them apart
+  // (161 / 0.935 = 172.2 -> 170, 161 / 0.93 = 173.1 -> 175)
+  check("eye height: EYE_RATIO is 0.935; 161 cm -> 170 (0.93 would give 175), 163.6 -> 175",
+    E.EYE_RATIO === 0.935 && p(161).cm === 170 && p(163.6).cm === 175, [E.EYE_RATIO, p(161), p(163.6)]);
   check("eye height: outside 140-210 cm of stature is no proposal (sitting, crouching, a bench); inside it, held to 150-200",
     p(120) === null && p(125) === null && E.proposeHeight(139.9) === null && E.proposeHeight(210.1) === null && E.proposeHeight(NaN) === null &&
     E.proposeHeight(142).cm === 150 && E.proposeHeight(142).clamped && E.proposeHeight(208).cm === 200 && E.proposeHeight(208).clamped,

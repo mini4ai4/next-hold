@@ -6,7 +6,7 @@
 //   - eye at y = −3 (163 cm): nothing changes before the 2.0 s window is full (read every frame), then 175 with the
 //     preview's line "Preview: the camera's height stands in"; the planned line whole in view, both lines at least
 //     0.5° tall as drawn; every ring by the test's rule at 175
-//   - y = −9 (157 cm): 170 within a window; rings by the rule at 170
+//   - y = −9 (157 cm): 170 within a window; rings by the rule at 170; y = −5 (161 cm): 170 (ratio 0.935, not 0.93)
 //   - a crouch (y = −60) and a head pitched 20° up change nothing in 3 s
 //   - a − pinch after a proposal: "Planned for N−5 cm", no eye line, and the eye moving after it changes nothing
 //   - a real move freezes it; the store holds the height only after that move
@@ -123,6 +123,13 @@ export class M1EyeHeightScenario extends Scenario {
       print(`[M1] y −9: ${state(main)}; ${ringsByRule(170, "y −9")} rings by the rule at 170`)
       if (main.getHeightCm() !== 170 || main.getHeightSourceLine() !== EYE_LINE_PREVIEW) errs.push(`y −9: ${state(main)}, want 170 from the eye`)
       if (Math.abs(main.getReach() - 170 * 0.44) > 1e-6) errs.push(`y −9: reach ${main.getReach()}`)
+      // session 30: y = −5 (161 cm) tells the ratio apart: 161 / 0.935 = 172.2 gives 170 (0.93 would give 175)
+      at(-5); await frames(2)
+      enable()
+      await waitFor(WINDOW_S + 1.0, proposed)
+      await frames(2)
+      print(`[M1] y −5: ${state(main)}`)
+      if (main.getHeightCm() !== 170 || main.getHeightSource() !== "eye") errs.push(`y −5 (161 cm): ${state(main)}, want 170 (ratio 0.935)`)
 
       // ── 3. a crouch, a pitched head: nothing ──
       await restorePreset(main); await frames(2)

@@ -88,7 +88,9 @@ export function heroLine(g: Go): string {
  *  "ticked on this go" repeated the first line and is gone; a first top that isn't an onsight gets one line that
  *  points at the next go (SEND is the most common result, and got nothing). */
 export function cardLines(g: Go, par: number | null, ticked: Go | null, split: number | null = null): string[] {
-  const l2 = par === null ? `${movesText(g.moves)} · no par for your body`
+  // session 30 (the hound): par is null when the search gives up (its state cap) or a route is over 8 moves, so the
+  // card says what happened, "no shortest found", not that there's no route for your body
+  const l2 = par === null ? `${movesText(g.moves)} · no shortest found`
     : g.moves <= par ? `${movesText(g.moves)} · the shortest for you`
     : split !== null ? `${movesText(g.moves)} · shortest ${par} · split at move ${split}`
     : `${movesText(g.moves)} · shortest for you: ${par}`

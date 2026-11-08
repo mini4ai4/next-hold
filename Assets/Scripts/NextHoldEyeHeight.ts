@@ -4,7 +4,8 @@
 // sampler one sample a frame (the camera's height over the floor under the climber, its pitch and roll) and applies
 // the proposal the way a height step applies a height.
 //
-// Eye height is about 0.93 x stature (an anthropometric average, good to about ±3-4 cm), so stature = eye / 0.93,
+// Eye height is about 0.935 x stature (adult tables 0.933-0.937, men and women alike; about ±1 cm between people, the
+// device's errors from mats, posture and shoes unmeasured), so stature = eye / 0.935,
 // snapped to 5 cm (a kept height and the best's key both use 5 cm steps) and held to the Lens's 150-200 cm. A value
 // whose implied stature is outside 140-210 cm (sitting, crouching, standing on a bench, a bad floor) is no proposal.
 //
@@ -16,7 +17,7 @@
 //
 // What the preview proves is this logic, not the measurement: in the preview the eye is wherever the scene puts it.
 
-export const EYE_RATIO = 0.93
+export const EYE_RATIO = 0.935
 export const STATURE_MIN_CM = 140
 export const STATURE_MAX_CM = 210
 export const HEIGHT_MIN_CM = 150

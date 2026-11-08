@@ -56,7 +56,7 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    it again to change or Remove it), the Ground / On wall switch, Done, and − and + for your height over the line
    "Your height: 175 cm" (150–200 cm, kept for next time; the climb page says "Planned for 175 cm"). With no height
    kept, the Lens proposes one from your eye height: stand level and still on the mats for 2 s and it plans for
-   eye height ÷ 0.93, snapped to 5 cm ("Planned for 175 cm" / "from your eye height"; in the preview the second line
+   eye height ÷ 0.935, snapped to 5 cm ("Planned for 175 cm" / "from your eye height"; in the preview the second line
    is "Preview: the camera's height stands in"). A crouch or a tilted head is ignored, it only ever revises up,
    − / + override it, and your first move keeps it. Reach follows the height, so the colours and the 1-2-3
    change for a taller or shorter climber (at 155 cm step 2 is the pinch h09, from 185 cm the jug h10).
@@ -112,10 +112,13 @@ The eye height is checked as logic only. In the preview the eye is wherever the 
 stand-in wall's floor, which reads as 180 cm), so LEAF's m1 moves the camera to test the window, the crouch and tilt
 gates, the up-only rule, − / + and a kept height winning, and the first move keeping it. Measuring a real body needs
 SPECS: there the floor is meant to come from WorldQueryModule hit tests on the mats you stand on (the mat's top, not
-the gym floor), and that code has been compiled but never run on a device. Eye height ≈ 0.93 × stature is an average,
-good to about ±3–4 cm, inside the 5 cm step. Reach comes from height alone (× 0.44 for the arms, the legs a share of
-that); arm span and weight are not modelled. "Shortest" on the card means the fewest moves under the Lens's own model,
-not the best or the right way to climb.
+the gym floor), and that code has been compiled but never run on a device. Eyes sit at about 93.5% of stature, for men
+and women alike (adult tables give 0.933–0.937), a centimetre or so either way between people; what mats, posture and
+shoes add on a device is unmeasured. It's a starting number you can change with − / +, and the planned line always
+says where it came from. Reach comes from height (× 0.44 for the arms, the legs a share of that); arm span isn't
+modelled. Weight, strength and flexibility aren't modelled, and they change what's secure for you. "Shortest" on the
+card means the fewest moves the Lens's planner finds for your height, within its search limit (it stops after 6,000
+positions or 8 moves, and then the card says "no shortest found"), not the best or the right way to climb.
 
 Voice is four words, each a button already on screen: "next hold" and "why" (both "?"; "why" while "?" reads Why),
 "show my beta", "again". Only short, final phrases count, and only while that button is showing; "don't…", "not…"
