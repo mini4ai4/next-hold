@@ -77,6 +77,8 @@ export class DemoAutopilot extends BaseScriptComponent {
   private waited = 0
   /** session 30: the eye gate's wait so far (real s) */
   private eyeWaited = 0
+  /** session 31: the current eye gate's wait (each gate gives up after EYE_GATE_MAX_S; eyeWaited is the take's total) */
+  private eyeGateWaited = 0
   private playing = false
   private scale = 1
   /** the timeline time play() started from, and the getTime() it is reached at (after the pre-roll) */
@@ -115,6 +117,7 @@ export class DemoAutopilot extends BaseScriptComponent {
     const END = this.take.end
     this.waited = 0
     this.eyeWaited = 0
+    this.eyeGateWaited = 0
     this.scale = Math.max(0.01, scale)
     this.from = Math.max(0, Math.min(END, from))
     this.t0 = getTime() + START_DELAY / Math.max(1, this.scale)
@@ -203,6 +206,7 @@ export class DemoAutopilot extends BaseScriptComponent {
       const before = this.t0
       this.t0 = getTime() - (gate.t - this.from) / this.scale
       this.eyeWaited += Math.max(0, this.t0 - before)
+      this.eyeGateWaited += Math.max(0, this.t0 - before)
     }
     const t = this.getTimelineTime()
     // the pre-roll holds the start point's pose and overlay alpha
@@ -272,16 +276,20 @@ export class DemoAutopilot extends BaseScriptComponent {
       case "waitCard": if (this.waited > 0) print(`[DemoAutopilot] the card gate waited ${this.waited.toFixed(1)} s for the card`); break
       // session 30 (v8 take)
       case "enableEye": m.enableEyeProposal(); break
+      // session 31 (CHANGES_V8_FIX1 item 5): a new climber on the glasses: a fresh store (nothing kept), and the eye's
+      // proposal on again, so the next level, still eye reads a new height with no pinch
+      case "freshEye": m.useStore(GeneralDataStore.create()); m.enableEyeProposal(); break
       case "waitEye":
-        print(`[DemoAutopilot] the eye gate waited ${this.eyeWaited.toFixed(1)} s: ${m.getHeightCm()} cm from ${m.getHeightSource()}` +
+        print(`[DemoAutopilot] the eye gate waited ${this.eyeGateWaited.toFixed(1)} s: ${m.getHeightCm()} cm from ${m.getHeightSource()}` +
           (m.getHeightSource() === "eye" ? "" : " (the proposal didn't land: the take goes on without it)"))
+        this.eyeGateWaited = 0
         break
     }
   }
 
   /** session 30: the eye gate holds while no proposal has landed, for at most EYE_GATE_MAX_S real seconds */
   private eyeGateHolds(): boolean {
-    return this.main.getHeightSource() !== "eye" && this.eyeWaited < EYE_GATE_MAX_S
+    return this.main.getHeightSource() !== "eye" && this.eyeGateWaited < EYE_GATE_MAX_S
   }
 
   // ── camera ────────────────────────────────────────────────────────────────
