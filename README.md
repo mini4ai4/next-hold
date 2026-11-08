@@ -57,13 +57,13 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    the full read from its first frame, is kept for LEAF d1: tick **Legacy V4 Take**.)
 
 ## Tests
-- LEAF: open the LEAF panel and run all thirty-six scenarios (one per done criterion in `devpost/design-brief.md`, one per review fix, h1–h5 and e1 for beta on request and the tag's outline, g1 for the control count, k1–k3 for the result card, Again, the pinned hint and what is kept, the k4/k5 pair for a kept height on reopen (run k4, refresh, then k5), v1 for voice on the preview's typed path, and d1 for the demo autopilot).
-  `x1-capture` is also listed: it is the screenshot driver for `devpost/visual/v7_2/`, not a test.
-  The raw output of the last full run (36 of 36 pass, session 27, one clean run on one build): `devpost/LEAF_RUN_2026-11-06_s27.txt`, copied out of
+- LEAF: open the LEAF panel and run all thirty-seven scenarios (one per done criterion in `devpost/design-brief.md`, one per review fix, h1–h5 and e1 for beta on request and the tag's outline, g1 for the control count, k1–k3 for the result card, Again, the pinned hint and what is kept, the k4/k5 pair for a kept height on reopen (run k4, refresh, then k5), v1 for voice on the preview's typed path, d1 for the v4 demo autopilot and d2 for the v7 one).
+  `x1-capture` is also listed: it is the screenshot driver for `devpost/visual/v7_3/`, not a test.
+  The raw output of the last full run (37 of 37 pass, session 28, one clean run on one build): `devpost/LEAF_RUN_2026-11-06_s28.txt`, copied out of
   the Lens Studio log with `node tests/extract_leaf_run.mjs <log> <first line>`. `node tests/leaf_wait.mjs <id>` waits
   for one scenario's result in the log when the run call times out; `node tests/leaf_status.mjs <first line>` lists
   every scenario's last verdict since then. Run LEAF in the preview (`onDevice: false`).
-- Scoring port, plan, beta and attempt logic: `node tests/scoring.port.test.mjs` (171 checks, including the voice parser, the 1-2-3 search
+- Scoring port, plan, beta and attempt logic: `node tests/scoring.port.test.mjs` (182 checks, including the voice parser, the 1-2-3 search
   against a brute force, following the glow = par at all 11 heights from 150 to 200 cm (`NextHoldPlan.ts`), the hint
   ladder, cue, came-off, goes and pinned-hint rules of `NextHoldBeta.ts`, and the ticks, card lines, best and fail-safe
   store of `NextHoldAttempt.ts`). The store keeps about 70 bytes a record, so the preview's 100 KB store holds about
@@ -80,7 +80,7 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
 - `devpost/design-brief.md`: the approved plan from `plan-lens`.
 - `devpost/BUILD_LOG.md`: every CLAD session, what it did, and the LEAF results.
 - `devpost/DEVPOST.md`, `devpost/VIDEO_PLAN.md`: the write-up and the video plan.
-- `devpost/visual/`: v6 screenshots (3 Nov); v7 in `visual/v7/`; the current build (session 27) in `visual/v7_2/`,
+- `devpost/visual/`: v6 screenshots (3 Nov); v7 in `visual/v7/`; the current build (session 28) in `visual/v7_3/`,
   S01–S12, taken through the real Lens with real pinches (see its INDEX for poses and what was hidden while shooting).
 
 ## What's stood in
