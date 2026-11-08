@@ -76,6 +76,8 @@ import {GLOW_PROFILE} from "./Wall/ProceduralTextures"
 import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/CameraProvider/WorldCameraFinderProvider"
 import {CHIP_SECONDS, PREVIEW_VOICE_LABEL, VOICE_LOG_MAX, VOICE_PAUSED, VoiceCommand, VoiceContext, chipText, parseCommand} from "./NextHoldVoice"
 import {AsrVoiceSource, InjectedVoiceSource, VoiceSource, lensAsr} from "./NextHoldVoiceSource"
+import {EyeState, FixedFloor, FloorSource, HeightSource, freezeEye, heightSource, initialEye, plannedText, pushSample} from "./NextHoldEyeHeight"
+import {WorldQueryFloor} from "./NextHoldFloorSource"
 
 
 /** how far in front of the wall face the control row and the why-line stand (cm) */
@@ -297,6 +299,15 @@ export class NextHoldMain extends BaseScriptComponent {
   private result: {go: Go; par: number | null; lines: string[]; key: string; resumed: boolean} | null = null
   /** the height read from the store at open (null: none kept) */
   private storedHeight: number | null = null
+  /** v8 (session 29): the height from the eye. On only at an open with no kept height (or enableEyeProposal());
+   *  useStore() turns it off, so every scenario, the autopilot and x1 stay at their 175 cm */
+  private eyeProposalOn = false
+  private eye: EyeState = initialEye()
+  private floor: FloorSource | null = null
+  /** a − / + this session (or the demo's setHeightCm): it wins over the eye */
+  private manualHeight: number | null = null
+  /** where the planned height came from (the planned line's second line) */
+  private heightFrom: HeightSource = "inspector"
   /** a go ended (a fall or the top): "Again" stays on the mats, with or without its card (a hint taken on the
    *  came-off card takes the card down, not Again), until a move, Again itself, or the eye back on the wall */
   private againOffered = false
@@ -349,6 +360,9 @@ export class NextHoldMain extends BaseScriptComponent {
     this.save = new NextHoldSave(store)
     this.storedHeight = this.save.readHeight()
     if (this.storedHeight !== null) this.heightCm = this.storedHeight
+    // v8: with no height kept, the eye proposes one (kept > manual > eye > Inspector)
+    this.heightFrom = this.storedHeight !== null ? "kept" : "inspector"
+    this.eyeProposalOn = this.storedHeight === null
     print(`[NextHold] store: ${this.save.hasStore() ? "max " + this.save.maxBytes() + " bytes, " + this.save.usedBytes() + " used" : "none"}; ` +
       `kept height ${this.storedHeight === null ? "none" : this.storedHeight + " cm"}`)
 
@@ -417,6 +431,7 @@ export class NextHoldMain extends BaseScriptComponent {
       this.tickRefused(getTime())
       this.tickCue(getTime())
       this.tickVoiceChip(getTime())
+      this.tickEye(getTime())
       // the row lays itself out late (after a start or a refresh): once its real size is known, or
       // whenever it changes, place it again, or in Ground it sits too close and covers a ring
       const size = this.controlRow.getSize()
@@ -543,6 +558,8 @@ export class NextHoldMain extends BaseScriptComponent {
     this.position[limb] = id
     this.override = null
     this.lastMoveHold = id
+    // v8: the first move freezes the eye's proposal; you used it, so it is kept (a crouched sample never is)
+    this.freezeEyeOnMove()
     // session 26: back on the start holds after a fall or a top, a fresh go from the start begins here
     this.beta = moved(this.beta, getTime(), positionKey(this.position), positionKey(this.startPos))
     // a move takes the last top's card down (a hand off the top climbs on), and Again with it
@@ -952,6 +969,26 @@ export class NextHoldMain extends BaseScriptComponent {
    *  reloadFromStore. */
   useStore(store: KVStore | null): void {
     this.save = new NextHoldSave(store)
+    // v8: a handed-in store means a test or the take: the eye proposes nothing (enableEyeProposal() turns it on).
+    // A proposal that landed before this (in the LEAF reset's first seconds) keeps its height, not its words
+    this.eyeProposalOn = false
+    if (this.heightFrom === "eye") { this.heightFrom = "inspector"; this.applyHeightSource() }
+  }
+
+  /** v8 tests and the demo: turn the eye's proposal on, as an open with no kept height does, reading the kept height
+   *  from the store in use (a kept one still wins) and forgetting any − / + so far. `floor`: where the floor is (the
+   *  preview default: the stand-in wall's floor line; on SPECS: hit tests along the gaze) */
+  enableEyeProposal(floor?: FloorSource): void {
+    if (!this.ready) return
+    this.storedHeight = this.save.readHeight()
+    this.manualHeight = null
+    this.eye = initialEye()
+    if (floor) this.floor = floor
+    this.eyeProposalOn = true
+    // as an open: the words follow what is kept, else nothing yet (a proposal sets "from your eye height")
+    this.heightFrom = this.storedHeight !== null ? "kept" : "inspector"
+    this.applyHeightSource()
+    print(`[NextHold] eye proposal on (floor: ${this.floorSource().name()}; kept ${this.storedHeight === null ? "none" : this.storedHeight + " cm"})`)
   }
 
   /** Read the store as an open would: the kept height (if any) and the next go's number. The position and
@@ -961,7 +998,9 @@ export class NextHoldMain extends BaseScriptComponent {
     this.storedHeight = this.save.readHeight()
     if (this.storedHeight !== null) {
       this.heightCm = this.storedHeight
+      this.heightFrom = "kept"
       this.controlRow.setHeight(this.heightCm)
+      this.applyHeightSource()
     }
     this.beta = {...this.beta, attempt: this.nextGoNumber()}
     this.recompute()
@@ -971,8 +1010,90 @@ export class NextHoldMain extends BaseScriptComponent {
   setHeightCm(cm: number): void {
     if (!this.ready) return
     this.heightCm = Math.min(HEIGHT_MAX_CM, Math.max(HEIGHT_MIN_CM, Math.round(cm / HEIGHT_STEP_CM) * HEIGHT_STEP_CM))
+    // v8: as a − / + would (it wins over the eye), without keeping it
+    this.manualHeight = this.heightCm
+    this.heightFrom = "manual"
+    this.eye = freezeEye(this.eye)
     this.controlRow.setHeight(this.heightCm)
+    this.applyHeightSource()
     this.recompute()
+  }
+
+  // ── v8 (session 29): height from eye height (NextHoldEyeHeight) ─────────────────────────────────────────────
+  /** the floor source: the injected one, else the stand-in wall's floor line in the preview, a WorldQueryModule hit
+   *  test on SPECS (never run on a device yet) */
+  private floorSource(): FloorSource {
+    if (!this.floor) {
+      let editor = true
+      try { editor = global.deviceInfoSystem.isEditor() } catch (e) { editor = true }
+      if (editor) this.floor = new FixedFloor(() => this.wall.wallToWorld(0, 0, 0).y, "preview wall floor")
+      else {
+        try { this.floor = new WorldQueryFloor() } catch (e) { this.floor = new FixedFloor(() => null, "none") }
+      }
+    }
+    return this.floor
+  }
+
+  /** one sample a frame while the eye may propose: the camera's height over the floor, its pitch and roll */
+  private tickEye(now: number): void {
+    if (!this.eyeProposalOn || this.eye.frozen) return
+    const camT = this.cameraTransform()
+    if (!camT) return
+    const floor = this.floorSource()
+    const pos = camT.getWorldPosition()
+    // the camera looks down its −Z (as the mats panel's follow measures it)
+    const gaze = camT.getWorldTransform().multiplyDirection(new vec3(0, 0, -1)).normalize()
+    const right = camT.getWorldTransform().multiplyDirection(new vec3(1, 0, 0)).normalize()
+    const pitchDeg = Math.asin(Math.max(-1, Math.min(1, gaze.y))) * 180 / Math.PI
+    const rollDeg = Math.asin(Math.max(-1, Math.min(1, right.y))) * 180 / Math.PI
+    if (floor.tick) floor.tick({x: pos.x, y: pos.y, z: pos.z}, {x: gaze.x, y: gaze.y, z: gaze.z}, pitchDeg)
+    const fy = floor.floorY()
+    const d = this.eyeToWallCm()
+    const onMats = this.mode === "climb" && this.view === "ground" && d !== null && d > GROUND_CM && !this.result &&
+      this.beta.cameOffMove === null && !this.settingsOpen
+    const was = this.eye.proposal
+    this.eye = pushSample(this.eye, {t: now, eyeCm: fy === null ? NaN : pos.y - fy, pitchDeg, rollDeg, x: pos.x, z: pos.z,
+      onMats, goLive: this.beta.moves > this.beta.fellAtMoves})
+    if (this.eye.proposal === null || this.eye.proposal === was) return
+    const h = heightSource(this.storedHeight, this.manualHeight, this.eye.proposal, this.climberHeightCm)
+    print(`[NextHold] eye height ${this.eye.eyeCm!.toFixed(1)} cm over the ${floor.name()}: stature ${this.eye.stature!.toFixed(1)}, ` +
+      `proposes ${this.eye.proposal} cm; planning for ${h.cm} cm (${h.source})`)
+    if (h.source !== "eye") return
+    this.heightFrom = "eye"
+    if (h.cm !== this.heightCm) {
+      // before the first move only, so no go is under way to end
+      this.heightCm = h.cm
+      this.controlRow.setHeight(this.heightCm)
+      this.recompute()
+    }
+    this.applyHeightSource()
+  }
+
+  /** the first move freezes the eye; a height it proposed is kept now (the climber climbed on it) */
+  private freezeEyeOnMove(): void {
+    if (!this.eye.frozen) this.eye = freezeEye(this.eye)
+    if (this.heightFrom === "eye" && this.eyeProposalOn) {
+      this.save.writeHeight(this.heightCm)
+      this.eyeProposalOn = false
+      print(`[NextHold] the eye's ${this.heightCm} cm kept on the first move (${this.save.lastWrite})`)
+    }
+  }
+
+  /** the planned line's second line for where the height came from */
+  private applyHeightSource(): void {
+    let editor = true
+    try { editor = global.deviceInfoSystem.isEditor() } catch (e) { editor = true }
+    const t = plannedText(this.heightCm, this.heightFrom, editor).split("\n")
+    this.controlRow.setHeightSource(t.length > 1 ? t[1] : "")
+  }
+
+  /** v8 reads: where the height came from, the eye's sampler state, the source line as shown */
+  getHeightSource(): HeightSource { return this.heightFrom }
+  getEyeState(): EyeState { return this.eye }
+  isEyeProposalOn(): boolean { return this.eyeProposalOn }
+  getHeightSourceLine(): string { return this.controlRow.getHeightSourceLine() }
+  getPlannedTexts(): {planned: Text | null; source: Text | null} {
+    return {planned: this.controlRow.getPlannedText(), source: this.controlRow.getHeightSourceText()}
   }
 
   /** One pinch on the came-off card: the hint ladder opens at that position. */
@@ -1072,7 +1193,12 @@ export class NextHoldMain extends BaseScriptComponent {
     const next = Math.min(HEIGHT_MAX_CM, Math.max(HEIGHT_MIN_CM, snapped + (step > 0 ? 1 : -1) * HEIGHT_STEP_CM))
     if (next === this.heightCm) return
     this.heightCm = next
+    // v8: a − / + overrides the eye, and the eye stops proposing
+    this.manualHeight = next
+    this.heightFrom = "manual"
+    this.eye = freezeEye(this.eye)
     this.controlRow.setHeight(this.heightCm)
+    this.applyHeightSource()
     // session 24 (C): kept for later opens (nothing happens if the store can't take it)
     this.save.writeHeight(this.heightCm)
     // session 26 (engineer bug 2): a height change starts a new go: one under way ends (counted for the problem),

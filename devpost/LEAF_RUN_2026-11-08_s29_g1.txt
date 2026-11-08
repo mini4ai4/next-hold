@@ -1,0 +1,306 @@
+06:20:18.922 Lens has been reset
+06:20:18.934 Lens has been reset
+06:20:20.105 [LeafPlugin][PluginViewModel] Loaded 39 scenario(s) from preview.
+06:20:20.105 [LeafPlugin][PluginViewModel] Running scenario: m1-eye-height
+06:20:20.214 [  0.000s]RUNS: m1-eye-height with args: []
+06:20:20.214 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:20:24.138 [M1] y −3: the proposal landed at 2.04 s (window 2 s): 175 cm (eye), "Planned for 175 cm" / "Preview: the camera's height stands in", eye ok; eye 163
+06:20:24.151 [M1] y −3: planned line 0.77° tall, eye line 0.69° tall; 6 rings by the rule at 175
+06:20:24.267 [M1] y −9: 175 cm (eye), "Planned for 175 cm" / "Preview: the camera's height stands in", eye window filling; 6 rings by the rule at 170
+06:20:27.614 [M1] crouch (y −60): 175 cm (inspector), "Planned for 175 cm" / "", eye implausible
+06:20:30.678 [M1] pitched 20° up (y −3): 175 cm (inspector), "Planned for 175 cm" / "", eye head pitched
+06:20:37.886 [M1] after −: 170 cm (manual), "Planned for 170 cm" / "", eye frozen, page climb
+06:20:44.979 [M1] the first move (RH to up): in its frame kept 170, frozen true
+06:20:51.358 [M1] kept 160 + eye at y −3: 160 cm (kept), "Planned for 160 cm" / "", eye ok; the eye proposed 175
+06:20:54.756 [M1] the preview's own eye (y 0): 166 cm over the floor, stature 178.49462365591395: 175 cm (kept), "Planned for 175 cm" / "", eye ok
+06:20:54.940 [ 34.727s]FAILED: m1-eye-height - AssertionError: eye height: y −3: the eye line isn't under the planned line (0.912 vs 0.919) y −9: 175 cm (eye), "Planned for 175 cm" / "Preview: the camera's height stands in", eye window filling, want 170 from the eye y −9: reach 77 y 0: 175 cm (kept), "Planned for 175 cm" / "", eye ok, want 180 Expected: "0" - Received: "4"
+06:20:54.940 [ 34.727s][m1-eye-height] FAILED - AssertionError: eye height: y −3: the eye line isn't under the planned line (0.912 vs 0.919) y −9: 175 cm (eye), "Planned for 175 cm" / "Preview: the camera's height stands in", eye window filling, want 170 from the eye y −9: reach 77 y 0: 175 cm (kept), "Planned for 175 cm" / "", eye ok, want 180 Expected: "0" - Received: "4"
+06:20:54.942 [LeafPlugin][PluginViewModel] ❌ Scenario m1-eye-height failed.
+06:21:23.955 Lens has been reset
+06:21:24.134 Lens has been reset
+06:21:24.803 Lens has been reset
+06:21:27.867 Lens has been reset
+06:21:27.876 Lens has been reset
+06:21:29.010 [LeafPlugin][PluginViewModel] Loaded 39 scenario(s) from preview.
+06:21:29.010 [LeafPlugin][PluginViewModel] Running scenario: m1-eye-height
+06:21:29.123 [  0.000s]RUNS: m1-eye-height with args: []
+06:21:29.123 [  0.000s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:21:33.052 [M1] y −3: the proposal landed at 2.04 s (window 2 s): 175 cm (eye), "Planned for 175 cm" / "Preview: the camera's height stands in", eye ok; eye 163
+06:21:33.066 [M1] y −3: planned line 0.77° tall, eye line 0.69° tall; 6 rings by the rule at 175
+06:21:35.212 [M1] y −9: 170 cm (eye), "Planned for 170 cm" / "Preview: the camera's height stands in", eye ok; 6 rings by the rule at 170
+06:21:38.552 [M1] crouch (y −60): 175 cm (inspector), "Planned for 175 cm" / "", eye implausible
+06:21:41.618 [M1] pitched 20° up (y −3): 175 cm (inspector), "Planned for 175 cm" / "", eye head pitched
+06:21:48.885 [M1] after −: 170 cm (manual), "Planned for 170 cm" / "", eye frozen, page climb
+06:21:56.035 [M1] the first move (RH to up): in its frame kept 170, frozen true
+06:22:02.418 [M1] kept 160 + eye at y −3: 160 cm (kept), "Planned for 160 cm" / "", eye ok; the eye proposed 175
+06:22:04.899 [M1] the preview's own eye (y 0): 166 cm over the floor, stature 178.49462365591395: 180 cm (eye), "Planned for 180 cm" / "Preview: the camera's height stands in", eye ok
+06:22:05.107 [ 35.984s]FAILED: m1-eye-height - AssertionError: eye height: y −3: the eye line isn't under the planned line (0.911 vs 0.915) Expected: "0" - Received: "1"
+06:22:05.107 [ 35.984s][m1-eye-height] FAILED - AssertionError: eye height: y −3: the eye line isn't under the planned line (0.911 vs 0.915) Expected: "0" - Received: "1"
+06:22:05.109 [LeafPlugin][PluginViewModel] ❌ Scenario m1-eye-height failed.
+06:22:34.824 Lens has been reset
+06:22:34.893 Lens has been reset
+06:22:35.479 Lens has been reset
+06:22:38.559 Lens has been reset
+06:22:38.564 Lens has been reset
+06:22:39.656 [LeafPlugin][PluginViewModel] Loaded 39 scenario(s) from preview.
+06:22:39.656 [LeafPlugin][PluginViewModel] Running scenario: m1-eye-height
+06:22:39.848 [  0.000s]RUNS: m1-eye-height with args: []
+06:22:39.849 [  0.000s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:22:43.759 [M1] y −3: the proposal landed at 2.03 s (window 2 s): 175 cm (eye), "Planned for 175 cm" / "Preview: the camera's height stands in", eye ok; eye 163
+06:22:43.773 [M1] y −3: planned line 0.77° tall, eye line 0.69° tall; 6 rings by the rule at 175
+06:22:45.920 [M1] y −9: 170 cm (eye), "Planned for 170 cm" / "Preview: the camera's height stands in", eye ok; 6 rings by the rule at 170
+06:22:49.256 [M1] crouch (y −60): 175 cm (inspector), "Planned for 175 cm" / "", eye implausible
+06:22:52.324 [M1] pitched 20° up (y −3): 175 cm (inspector), "Planned for 175 cm" / "", eye head pitched
+06:22:59.589 [M1] after −: 170 cm (manual), "Planned for 170 cm" / "", eye frozen, page climb
+06:23:06.717 [M1] the first move (RH to up): in its frame kept 170, frozen true
+06:23:13.082 [M1] kept 160 + eye at y −3: 160 cm (kept), "Planned for 160 cm" / "", eye ok; the eye proposed 175
+06:23:15.556 [M1] the preview's own eye (y 0): 166 cm over the floor, stature 178.49462365591395: 180 cm (eye), "Planned for 180 cm" / "Preview: the camera's height stands in", eye ok
+06:23:15.762 [ 35.914s]PASSED: m1-eye-height
+06:23:15.762 [ 35.914s][m1-eye-height] PASSED
+06:23:15.764 [LeafPlugin][PluginViewModel] ✅ Scenario m1-eye-height completed successfully.
+06:23:22.151 Lens has been reset
+06:23:22.277 Lens has been reset
+06:23:22.970 Lens has been reset
+06:23:26.870 Lens has been reset
+06:23:27.199 Lens has been reset
+06:23:28.346 Lens has been reset
+06:23:28.350 Lens has been reset
+06:23:29.441 [LeafPlugin][PluginViewModel] Loaded 39 scenario(s) from preview.
+06:23:29.441 [LeafPlugin][PluginViewModel] Running scenario: m1-eye-height
+06:23:29.675 [  0.000s]RUNS: m1-eye-height with args: []
+06:23:29.675 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:23:32.111 [M1] y −3: the proposal landed at 0.53 s (window 2 s): 175 cm (eye), "Planned for 175 cm" / "Preview: the camera's height stands in", eye ok; eye 163
+06:23:32.125 [M1] y −3: planned line 0.77° tall, eye line 0.69° tall; 6 rings by the rule at 175
+06:23:32.804 [M1] y −9: 170 cm (eye), "Planned for 170 cm" / "Preview: the camera's height stands in", eye ok; 6 rings by the rule at 170
+06:23:36.141 [M1] crouch (y −60): 175 cm (inspector), "Planned for 175 cm" / "", eye implausible
+06:23:39.194 [M1] pitched 20° up (y −3): 175 cm (inspector), "Planned for 175 cm" / "", eye head pitched
+06:23:44.967 [M1] after −: 170 cm (manual), "Planned for 170 cm" / "", eye ok, page climb
+06:23:48.148 [M1] the first move (RH to up): in its frame kept 170, frozen true
+06:23:54.536 [M1] kept 160 + eye at y −3: 160 cm (kept), "Planned for 160 cm" / "", eye ok; the eye proposed 175
+06:23:55.498 [M1] the preview's own eye (y 0): 166 cm over the floor, stature 178.49462365591395: 180 cm (eye), "Planned for 180 cm" / "Preview: the camera's height stands in", eye ok
+06:23:55.702 [ 26.028s]FAILED: m1-eye-height - AssertionError: eye height: y −3: something changed before the window was full: at 0.53 s: 175 cm (eye), "Planned for 175 cm" / "Preview: the camera's height stands in", eye ok y −3: the proposal landed at 0.5319157499998255 after −, the eye moved to y +10: 190 cm (eye), "Planned for 190 cm" / "Preview: the camera's height stands in", eye ok, frozen false Expected: "0" - Received: "3"
+06:23:55.702 [ 26.028s][m1-eye-height] FAILED - AssertionError: eye height: y −3: something changed before the window was full: at 0.53 s: 175 cm (eye), "Planned for 175 cm" / "Preview: the camera's height stands in", eye ok y −3: the proposal landed at 0.5319157499998255 after −, the eye moved to y +10: 190 cm (eye), "Planned for 190 cm" / "Preview: the camera's height stands in", eye ok, frozen false Expected: "0" - Received: "3"
+06:23:55.704 [LeafPlugin][PluginViewModel] ❌ Scenario m1-eye-height failed.
+06:24:01.533 Lens has been reset
+06:24:01.579 Lens has been reset
+06:24:02.160 Lens has been reset
+06:24:03.441 Lens has been reset
+06:24:03.445 Lens has been reset
+06:24:04.535 [LeafPlugin][PluginViewModel] Loaded 39 scenario(s) from preview.
+06:24:04.535 [LeafPlugin][PluginViewModel] Running scenario: m1-eye-height
+06:24:04.834 [  0.000s]RUNS: m1-eye-height with args: []
+06:24:04.834 [  0.000s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:24:08.757 [M1] y −3: the proposal landed at 2.04 s (window 2 s): 175 cm (eye), "Planned for 175 cm" / "Preview: the camera's height stands in", eye ok; eye 163
+06:24:08.771 [M1] y −3: planned line 0.77° tall, eye line 0.69° tall; 6 rings by the rule at 175
+06:24:10.919 [M1] y −9: 170 cm (eye), "Planned for 170 cm" / "Preview: the camera's height stands in", eye ok; 6 rings by the rule at 170
+06:24:14.251 [M1] crouch (y −60): 175 cm (inspector), "Planned for 175 cm" / "", eye implausible
+06:24:17.304 [M1] pitched 20° up (y −3): 175 cm (inspector), "Planned for 175 cm" / "", eye head pitched
+06:24:24.616 [M1] after −: 170 cm (manual), "Planned for 170 cm" / "", eye frozen, page climb
+06:24:31.760 [M1] the first move (RH to up): in its frame kept 170, frozen true
+06:24:38.150 [M1] kept 160 + eye at y −3: 160 cm (kept), "Planned for 160 cm" / "", eye ok; the eye proposed 175
+06:24:40.640 [M1] the preview's own eye (y 0): 166 cm over the floor, stature 178.49462365591395: 180 cm (eye), "Planned for 180 cm" / "Preview: the camera's height stands in", eye ok
+06:24:40.846 [ 36.012s]PASSED: m1-eye-height
+06:24:40.847 [ 36.013s][m1-eye-height] PASSED
+06:24:40.849 [LeafPlugin][PluginViewModel] ✅ Scenario m1-eye-height completed successfully.
+06:24:44.318 Lens has been reset
+06:24:44.324 Lens has been reset
+06:24:45.485 [LeafPlugin][PluginViewModel] Loaded 39 scenario(s) from preview.
+06:24:45.485 [LeafPlugin][PluginViewModel] Running scenario: g1-control-count
+06:24:45.821 [  0.000s]RUNS: g1-control-count with args: []
+06:24:45.821 [  0.000s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:24:47.599 [G1] mats: 4 buttons (ShowBetaButton 11x10, AskButton 11x10, BodyButton 11x10, SetupButton 11x10), least gap 3.00 cm; labels ShowBetaButton "Show my beta" 5.01 cm, AskButton "?" 5.32 cm, BodyButton "Body" 3.44 cm, SetupButton "Setup" 3.50 cm
+06:24:47.601 [G1] mats: word "Hint", dots "○○○" 1.94/1.94/1.94 cm
+06:24:49.357 [G1] mats, beta shown: 4 buttons (ShowBetaButton 11x10, AskButton 11x10, BodyButton 11x10, SetupButton 11x10), least gap 3.00 cm; labels ShowBetaButton "Hide beta" 4.97 cm, AskButton "?" 5.32 cm, BodyButton "Body" 3.44 cm, SetupButton "Setup" 3.50 cm
+06:24:49.358 [G1] mats, beta shown: word "Why", no dots
+06:24:52.799 [G1] rung 1: word "Move", dots "●○○" 1.90/1.94/1.94 cm
+06:24:56.257 [G1] rung 3: word "", dots "●●●" 1.90/1.90/1.90 cm
+06:24:58.246 [G1] body: 4 buttons (Toggle_LH 11x10, Toggle_RH 11x10, Toggle_LF 11x10, Toggle_RF 11x10), least gap 3.00 cm; labels Toggle_LH "LH" 2.87 cm, Toggle_RH "RH" 2.87 cm, Toggle_LF "LF" 2.87 cm, Toggle_RF "RF" 2.87 cm
+06:24:59.980 [G1] LF picked: 4 buttons (ShowBetaButton 11x10, AskButton 11x10, BodyButton 11x10, SetupButton 11x10), least gap 3.00 cm; labels ShowBetaButton "Show my beta" 5.01 cm, AskButton "?" 5.32 cm, BodyButton "Body" 3.44 cm, SetupButton "Setup" 3.50 cm
+06:25:01.735 [G1] setup: 5 buttons (SetupButton 11x10, ModeSwitch 11x10, ViewToggle 11x10, HeightDown 11x10, HeightUp 11x10), least gap 3.00 cm; labels SetupButton "Done" 2.93 cm, ModeSwitch "Mark holds" 6.43 cm, ViewToggle "Ground" 2.31 cm, HeightDown "−" 2.25 cm, HeightUp "+" 4.17 cm
+06:25:01.736 [G1] setup: "Ground" 7.86 cm wide in an 11 cm cell; the height line "Your height: 175 cm" at y -2.2
+06:25:03.725 [G1] wall: 2 buttons (AskButton 11x10, BodyButton 11x10), least gap 3.00 cm; labels AskButton "?" 5.32 cm, BodyButton "Body" 3.44 cm
+06:25:03.727 [G1] wall: strip x 0.141..0.523 y 0.535..0.670; lower hand's hold at screen y 0.694; over no hold
+06:25:03.728 [G1] before (session 23): 10 buttons while climbing, 8 x 5 cm, 2 cm gaps; Setup's − / + 5 x 5 cm (session 24); now 4
+06:25:03.910 [ 18.089s]FAILED: g1-control-count - AssertionError: fewer, bigger controls: setup: the height line (y -2.2) isn't under − and + (y -13.0) Expected: "0" - Received: "1"
+06:25:03.910 [ 18.089s][g1-control-count] FAILED - AssertionError: fewer, bigger controls: setup: the height line (y -2.2) isn't under − and + (y -13.0) Expected: "0" - Received: "1"
+06:25:03.912 [LeafPlugin][PluginViewModel] ❌ Scenario g1-control-count failed.
+06:25:27.897 Lens has been reset
+06:25:28.254 Lens has been reset
+06:25:31.138 Lens has been reset
+06:25:31.148 Lens has been reset
+06:25:32.322 [LeafPlugin][PluginViewModel] Loaded 39 scenario(s) from preview.
+06:25:32.322 [LeafPlugin][PluginViewModel] Running scenario: g1-control-count
+06:25:32.688 [  0.000s]RUNS: g1-control-count with args: []
+06:25:32.688 [  0.000s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:25:34.497 [G1] mats: 4 buttons (ShowBetaButton 11x10, AskButton 11x10, BodyButton 11x10, SetupButton 11x10), least gap 3.00 cm; labels ShowBetaButton "Show my beta" 5.01 cm, AskButton "?" 5.32 cm, BodyButton "Body" 3.44 cm, SetupButton "Setup" 3.50 cm
+06:25:34.499 [G1] mats: word "Hint", dots "○○○" 1.94/1.94/1.94 cm
+06:25:36.258 [G1] mats, beta shown: 4 buttons (ShowBetaButton 11x10, AskButton 11x10, BodyButton 11x10, SetupButton 11x10), least gap 3.00 cm; labels ShowBetaButton "Hide beta" 4.97 cm, AskButton "?" 5.32 cm, BodyButton "Body" 3.44 cm, SetupButton "Setup" 3.50 cm
+06:25:36.259 [G1] mats, beta shown: word "Why", no dots
+06:25:39.722 [G1] rung 1: word "Move", dots "●○○" 1.90/1.94/1.94 cm
+06:25:43.189 [G1] rung 3: word "", dots "●●●" 1.90/1.90/1.90 cm
+06:25:45.181 [G1] body: 4 buttons (Toggle_LH 11x10, Toggle_RH 11x10, Toggle_LF 11x10, Toggle_RF 11x10), least gap 3.00 cm; labels Toggle_LH "LH" 2.87 cm, Toggle_RH "RH" 2.87 cm, Toggle_LF "LF" 2.87 cm, Toggle_RF "RF" 2.87 cm
+06:25:46.913 [G1] LF picked: 4 buttons (ShowBetaButton 11x10, AskButton 11x10, BodyButton 11x10, SetupButton 11x10), least gap 3.00 cm; labels ShowBetaButton "Show my beta" 5.01 cm, AskButton "?" 5.32 cm, BodyButton "Body" 3.44 cm, SetupButton "Setup" 3.50 cm
+06:25:48.669 [G1] setup: 5 buttons (SetupButton 11x10, ModeSwitch 11x10, ViewToggle 11x10, HeightDown 11x10, HeightUp 11x10), least gap 3.00 cm; labels SetupButton "Done" 2.93 cm, ModeSwitch "Mark holds" 6.43 cm, ViewToggle "Ground" 2.31 cm, HeightDown "−" 2.25 cm, HeightUp "+" 4.17 cm
+06:25:48.671 [G1] setup: "Ground" 7.86 cm wide in an 11 cm cell; the height line "Your height: 175 cm" at y -20.8
+06:25:50.667 [G1] wall: 2 buttons (AskButton 11x10, BodyButton 11x10), least gap 3.00 cm; labels AskButton "?" 5.32 cm, BodyButton "Body" 3.44 cm
+06:25:50.670 [G1] wall: strip x 0.141..0.523 y 0.535..0.670; lower hand's hold at screen y 0.694; over no hold
+06:25:50.671 [G1] before (session 23): 10 buttons while climbing, 8 x 5 cm, 2 cm gaps; Setup's − / + 5 x 5 cm (session 24); now 4
+06:25:50.853 [ 18.165s]PASSED: g1-control-count
+06:25:50.853 [ 18.165s][g1-control-count] PASSED
+06:25:50.855 [LeafPlugin][PluginViewModel] ✅ Scenario g1-control-count completed successfully.
+06:25:54.478 Lens has been reset
+06:25:54.485 Lens has been reset
+06:25:55.639 [LeafPlugin][PluginViewModel] Loaded 39 scenario(s) from preview.
+06:25:55.639 [LeafPlugin][PluginViewModel] Running scenario: m1-eye-height
+06:25:56.033 [  0.000s]RUNS: m1-eye-height with args: []
+06:25:56.033 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:25:59.984 [M1] y −3: the proposal landed at 2.03 s (window 2 s): 175 cm (eye), "Planned for 175 cm" / "Preview: the camera's height stands in", eye ok; eye 163
+06:25:59.998 [M1] y −3: planned line 0.77° tall, eye line 0.69° tall; 6 rings by the rule at 175
+06:26:02.149 [M1] y −9: 170 cm (eye), "Planned for 170 cm" / "Preview: the camera's height stands in", eye ok; 6 rings by the rule at 170
+06:26:05.503 [M1] crouch (y −60): 175 cm (inspector), "Planned for 175 cm" / "", eye implausible
+06:26:08.570 [M1] pitched 20° up (y −3): 175 cm (inspector), "Planned for 175 cm" / "", eye head pitched
+06:26:15.860 [M1] after −: 170 cm (manual), "Planned for 170 cm" / "", eye frozen, page climb
+06:26:23.004 [M1] the first move (RH to up): in its frame kept 170, frozen true
+06:26:29.408 [M1] kept 160 + eye at y −3: 160 cm (kept), "Planned for 160 cm" / "", eye ok; the eye proposed 175
+06:26:31.879 [M1] the preview's own eye (y 0): 166 cm over the floor, stature 178.49462365591395: 180 cm (eye), "Planned for 180 cm" / "Preview: the camera's height stands in", eye ok
+06:26:32.084 [ 36.052s]PASSED: m1-eye-height
+06:26:32.084 [ 36.052s][m1-eye-height] PASSED
+06:26:32.086 [LeafPlugin][PluginViewModel] ✅ Scenario m1-eye-height completed successfully.
+06:26:32.141 Lens has been reset
+06:26:32.153 Lens has been reset
+06:26:33.407 [LeafPlugin][PluginViewModel] Loaded 39 scenario(s) from preview.
+06:26:33.407 [LeafPlugin][PluginViewModel] Running scenario: r5-control-row-in-view
+06:26:33.871 [  0.000s]RUNS: r5-control-row-in-view with args: []
+06:26:33.871 [  0.000s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:26:35.669 [N5] ground, preset: D 125 cm: panel 60.0 cm from the eye, x0.49, rank 3 (Lens 3), 10.0° below the gaze, "?" 5.3° wide, planned line 0.76° tall, seen on the wall x 109..138, y 127..161; problem x 61..191
+06:26:39.168 [N5] ground, 250 cm: D 250 cm: panel 60.0 cm from the eye, x0.43, rank 1 (Lens 1: over lh, low), 11.0° below the gaze, "?" 4.6° wide, planned line 0.67° tall, seen on the wall x 90..140, y 88..148; problem x 60..192
+06:26:39.267 [N5] ground, 425 cm: D 365 cm: panel 60.0 cm from the eye, x0.43, rank 2 (Lens 2: over h12, h14, h18), 11.0° below the gaze, "?" 4.5° wide, planned line 0.67° tall, seen on the wall x 162..246, y 33..135; problem x 59..193
+06:26:39.386 [N5] ground, 250 cm, pitch +8.8°: D 250 cm: no place in view clear of the glow and the beta's words: the panel waits 27.5° below the gaze, out of view (x 0.271..0.729 y 1.042..1.556)
+06:26:39.486 [N5] ground, 250 cm, pitch +8.8°, then 15° down: D 250 cm: panel 60.0 cm from the eye, x0.49, rank 2 (Lens 2: over low, h17), 10.0° below the gaze, "?" 5.3° wide, planned line 0.76° tall, seen on the wall x 86..146, y 57..129; problem x 60..192
+06:26:39.620 [N5] ground, 250 cm, pitch -10°: D 250 cm: panel 60.0 cm from the eye, x0.49, rank 2 (Lens 2: over low, h17), 5.3° below the gaze, "?" 5.3° wide, planned line 0.79° tall, seen on the wall x 86..146, y 60..133; problem x 60..192
+06:26:39.805 [N5] ground, 250 cm, turned 20° left: D 250 cm: panel 60.0 cm from the eye, x0.43, rank 3 (Lens 3), 11.0° below the gaze, "?" 4.9° wide, planned line 1.66° tall, seen on the wall x -46..18, y 73..146; problem x 60..192
+06:26:39.934 [N5] ground, 250 cm, turned 20° right: D 250 cm: panel 60.0 cm from the eye, x0.55, rank 3 (Lens 3), 9.2° below the gaze, "?" 6.3° wide, planned line 2.08° tall, seen on the wall x 201..275, y 77..164; problem x 60..192
+06:26:40.070 [N5] ground, 250 cm, 40 cm left: D 250 cm: panel 60.0 cm from the eye, x0.43, rank 2 (Lens 2: over side, h13), 11.0° below the gaze, "?" 4.6° wide, planned line 0.67° tall, seen on the wall x 22..72, y 88..148; problem x 60..192
+06:26:40.202 [N5] ground, 250 cm, 40 cm right, pitch +8.8°: D 250 cm: panel 60.0 cm from the eye, x0.43, rank 1 (Lens 1: over h11, far), 6.3° below the gaze, "?" 4.8° wide, planned line 0.70° tall, seen on the wall x 188..240, y 148..207; problem x 60..192
+06:26:40.337 [N5] ground, 425 cm, 37.5 cm right, pitch -2°: D 365 cm: panel 60.0 cm from the eye, x0.43, rank 3 (Lens 3), 6.3° below the gaze, "?" 4.6° wide, planned line 0.69° tall, seen on the wall x 199..285, y 52..155; problem x 59..193
+06:26:40.468 [N5] ground, 425 cm, 50 cm right, pitch -2°: D 365 cm: panel 60.0 cm from the eye, x0.49, rank 3 (Lens 3), 5.3° below the gaze, "?" 5.2° wide, planned line 0.79° tall, seen on the wall x 200..297, y 52..170; problem x 59..193
+06:26:40.679 [N5] ground, 250 cm, pitch +8.8°, beta hidden: D 250 cm: panel 60.0 cm from the eye, x0.43, rank 1 (Lens 1: over lh, "START" on lh, up, h09), 11.0° below the gaze, "?" 4.7° wide, planned line 0.69° tall, seen on the wall x 90..140, y 128..186; problem x 60..192
+06:26:40.819 [N5] ground, 250 cm, pitch -10°, beta hidden: D 250 cm: panel 60.0 cm from the eye, x0.43, rank 2 (Lens 2: over low, h17), 6.3° below the gaze, "?" 4.7° wide, planned line 0.69° tall, seen on the wall x 88..141, y 60..125; problem x 60..192
+06:26:40.949 [N5] ground, 250 cm, turned 20° left, beta hidden: D 250 cm: panel 60.0 cm from the eye, x0.43, rank 3 (Lens 3), 11.0° below the gaze, "?" 4.9° wide, planned line 1.66° tall, seen on the wall x -46..18, y 73..146; problem x 60..192
+06:26:41.081 [N5] ground, 250 cm, turned 20° right, beta hidden: D 250 cm: panel 60.0 cm from the eye, x0.55, rank 3 (Lens 3), 9.2° below the gaze, "?" 6.3° wide, planned line 2.08° tall, seen on the wall x 201..275, y 77..164; problem x 60..192
+06:26:41.221 [N5] ground, 250 cm, 40 cm left, beta hidden: D 250 cm: panel 60.0 cm from the eye, x0.43, rank 2 (Lens 2: over side, h13), 11.0° below the gaze, "?" 4.6° wide, planned line 0.67° tall, seen on the wall x 22..72, y 88..148; problem x 60..192
+06:26:41.353 [N5] ground, 250 cm, 40 cm right, pitch +8.8°, beta hidden: D 250 cm: panel 60.0 cm from the eye, x0.43, rank 1 (Lens 1: over h11, far), 6.3° below the gaze, "?" 4.8° wide, planned line 0.70° tall, seen on the wall x 188..240, y 148..207; problem x 60..192
+06:26:41.482 [N5] ground, 425 cm, 37.5 cm right, pitch -2°, beta hidden: D 365 cm: panel 60.0 cm from the eye, x0.43, rank 3 (Lens 3), 6.3° below the gaze, "?" 4.6° wide, planned line 0.69° tall, seen on the wall x 199..285, y 52..155; problem x 59..193
+06:26:41.615 [N5] ground, 425 cm, 50 cm right, pitch -2°, beta hidden: D 365 cm: panel 60.0 cm from the eye, x0.49, rank 3 (Lens 3), 5.3° below the gaze, "?" 5.2° wide, planned line 0.79° tall, seen on the wall x 200..297, y 52..170; problem x 59..193
+06:26:41.862 [N5] ground, 425 cm: turned 4°, the panel moved 0.0 cm; turned 15°, 8.9 cm
+06:26:41.879 [N5] ground, 425 cm, turned 15°: D 365 cm: panel 60.0 cm from the eye, x0.49, rank 3 (Lens 3), 10.0° below the gaze, "?" 5.6° wide, planned line 1.63° tall, seen on the wall x 218..325, y 21..149; problem x 59..193
+06:26:45.599 [N5] on wall, preset: ring x 0.370..0.894 y -0.021..0.438, row x 0.125..0.543 y 0.480..0.694
+06:26:47.351 [N5] on wall, after RH -> up: ring x 0.037..0.533 y -0.009..0.426, row x 0.125..0.543 y 0.480..0.694
+06:26:47.351 [N5] on wall: every control in the straight-ahead view
+06:26:47.531 [ 13.660s]PASSED: r5-control-row-in-view
+06:26:47.532 [ 13.661s][r5-control-row-in-view] PASSED
+06:26:47.534 [LeafPlugin][PluginViewModel] ✅ Scenario r5-control-row-in-view completed successfully.
+06:26:50.902 Lens has been reset
+06:26:50.911 Lens has been reset
+06:26:52.078 [LeafPlugin][PluginViewModel] Loaded 39 scenario(s) from preview.
+06:26:52.078 [LeafPlugin][PluginViewModel] Running scenario: r7-height
+06:26:52.545 [  0.000s]RUNS: r7-height with args: []
+06:26:52.545 [  0.000s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:26:55.974 [r7] height: − at -7.00,-13.00, + at 7.00,-13.00, the readout at 0.00,-20.80
+06:26:56.009 [r7] 175 cm: glow RH, green rings h09,up; look-ahead RH->up LH->h09 LF->lh
+06:27:04.603 [r7] in the pinch frame: height 150, reach 66.0, panel "150 cm", h09 yellow (0.582; rule yellow 0.582)
+06:27:04.706 [r7] 150 cm: glow RH, green rings up; look-ahead RH->up LH->h09 LF->lh
+06:27:08.221 [r7] 155 cm: 1-2-3 RH->up (green 0.88), LH->h09 (green 0.75), LF->lh (green 1.00); rule RH->up LH->h09 LF->lh; route to the top 5 moves; 2. LH->h09 green 0.75 (neutral outline on an occupied hold); 3. LF->lh green 1.00 (neutral outline on an occupied hold)
+06:27:08.255 [r7] 155 cm: badges: 2 "2 · LH": nearest h09 0.5 cm, next up 8.4 cm; 3 "3 · LF": nearest lh 0.4 cm, next h09 22.1 cm; tags: 2 on h09: neutral outline, 3 on lh: neutral outline; styles: green solid x2, red broken x2, yellow dashed x2
+06:27:18.519 [r7] 180 cm look-ahead RH->up LH->h09 LF->lh; in the 185 pinch frame RH->up LH->h10 LF->lh (rule RH->up LH->h10 LF->lh); badge 2 "2 · LH" on h10, badge 3 on lh; 2. LH->h10 yellow 0.64 (neutral outline on an occupied hold); 3. LF->lh green 0.98 (neutral outline on an occupied hold)
+06:27:22.071 [r7] 195 cm: 1-2-3 RH->up (green 1.00), LH->h10 (green 0.74), LF->lh (green 0.90); rule RH->up LH->h10 LF->lh; route to the top 4 moves; 2. LH->h10 green 0.74 (neutral outline on an occupied hold); 3. LF->lh green 0.90 (neutral outline on an occupied hold)
+06:27:22.103 [r7] 195 cm: badges: 2 "2 · LH": nearest h10 0.6 cm, next h20 19.4 cm; 3 "3 · LF": nearest lh 0.4 cm, next h09 22.1 cm; tags: 2 on h10: neutral outline, 3 on lh: neutral outline; styles: green solid x3, yellow dashed x2, red broken x1
+06:27:25.452 [r7] 200 cm: RH green h09,up; look-ahead RH->up LH->h10 LF->lh
+06:27:36.130 [r7] LH=lh RH=h11 LF=lf RF=rf: best at 170 cm RH->up (Lens RH); in the 165 pinch frame LH, rule LH->up
+06:27:44.809 [ 52.264s]PASSED: r7-height
+06:27:44.809 [ 52.264s][r7-height] PASSED
+06:27:44.811 [LeafPlugin][PluginViewModel] ✅ Scenario r7-height completed successfully.
+06:27:44.865 Lens has been reset
+06:27:44.875 Lens has been reset
+06:27:46.056 [LeafPlugin][PluginViewModel] Loaded 39 scenario(s) from preview.
+06:27:46.057 [LeafPlugin][PluginViewModel] Running scenario: k3-kept
+06:27:46.563 [  0.000s]RUNS: k3-kept with args: []
+06:27:46.563 [  0.000s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:27:51.709 [K3] after −: 170 cm, kept 170, "Your height: 170 cm" (wrote nh.height 170)
+06:27:51.785 [K3] opened with 160 kept: 160 cm, reach 70.4, "Your height: 160 cm", label "160 cm"
+06:27:51.799 [K3] at 160 cm 6 rings by the test's rule
+06:28:07.822 [K3] an in-memory store reports a cap of 0 bytes; the Lens uses 10240
+06:28:17.082 [K3] a store near its 10240 bytes: card "FLASH · go 1 | 4 moves · the shortest for you | No hints · flashed with your beta", last write "skipped nh.best.de635afc", key kept false
+06:28:17.083 [K3] the real store: max 102400 bytes; keys before []; smoke before none; wrote "s24-31.156", read "s24-31.156", removed true
+06:28:17.294 [ 30.731s]PASSED: k3-kept
+06:28:17.294 [ 30.731s][k3-kept] PASSED
+06:28:17.296 [LeafPlugin][PluginViewModel] ✅ Scenario k3-kept completed successfully.
+06:28:17.349 Lens has been reset
+06:28:17.359 Lens has been reset
+06:28:18.500 [LeafPlugin][PluginViewModel] Loaded 39 scenario(s) from preview.
+06:28:18.500 [LeafPlugin][PluginViewModel] Running scenario: k4-reopen-write
+06:28:19.039 [  0.000s]RUNS: k4-reopen-write with args: []
+06:28:19.039 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:28:20.740 [K4] the real store before: {"keys":[],"height":null}
+06:28:25.934 [K4] the real store now holds nh.height = 165 (wrote nh.height 165); keys [nh.test.reopen, nh.height, nh.test.before]
+06:28:26.193 [  7.155s]PASSED: k4-reopen-write
+06:28:26.193 [  7.155s][k4-reopen-write] PASSED
+06:28:26.196 [LeafPlugin][PluginViewModel] ✅ Scenario k4-reopen-write completed successfully.
+06:28:32.618 Lens has been reset
+06:28:32.627 Lens has been reset
+06:28:33.791 Lens has been reset
+06:28:33.796 Lens has been reset
+06:28:34.910 [LeafPlugin][PluginViewModel] Loaded 39 scenario(s) from preview.
+06:28:34.911 [LeafPlugin][PluginViewModel] Running scenario: k5-reopen-read
+06:28:35.504 [  0.000s]RUNS: k5-reopen-read with args: []
+06:28:35.504 [  0.000s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:28:37.010 [K5] after the reset the Lens opened at 165 cm ("Planned for 165 cm", reach 72.6); marker 165
+06:28:37.011 [K5] the real store left with keys [], height none; before k4: {"keys":[],"height":null}
+06:28:37.264 [  1.760s]PASSED: k5-reopen-read
+06:28:37.264 [  1.760s][k5-reopen-read] PASSED
+06:28:37.264 [LeafPlugin][PluginViewModel] ✅ Scenario k5-reopen-read completed successfully.
+06:28:40.424 Lens has been reset
+06:28:40.430 Lens has been reset
+06:28:41.604 [LeafPlugin][PluginViewModel] Loaded 39 scenario(s) from preview.
+06:28:41.605 [LeafPlugin][PluginViewModel] Running scenario: d2-demo-v7
+06:28:42.287 [  0.000s]RUNS: d2-demo-v7 with args: []
+06:28:42.288 [  0.001s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:29:01.715 [d2] s0-hidden-read t=2.6: ok
+06:29:01.715 [d2] s1-beta t=12.0: ok
+06:29:01.715 [d2] s2-setup t=15.6: ok
+06:29:01.715 [d2] s2-155 t=21.1: ok
+06:29:01.715 [d2] s2-195 t=29.1: ok
+06:29:01.715 [d2] s2-175 t=34.1: ok
+06:29:01.715 [d2] s3-quiet-wall t=46.0: ok
+06:29:01.715 [d2] s4-voice t=48.6: ok
+06:29:01.715 [d2] s5-move t=56.2: ok
+06:29:01.715 [d2] s5-why t=61.1: ok
+06:29:01.715 [d2] s6-moved t=70.0: ok
+06:29:01.715 [d2] s6-came-off t=79.1: ok
+06:29:01.715 [d2] s7-hint t=85.1: ok
+06:29:01.715 [d2] s7-again t=90.1: ok
+06:29:01.715 [d2] s8-pin t=101.1: ok
+06:29:01.715 [d2] s8-lh t=108.1: ok
+06:29:01.715 [d2] s8-topped t=111.7: ok
+06:29:01.715 [d2] s8-card t=114.6: ok
+06:29:01.715 [d2] end t=120.0: ok
+06:29:01.715 [d2] the card up from t=114.2 to 120 (5.8 s of the take), the gate waited 2.1 s real
+06:29:01.715 [d2] ripples ShowBetaButton,SetupButton,HeightDown,HeightDown,HeightDown,HeightDown,HeightUp,HeightUp,HeightUp,HeightUp,HeightUp,HeightUp,HeightUp,HeightUp,HeightDown,HeightDown,HeightDown,HeightDown,SetupButton,ShowBetaButton,AskButton,AskButton,AskButton,up,h09,CameOffCard,AgainButton,up,h09,lh,h20
+06:29:01.926 [ 19.639s]PASSED: d2-demo-v7
+06:29:01.926 [ 19.639s][d2-demo-v7] PASSED
+06:29:01.926 [LeafPlugin][PluginViewModel] ✅ Scenario d2-demo-v7 completed successfully.
+06:29:04.480 Lens has been reset
+06:29:04.489 Lens has been reset
+06:29:05.664 [LeafPlugin][PluginViewModel] Loaded 39 scenario(s) from preview.
+06:29:05.664 [LeafPlugin][PluginViewModel] Running scenario: h1-hidden-read
+06:29:06.324 [  0.000s]RUNS: h1-hidden-read with args: []
+06:29:06.324 [  0.000s]Running with runner config: {"__leaf__log_level":"INFO","__leaf__timeout_secs":"600","__leaf__diagnostic_policy":"fallback","__leaf__diagnostic_report_duration_ms":"-1"}
+06:29:08.215 [H1] from 250 cm: outline line 3.64 cm, a ring's 3.64 cm
+06:29:16.730 [H1] refused on the top hold: "OUT OF REACH"
+06:29:25.754 [H1] start feet, beta hidden: LF null, RF null, LH lh, RH rh
+06:29:27.488 [H1] start feet, beta shown: LF lf, RF rf, LH lh, RH rh
+06:29:34.375 [H1] LF moved: LF h16, RF null, LH lh, RH rh
+06:29:34.722 [H1] rf marked a start hold: LF null, RF rf, LH lh, RH rh (starts rf,lh,rh)
+06:29:34.940 [ 28.616s]PASSED: h1-hidden-read
+06:29:34.941 [ 28.617s][h1-hidden-read] PASSED
+06:29:34.942 [LeafPlugin][PluginViewModel] ✅ Scenario h1-hidden-read completed successfully.

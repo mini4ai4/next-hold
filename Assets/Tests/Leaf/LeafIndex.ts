@@ -38,6 +38,7 @@ import {K5ReopenReadScenario} from "./K5ReopenReadScenario"
 import {V1VoiceScenario} from "./V1VoiceScenario"
 import {X1CaptureScenario} from "./X1CaptureScenario"
 import {D2DemoV7Scenario} from "./D2DemoV7Scenario"
+import {M1EyeHeightScenario} from "./M1EyeHeightScenario"
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -80,6 +81,8 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "v1-voice", typename: V1VoiceScenario.getTypeName()},
     {id: "d1-demo-autopilot", typename: D1DemoAutopilotScenario.getTypeName()},
     {id: "d2-demo-v7", typename: D2DemoV7Scenario.getTypeName()},
+    // session 29 (v8)
+    {id: "m1-eye-height", typename: M1EyeHeightScenario.getTypeName()},
     // session 27: the screenshot driver for devpost/visual/v7_2, not a test (see X1CaptureScenario.ts)
     {id: "x1-capture", typename: X1CaptureScenario.getTypeName()},
   ]

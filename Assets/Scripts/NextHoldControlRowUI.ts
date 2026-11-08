@@ -43,6 +43,11 @@ export const ASK_CAP_CM = 4
 export const SMALL_CAP_CM = 1.7
 /** session 28: the planned line's cap on the climb page (cm, at its 110 cm size) */
 export const PLANNED_CAP_CM = 1.3
+/** v8 (session 29): the planned line's second line ("from your eye height"): its cap, its drop under the first line
+ *  and the planned item's height with both (one line: 2.2 cm) */
+export const SOURCE_CAP_CM = 1.0
+export const SOURCE_DY_CM = 2.9
+export const PLANNED_TWO_LINE_H = 5.0
 /** the "●"/"○" glyphs are about 0.6 of an em across, an em about 1.43 caps: the size that draws a 1.2 cm dot */
 export const DOT_CM = 1.2
 const DOT_SIZE = (DOT_CM / 0.6) * (TEXT_PER_CM / 1.43)
@@ -116,6 +121,9 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
   private viewLabel: Text
   private plannedLine: Text
   private plannedItem: FlexItem
+  /** v8 (session 29): the planned line's second line, where the height came from ("from your eye height"); "" = none */
+  private sourceLine: Text
+  private sourceText = ""
   private noteText: Text
   private noteItem: FlexItem
   private gridItem: FlexItem
@@ -246,6 +254,11 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
       this.plannedLine = this.addText(so, "Planned for 175 cm", GRID_W, TYPE_SCALE.Body.size, TYPE_SCALE.Body.weight)
       this.plannedLine.getSceneObject().getTransform().setLocalPosition(new vec3(0, 0, LAYOUT_Z_LIFT))
       this.plannedLine.textFill.color = new vec4(1, 1, 1, 0.85)
+      // v8: under it, only when the height came from the eye; empty otherwise, so the panel is as it was
+      const srcSO = this.obj(so, "PlannedSource", new vec3(0, -SOURCE_DY_CM, 0))
+      this.sourceLine = this.addText(srcSO, "", GRID_W, capSize(SOURCE_CAP_CM), TYPE_SCALE.Body.weight)
+      this.sourceLine.textFill.color = new vec4(1, 1, 1, 0.85)
+      srcSO.enabled = false // an empty Text reports an unbounded box: off until it has words
     })
     this.plannedItem = planned.getComponent(FlexItem.getTypeName()) as FlexItem
 
@@ -292,10 +305,44 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
     this.applyPlannedText()
   }
 
+  /** v8 (session 29): the second line under "Planned for N cm" on the climb page (NextHoldEyeHeight.plannedText):
+   *  "from your eye height", or in the preview "Preview: the camera's height stands in"; "" for none */
+  setHeightSource(text: string): void {
+    if (text === this.sourceText) return
+    this.sourceText = text
+    this.applyPlannedText()
+  }
+
   /** "Planned for 175 cm" under the climb page; session 28: "Your height: 175 cm" under Setup's − and + (they change it) */
   private applyPlannedText(): void {
     if (this.plannedLine) this.plannedLine.text = (this.page === "settings" ? "Your height: " : "Planned for ") + this.heightCm + " cm"
+    this.applySourceLine()
   }
+
+  /** v8: the source line shows on the climb page's grid only; with it the planned item is two lines tall */
+  private applySourceLine(): void {
+    if (!this.sourceLine || !this.plannedItem) return
+    const shown = this.sourceText !== "" && this.page === "climb" && this.view !== "wall"
+    const want = shown ? this.sourceText : ""
+    if (this.sourceLine.text !== want) this.sourceLine.text = want
+    this.sourceLine.getSceneObject().enabled = shown
+    const h = shown ? PLANNED_TWO_LINE_H : this.layout === "strip" ? 0.01 : this.layout === "settings" ? 4.4 : 2.2
+    // the planned Text sits on the flex item itself (flex places that object), so it moves up inside its own layout
+    // rect, never by its transform; the source line is a child, under it
+    const y = shown ? SOURCE_DY_CM / 2 : 0
+    const r = this.plannedLine.layoutRect
+    if (Math.abs(r.bottom - (-1.4 + y)) > 1e-4) this.plannedLine.layoutRect = Rect.create(-GRID_W / 2, GRID_W / 2, -1.4 + y, 1.4 + y)
+    this.sourceLine.getSceneObject().getTransform().setLocalPosition(new vec3(0, y - SOURCE_DY_CM, 0))
+    if (Math.abs(this.plannedItem.overrideHeight - h) > 1e-4) {
+      this.plannedItem.overrideHeight = h
+      if (this.flex && this.laidOut) this.flex.forceLayout()
+    }
+  }
+
+  /** v8: the source line as shown ("" when hidden) */
+  getHeightSourceLine(): string { return this.sourceLine && this.sourceLine.getSceneObject().enabled ? this.sourceLine.text : "" }
+  getHeightSourceText(): Text | null { return this.sourceLine || null }
+  getPlannedText(): Text | null { return this.plannedLine || null }
 
   /** Session 26: the whole row hidden while the result card takes its place (Main decides). */
   setHidden(hidden: boolean): void {
@@ -416,6 +463,7 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
       // (x0.43, 60 cm out) "Planned for 155 cm" is still ~0.5° tall; the settings page twice Body as before
       this.plannedLine.size = layout === "settings" ? TYPE_SCALE.Body.size * 2 : capSize(PLANNED_CAP_CM)
       this.plannedLine.getSceneObject().enabled = !strip
+      this.applySourceLine()
       this.noteItem.overrideHeight = strip ? 0.01 : 2.2
       this.noteText.text = strip ? "" : NOTE_TEXT
       // lay out now, in this frame, so Main places the row at its new size (d1: the frame the view switched On wall

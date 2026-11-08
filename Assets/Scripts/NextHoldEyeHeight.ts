@@ -143,4 +143,15 @@ export interface FloorSource {
   floorY(): number | null
   /** for the log: "preview wall" or "world query" */
   name(): string
+  /** a frame's look, for a source that measures (the device's hit tests along the gaze); world cm */
+  tick?(eye: {x: number; y: number; z: number}, gaze: {x: number; y: number; z: number}, pitchDeg: number): void
+}
+
+/** A floor at a fixed or computed height (the preview: the stand-in wall's floor line; tests) */
+export class FixedFloor implements FloorSource {
+  private get: () => number | null
+  private label: string
+  constructor(get: () => number | null, label = "fixed") { this.get = get; this.label = label }
+  floorY(): number | null { return this.get() }
+  name(): string { return this.label }
 }
