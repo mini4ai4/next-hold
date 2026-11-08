@@ -1,12 +1,15 @@
 // Session 29, v8 change 3: your time, shown only after the top.
 // - Every frame of every go, from its first pinch to its top, every enabled Text in the scene is read: none shows a
 //   clock (\d:\d\d). That is the safety claim: no clock while you climb.
-// - Go 1 from the start (real pinches on the test's own glow, at 175 cm): after TOPPED, the card's fourth line matches
-//   "m:ss start to top · new best", and the time the Lens kept equals the test's own measure of the go (its first
+// - Go 1 from the start (real pinches on the test's own glow, at 175 cm, 1.5 s before each move after the first): after
+//   TOPPED, the card's fourth line is "m:ss start to top" with no suffix (session 31, CHANGES_V8_FIX1 item 3: the first
+//   time kept has nothing to beat), and the time the Lens kept equals the test's own measure of the go (its first
 //   move's pinch to the top-out pinch) within 0.2 s. getResultLines() stays three lines with no clock.
-// - Go 2, slower (a 3 s wait before each move): "m:ss start to top · best <go 1's m:ss>"; the store's "s" is still
+// - Go 2, slower (a 3 s wait before each move): "m:ss start to top · fastest <go 1's m:ss>"; the store's "s" is still
 //   go 1's (the fastest).
-// - 195 cm: a separate best ("new best" again), under its own key.
+// - Go 3, at pinch speed (faster than go 1): "m:ss start to top · fastest yet"; the store's "s" is now go 3's.
+// - No time line ever says "best" (best is the go ranking, which time never decides).
+// - 195 cm: a separate record (no suffix again: its first time), under its own key.
 // - A top climbed on from a fall (not from the start): no fourth line.
 // - The card (RESULT_HALF_H 7.5, as v7: the four lines fit the old plate) is whole in view and over no ring of the problem, its time line too.
 
@@ -19,7 +22,8 @@ import {camera, fmtBox, fmtPos, frames, getMain, makeReference, mustFind, pinch,
 import {RefPosition} from "./NextHoldReferenceRule"
 
 const CLOCK = /\d:\d\d/
-const TIME_LINE = /^(\d+):(\d\d) start to top · (new best|best (\d+):(\d\d))$/
+/** session 31: m[3] = "fastest yet" or "fastest m:ss" (m[4], m[5]); none on the first time kept */
+const TIME_LINE = /^(\d+):(\d\d) start to top(?: · (fastest yet|fastest (\d+):(\d\d)))?$/
 
 function textsUnder(so: SceneObject, out: Text[]): Text[] {
   if (!so.enabled) return out
@@ -101,12 +105,12 @@ export class K7TimeAfterTopScenario extends Scenario {
     }
 
     // ── go 1 ──
-    const g1 = await climb("go 1")
+    const g1 = await climb("go 1", 1.5)
     const c1 = g1 ? await card(g1.top) : null
     const measured1 = g1 ? g1.top - g1.first : -1
     print(`[K7] go 1: measured ${measured1.toFixed(2)} s, the Lens kept ${c1 && c1.secs != null ? c1.secs.toFixed(2) : "-"} s; card ${c1 ? c1.lines.join(" | ") + " || " + c1.time : "-"}`)
     const m1 = c1 ? TIME_LINE.exec(c1.time) : null
-    if (!m1 || m1[3] !== "new best") errs.push(`go 1: line 4 reads "${c1 ? c1.time : ""}", want "m:ss start to top · new best"`)
+    if (!m1 || m1[3] !== undefined) errs.push(`go 1: line 4 reads "${c1 ? c1.time : ""}", want "m:ss start to top" (no suffix)`)
     else if (secsOf(m1[1], m1[2]) !== Math.floor(measured1)) errs.push(`go 1: line 4 says ${m1[1]}:${m1[2]}, the go took ${measured1.toFixed(2)} s`)
     if (!c1 || c1.secs == null || Math.abs(c1.secs - measured1) > 0.2) errs.push(`go 1: the Lens's time ${c1 ? c1.secs : "-"} s against the measured ${measured1.toFixed(2)} s (±0.2)`)
     if (!c1 || c1.lines.length !== 3 || c1.lines.some((l) => CLOCK.test(l))) errs.push(`go 1: getResultLines() is "${c1 ? c1.lines.join(" | ") : ""}": three lines, no clock`)
@@ -125,9 +129,22 @@ export class K7TimeAfterTopScenario extends Scenario {
     print(`[K7] go 2 (slower): measured ${measured2.toFixed(2)} s, kept ${c2 && c2.secs != null ? c2.secs.toFixed(2) : "-"} s; line 4 "${c2 ? c2.time : ""}"`)
     const m2 = c2 ? TIME_LINE.exec(c2.time) : null
     if (!m2 || !m2[4] || secsOf(m2[4], m2[5]) !== Math.floor(r1 ? r1.s : -1) || secsOf(m2[1], m2[2]) !== Math.floor(measured2))
-      errs.push(`go 2: line 4 reads "${c2 ? c2.time : ""}", want ${Math.floor(measured2)} s "start to top · best" go 1's time`)
+      errs.push(`go 2: line 4 reads "${c2 ? c2.time : ""}", want ${Math.floor(measured2)} s "start to top · fastest" go 1's time`)
     const r2 = record(bk175)
     if (!r2 || !r1 || r2.s !== r1.s) errs.push(`go 2: the store's best time ${r2 ? r2.s : "-"}, want go 1's ${r1 ? r1.s : "-"} (the fastest)`)
+
+    // ── go 3, faster than go 1: "fastest yet" ──
+    await pinch("AgainButton"); await frames(3)
+    const g3f = await climb("go 3")
+    const c3f = g3f ? await card(g3f.top) : null
+    const measured3 = g3f ? g3f.top - g3f.first : -1
+    print(`[K7] go 3 (faster): measured ${measured3.toFixed(2)} s against go 1's ${measured1.toFixed(2)}; line 4 "${c3f ? c3f.time : ""}"`)
+    const m3 = c3f ? TIME_LINE.exec(c3f.time) : null
+    if (!(measured3 < measured1)) errs.push(`go 3 (${measured3.toFixed(2)} s) wasn't faster than go 1 (${measured1.toFixed(2)} s): the test's own pacing`)
+    else if (!m3 || m3[3] !== "fastest yet" || secsOf(m3[1], m3[2]) !== Math.floor(measured3)) errs.push(`go 3: line 4 reads "${c3f ? c3f.time : ""}", want "${Math.floor(measured3)} s start to top · fastest yet"`)
+    const r3 = record(bk175)
+    if (!r3 || Math.abs(r3.s - measured3) > 0.2) errs.push(`go 3: the store's best time ${r3 ? r3.s : "-"}, want go 3's ${measured3.toFixed(2)}`)
+    for (const [tag, c] of [["go 1", c1], ["go 2", c2], ["go 3", c3f]] as [string, any][]) if (c && /best/.test(c.time)) errs.push(`${tag}: the time line says "best": "${c.time}"`)
 
     // ── 195 cm: its own best ──
     await pinch("AgainButton"); await frames(3)
@@ -137,7 +154,7 @@ export class K7TimeAfterTopScenario extends Scenario {
     const c3 = g3 ? await card(g3.top) : null
     print(`[K7] 195 cm: line 4 "${c3 ? c3.time : ""}", key ${main.getBestKey()} ${JSON.stringify(record(main.getBestKey()))}`)
     if (main.getHeightCm() !== 195 || main.getBestKey() === bk175) errs.push(`195 cm: height ${main.getHeightCm()}, key ${main.getBestKey()}`)
-    if (!c3 || !TIME_LINE.test(c3.time) || TIME_LINE.exec(c3.time)![3] !== "new best") errs.push(`195 cm: line 4 reads "${c3 ? c3.time : ""}", want a new best (its own key)`)
+    if (!c3 || !TIME_LINE.test(c3.time) || TIME_LINE.exec(c3.time)![3] !== undefined) errs.push(`195 cm: line 4 reads "${c3 ? c3.time : ""}", want no suffix (its own key's first time)`)
     checkPlace("195 cm")
 
     // ── a top climbed on from a fall: no time ──

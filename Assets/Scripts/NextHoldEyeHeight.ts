@@ -129,14 +129,58 @@ export function heightSource(kept: number | null, manual: number | null, proposa
 }
 
 export const EYE_LINE = "from your eye height"
-export const EYE_LINE_PREVIEW = "Preview: the camera's height stands in"
+/** session 31 (CHANGES_V8_FIX1 item 1): the feature first, the stand-in in brackets (it said "Preview: the camera's
+ *  height stands in", which never said "eye") */
+export const EYE_LINE_PREVIEW = "from your eye height (preview camera)"
+/** while the window is filling with no proposal yet: the line names the reading instead of a number */
+export const READING_LINE = "Reading your eye height…"
+/** Setup, under "Your height: N cm", while the height came from the eye (not after a − / + or a kept height) */
+export const SETUP_EYE_LINE = "from your eye height · − / + to change"
 
 /** The climb page's planned line: one line, or two when the height came from the eye (in the preview the second
- *  line says the camera's height stands in, as the voice chip says typed text does). Setup keeps "Your height: N cm". */
-export function plannedText(cm: number, source: HeightSource, preview: boolean): string {
+ *  line names the preview camera, as the voice chip says typed text does). Session 31: while the eye is being read
+ *  and nothing is proposed yet, "Reading your eye height…" in place of the number. */
+export function plannedText(cm: number, source: HeightSource, preview: boolean, reading = false): string {
+  if (reading && source !== "eye") return READING_LINE
   const first = `Planned for ${cm} cm`
   if (source !== "eye") return first
   return first + "\n" + (preview ? EYE_LINE_PREVIEW : EYE_LINE)
+}
+
+/** Setup's second line under "Your height: N cm": only while the height came from the eye */
+export function setupSourceLine(source: HeightSource): string {
+  return source === "eye" ? SETUP_EYE_LINE : ""
+}
+
+/** session 31: the eye is being read: the proposal is on, nothing frozen or proposed yet, and a level, still window is
+ *  filling (its first 2.0 s). A window that fails (a moving head, a crouch) stops reading once it is full, so the line
+ *  never hides the number for long. */
+export function isReading(on: boolean, s: EyeState): boolean {
+  return on && !s.frozen && s.proposal === null && s.last === "window filling"
+}
+
+/** session 31 (CHANGES_V8_FIX1 item 9, the engineer's P1-1): the device floor from its hits along the gaze. Hits more
+ *  than FLOOR_OUTLIER_CM from the median are dropped (a bench, a pad edge, a ray that hit a wall's foot); the floor is
+ *  the median of what is left, once at least FLOOR_MIN_KEPT remain. null until then. */
+export const FLOOR_HITS = 15
+export const FLOOR_MIN_KEPT = 8
+export const FLOOR_OUTLIER_CM = 8
+/** the floor is measured again once the eye has moved this far (cm, horizontally) from where it was measured (from the
+ *  gym floor onto 30 cm mats: a frozen floor would read every eye 30 cm low) */
+export const FLOOR_REMEASURE_CM = 100
+
+export function floorFromHits(hits: number[]): number | null {
+  const ok = hits.filter((h) => typeof h === "number" && isFinite(h))
+  if (ok.length < FLOOR_MIN_KEPT) return null
+  const m = median(ok)
+  const kept = ok.filter((h) => Math.abs(h - m) <= FLOOR_OUTLIER_CM)
+  return kept.length >= FLOOR_MIN_KEPT ? median(kept) : null
+}
+
+export function needsRemeasure(at: {x: number; z: number} | null, eye: {x: number; z: number}): boolean {
+  if (!at) return false
+  const dx = eye.x - at.x, dz = eye.z - at.z
+  return Math.sqrt(dx * dx + dz * dz) >= FLOOR_REMEASURE_CM
 }
 
 /** where the floor under the climber is, in world cm (y up); null when it isn't known yet */

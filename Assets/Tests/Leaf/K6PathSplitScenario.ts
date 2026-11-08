@@ -1,10 +1,13 @@
 // Session 29, v8 change 2: your path against the shortest, on the result card only.
 // - At 175 cm, real pinches from the preset, off the plan at move 4: RH up, LH h09, LF lh, RF rh, LH h20 (each a plain
-//   pinch, each green or yellow by the test's rule). After TOPPED, line 2 reads "5 moves · shortest 4 · split at move 4",
-//   where 4 (par) and the split both come from the test's own route search (the split: the first move after which the
-//   test's shortest route to the top is not one move shorter; a hand on the top counts 0). The card names no hold and
-//   no limb. Line 2 is drawn whole (narrower than its 34 cm line, so not shrunk), at least its 1 cm cap and 0.5° tall
-//   as drawn; the card and Again are in view and over no ring of the problem.
+//   pinch, each green or yellow by the test's rule). Go 1 (beta hidden, no hint) is an onsight: session 31
+//   (CHANGES_V8_FIX1 item 2) its card reads "5 moves · 4 is possible" with no move number, and "Onsight: first go, no
+//   hints.", never "Pick something harder?". Again, and the same climb as go 2 (a REPEAT): line 2 reads "5 moves · 4 is
+//   possible · rethink move 4", where 4 (par) and the move both come from the test's own route search (the first move
+//   after which the test's shortest route to the top is not one move shorter; a hand on the top counts 0). No card says
+//   "split". The card names no hold and no limb. Go 2's line 2 (the longest, 40 characters) is drawn whole (narrower
+//   than its 34 cm line, so not shrunk), at least its 1 cm cap and 0.5° tall as drawn; the card and Again are in view
+//   and over no ring of the problem.
 // - Again, then the test's own glow to the top in par: line 2 is "4 moves · the shortest for you" (unchanged at par).
 // - The split isn't on the came-off card: a fall at move 4 off the plan shows "Came off from here" and its hint only.
 
@@ -42,19 +45,31 @@ export class K6PathSplitScenario extends Scenario {
     // the test's own distance to the top: its route search, a hand on the top = 0, no route = Infinity
     const dist = (p: RefPosition) => (p.LH === PRESET_TOP || p.RH === PRESET_TOP) ? 0 : (() => { const r = ref.route(p, null, true); return r ? r.length : Infinity })()
 
-    // ── the off-plan climb, real pinches ──
-    const positions: RefPosition[] = [start]
-    let topTime = -1
-    for (const [limb, hold] of PATH) {
-      const before = positions[positions.length - 1]
-      const rule = ref.perHold(before).filter((r) => r.holdId === hold && r.limb === limb)[0]
-      const got = await pinchCapture("Hold_" + hold, () => ({pos: main.getPosition() as RefPosition, topped: main.isTopped()}))
-      if (!got.fired || !got.value || got.value.pos[limb as keyof RefPosition] !== hold) { errs.push(`the pinch on ${hold} didn't move ${limb} there (${JSON.stringify(got.value)})`); break }
-      if (rule && rule.colour === "red") errs.push(`${limb} to ${hold} is red by the rule`)
-      positions.push(got.value.pos)
-      if (got.value.topped) topTime = got.time
-      await frames(2)
+    // ── the off-plan climb, real pinches: go 1 (an onsight), then Again and go 2 (a REPEAT) ──
+    const offPlan = async (tag: string): Promise<{positions: RefPosition[]; topTime: number}> => {
+      const positions: RefPosition[] = [start]
+      let topTime = -1
+      for (const [limb, hold] of PATH) {
+        const before = positions[positions.length - 1]
+        const rule = ref.perHold(before).filter((r) => r.holdId === hold && r.limb === limb)[0]
+        const got = await pinchCapture("Hold_" + hold, () => ({pos: main.getPosition() as RefPosition, topped: main.isTopped()}))
+        if (!got.fired || !got.value || got.value.pos[limb as keyof RefPosition] !== hold) { errs.push(`${tag}: the pinch on ${hold} didn't move ${limb} there (${JSON.stringify(got.value)})`); break }
+        if (rule && rule.colour === "red") errs.push(`${tag}: ${limb} to ${hold} is red by the rule`)
+        positions.push(got.value.pos)
+        if (got.value.topped) topTime = got.time
+        await frames(2)
+      }
+      return {positions, topTime}
     }
+    const go1 = await offPlan("go 1")
+    const lines1 = go1.topTime < 0 ? [] : await cardAfterTop(main, go1.topTime)
+    print(`[K6] go 1 (onsight): ${lines1.join(" | ")}`)
+    const want1 = ["ONSIGHT · go 1", `${PATH.length} moves · ${par} is possible`, "Onsight: first go, no hints."]
+    if (go1.topTime < 0) errs.push("go 1 didn't top out")
+    else if (lines1.join(" | ") !== want1.join(" | ")) errs.push(`go 1 (onsight) reads "${lines1.join(" | ")}", want "${want1.join(" | ")}"`)
+    if (lines1.some((l) => /split|rethink|Pick something harder/.test(l))) errs.push(`go 1 (onsight over the shortest): "${lines1.join(" | ")}"`)
+    await pinch("AgainButton"); await frames(3)
+    const {positions, topTime} = await offPlan("go 2")
     const ds = positions.map(dist)
     let split: number | null = null
     for (let k = 1; k < ds.length && split === null; k++) if (!(ds[k] < ds[k - 1])) split = k
@@ -62,9 +77,12 @@ export class K6PathSplitScenario extends Scenario {
     if (topTime < 0) errs.push("the climb didn't top out")
     if (par !== 4 || split !== 4) errs.push(`the test's own search: par ${par}, split ${split} (the prototype says 4 and 4)`)
     const lines = topTime < 0 ? [] : await cardAfterTop(main, topTime)
-    print(`[K6] the card: ${lines.join(" | ")}`)
-    const want2 = `${PATH.length} moves · shortest ${par} · split at move ${split}`
+    print(`[K6] go 2, the card: ${lines.join(" | ")}`)
+    const want2 = `${PATH.length} moves · ${par} is possible · rethink move ${split}`
+    // go 1 ticked the problem (an onsight), so go 2 is a REPEAT: not an onsight, so it gets the move number
+    if (lines[0] !== "REPEAT · go 2") errs.push(`go 2's line 1 reads "${lines[0]}", want "REPEAT · go 2"`)
     if (lines[1] !== want2) errs.push(`line 2 reads "${lines[1]}", want "${want2}"`)
+    if (lines.some((l) => /split|Pick something harder/.test(l))) errs.push(`go 2: "${lines.join(" | ")}"`)
     for (const w of ["LH", "RH", "LF", "RF", "hand", "foot"].concat(HOLDS.map((h) => h.id))) {
       if (lines.some((l) => new RegExp("\\b" + w + "\\b").test(l))) errs.push(`the card names "${w}": "${lines.join(" | ")}"`)
     }
@@ -117,7 +135,7 @@ export class K6PathSplitScenario extends Scenario {
       const card = main.isCameOffVisible() ? [main.getCameOffText(), main.getCameOffHintText()] : []
       print(`[K6] came off after move 4: ${JSON.stringify(card)}`)
       if (!card.length) errs.push("no came-off card after the fall")
-      if (card.some((l) => /split|shortest/.test(l))) errs.push(`the came-off card mentions the split: ${card.join(" | ")}`)
+      if (card.some((l) => /split|shortest|possible|rethink/.test(l))) errs.push(`the came-off card mentions the split: ${card.join(" | ")}`)
     } finally {
       camT.setWorldPosition(cp)
       if (tracking) tracking.enabled = trackingWas

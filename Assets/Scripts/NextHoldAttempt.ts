@@ -18,8 +18,8 @@
 // tick, then go (first tops only), then hints, then moves. A top climbed on from a fall, not from the start, gets
 // no tick (resumedLines). No points. v8 (session 29): no clock while you climb; the card shows your time after the
 // top, as a fourth line (timeLine), only for a top from the start, and time never ranks a go.
-// v8 change 2: over the shortest, line 2 says at which move the go left it ("5 moves · shortest 4 · split at move 4",
-// NextHoldPlan.splitMove); it never names the move's hold or limb (that would be the answer key).
+// v8 change 2: over the shortest, line 2 says at which move the go left it ("5 moves · 4 is possible · rethink move 4",
+// session 31's words; NextHoldPlan.splitMove); it never names the move's hold or limb (that would be the answer key).
 //
 // Kept (each read and write in try/catch, so a bad value or a full store never stops the Lens):
 //   nh.goes.<hash of the problem>          {"g": goes ended, "b": the tick {"t", "n": go, "m": moves, "h": hints} | null}
@@ -44,6 +44,8 @@ export const STORE_HEADROOM = 0.9
  *  in-memory GeneralDataStore.create() says 0) */
 export const FALLBACK_MAX_BYTES = 10240
 export const ONSIGHT_LINE = "Clean onsight. Pick something harder?"
+/** session 31 (CHANGES_V8_FIX1 item 2): an onsight over the shortest isn't sent on to a harder problem */
+export const ONSIGHT_OVER_LINE = "Onsight: first go, no hints."
 
 /** ONSIGHT / FLASH / SEND from what the go recorded (NextHoldBeta: attempt, betaSeenThisGo, hintsThisGo), for the
  *  problem's first top; a later top is a REPEAT (tickOf). */
@@ -90,11 +92,15 @@ export function heroLine(g: Go): string {
 export function cardLines(g: Go, par: number | null, ticked: Go | null, split: number | null = null): string[] {
   // session 30 (the hound): par is null when the search gives up (its state cap) or a route is over 8 moves, so the
   // card says what happened, "no shortest found", not that there's no route for your body
+  // session 31 (CHANGES_V8_FIX1 item 2, the judges): no "split" (climbing jargon, and "the splits" is a stem): over the
+  // shortest, "5 moves · 4 is possible · rethink move 4"; an onsight (climbed blind, first go) gets no move number
+  const over = par !== null && g.moves > par
   const l2 = par === null ? `${movesText(g.moves)} · no shortest found`
-    : g.moves <= par ? `${movesText(g.moves)} · the shortest for you`
-    : split !== null ? `${movesText(g.moves)} · shortest ${par} · split at move ${split}`
+    : !over ? `${movesText(g.moves)} · the shortest for you`
+    : g.tick === "ONSIGHT" ? `${movesText(g.moves)} · ${par} is possible`
+    : split !== null ? `${movesText(g.moves)} · ${par} is possible · rethink move ${split}`
     : `${movesText(g.moves)} · shortest for you: ${par}`
-  const l3 = g.tick === "ONSIGHT" ? ONSIGHT_LINE
+  const l3 = g.tick === "ONSIGHT" ? (over ? ONSIGHT_OVER_LINE : ONSIGHT_LINE)
     : ticked ? `${hintsText(g.hints)} · ticked: ${ticked.tick.toLowerCase()} (go ${ticked.go})`
     : firstTopLine(g, par)
   return [heroLine(g), l2, l3]
@@ -115,15 +121,19 @@ export function clockText(sec: number): string {
   return `${m}:${r < 10 ? "0" : ""}${r}`
 }
 
-/** v8: is `sec` a new best time against the kept one (none kept, or faster) */
+/** v8: is `sec` the fastest yet against the kept one (none kept, or faster): what is kept as "s" */
 export function isNewBestTime(sec: number, best: number | null | undefined): boolean {
   return best === null || best === undefined || sec < best
 }
 
-/** v8: the card's fourth line after a top from the start: "1:42 start to top · best 1:31", or "· new best" when it
- *  is the first or the fastest at this problem and height. `best` is the kept best before this go. */
+/** v8: the card's fourth line after a top from the start. `best` is the kept fastest before this go (per problem and
+ *  height). Session 31 (CHANGES_V8_FIX1 item 3): the first time kept has no suffix ("0:05 start to top": nothing to
+ *  beat); later "0:14 start to top · fastest 0:05", or "· fastest yet" when it beats the kept one. Never "best": best is
+ *  the go ranking (better()), which time never decides. */
 export function timeLine(sec: number, best: number | null | undefined): string {
-  return `${clockText(sec)} start to top · ` + (isNewBestTime(sec, best) ? "new best" : `best ${clockText(best as number)}`)
+  const t = `${clockText(sec)} start to top`
+  if (best === null || best === undefined) return t
+  return t + (sec < best ? " · fastest yet" : ` · fastest ${clockText(best)}`)
 }
 
 /** Session 26: the card for a top climbed on from a fall (not from the start holds): no tick, no best. */

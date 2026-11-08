@@ -48,6 +48,10 @@ export const PLANNED_CAP_CM = 1.3
 export const SOURCE_CAP_CM = 1.0
 export const SOURCE_DY_CM = 2.9
 export const PLANNED_TWO_LINE_H = 5.0
+/** session 31 (CHANGES_V8_FIX1 item 1): Setup's second line ("from your eye height · − / + to change") sits inside the
+ *  settings page's 4.4 cm planned item, so nothing on the page moves: "Your height" rises this much, the line sits here */
+export const SETUP_LINE_UP_CM = 0.9
+export const SETUP_SOURCE_Y_CM = -1.35
 /** the "●"/"○" glyphs are about 0.6 of an em across, an em about 1.43 caps: the size that draws a 1.2 cm dot */
 export const DOT_CM = 1.2
 const DOT_SIZE = (DOT_CM / 0.6) * (TEXT_PER_CM / 1.43)
@@ -124,6 +128,9 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
   /** v8 (session 29): the planned line's second line, where the height came from ("from your eye height"); "" = none */
   private sourceLine: Text
   private sourceText = ""
+  /** session 31: Setup's source line ("" for none), and line 1 in place of "Planned for N cm" while the eye is read */
+  private setupText = ""
+  private plannedOverride = ""
   private noteText: Text
   private noteItem: FlexItem
   private gridItem: FlexItem
@@ -306,33 +313,51 @@ export class NextHoldControlRowUI extends BaseScriptComponent {
   }
 
   /** v8 (session 29): the second line under "Planned for N cm" on the climb page (NextHoldEyeHeight.plannedText):
-   *  "from your eye height", or in the preview "Preview: the camera's height stands in"; "" for none */
+   *  "from your eye height", or in the preview "from your eye height (preview camera)"; "" for none */
   setHeightSource(text: string): void {
     if (text === this.sourceText) return
     this.sourceText = text
     this.applyPlannedText()
   }
 
-  /** "Planned for 175 cm" under the climb page; session 28: "Your height: 175 cm" under Setup's − and + (they change it) */
-  private applyPlannedText(): void {
-    if (this.plannedLine) this.plannedLine.text = (this.page === "settings" ? "Your height: " : "Planned for ") + this.heightCm + " cm"
+  /** session 31: Setup's line under "Your height: N cm" while the height came from the eye; "" for none */
+  setSetupSource(text: string): void {
+    if (text === this.setupText) return
+    this.setupText = text
     this.applySourceLine()
   }
 
-  /** v8: the source line shows on the climb page's grid only; with it the planned item is two lines tall */
+  /** session 31: the climb page's first line in place of "Planned for N cm" ("Reading your eye height…"); "" for none */
+  setPlannedOverride(text: string): void {
+    if (text === this.plannedOverride) return
+    this.plannedOverride = text
+    this.applyPlannedText()
+  }
+
+  /** "Planned for 175 cm" under the climb page; session 28: "Your height: 175 cm" under Setup's − and + (they change it) */
+  private applyPlannedText(): void {
+    if (this.plannedLine) this.plannedLine.text = this.page === "settings" ? "Your height: " + this.heightCm + " cm"
+      : this.plannedOverride !== "" ? this.plannedOverride : "Planned for " + this.heightCm + " cm"
+    this.applySourceLine()
+  }
+
+  /** v8: the source line shows on the climb page's grid only; with it the planned item is two lines tall. Session 31:
+   *  on the settings page it shows Setup's line inside the page's own 4.4 cm item (the item doesn't grow) */
   private applySourceLine(): void {
     if (!this.sourceLine || !this.plannedItem) return
-    const shown = this.sourceText !== "" && this.page === "climb" && this.view !== "wall"
-    const want = shown ? this.sourceText : ""
+    const climb = this.sourceText !== "" && this.page === "climb" && this.view !== "wall"
+    const setup = this.setupText !== "" && this.page === "settings"
+    const shown = climb || setup
+    const want = climb ? this.sourceText : setup ? this.setupText : ""
     if (this.sourceLine.text !== want) this.sourceLine.text = want
     this.sourceLine.getSceneObject().enabled = shown
-    const h = shown ? PLANNED_TWO_LINE_H : this.layout === "strip" ? 0.01 : this.layout === "settings" ? 4.4 : 2.2
+    const h = climb ? PLANNED_TWO_LINE_H : this.layout === "strip" ? 0.01 : this.layout === "settings" ? 4.4 : 2.2
     // the planned Text sits on the flex item itself (flex places that object), so it moves up inside its own layout
     // rect, never by its transform; the source line is a child, under it
-    const y = shown ? SOURCE_DY_CM / 2 : 0
+    const y = climb ? SOURCE_DY_CM / 2 : setup ? SETUP_LINE_UP_CM : 0
     const r = this.plannedLine.layoutRect
     if (Math.abs(r.bottom - (-1.4 + y)) > 1e-4) this.plannedLine.layoutRect = Rect.create(-GRID_W / 2, GRID_W / 2, -1.4 + y, 1.4 + y)
-    this.sourceLine.getSceneObject().getTransform().setLocalPosition(new vec3(0, y - SOURCE_DY_CM, 0))
+    this.sourceLine.getSceneObject().getTransform().setLocalPosition(new vec3(0, climb ? y - SOURCE_DY_CM : SETUP_SOURCE_Y_CM, 0))
     if (Math.abs(this.plannedItem.overrideHeight - h) > 1e-4) {
       this.plannedItem.overrideHeight = h
       if (this.flex && this.laidOut) this.flex.forceLayout()

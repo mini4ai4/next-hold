@@ -58,18 +58,21 @@ export function moveWhy(m: ScoreResult, holdType: string | null | undefined, pla
 /**
  * v8 change 2 (session 29): where a go left the shortest. `positions[0]` is the go's start, `positions[k]` the
  * position after move k; `distTo(p)` is the number of moves of the shortest secure route to the top from p (0 when a
- * hand is already on the top, Infinity when there is no route). The split is the first move that doesn't bring the
+ * hand is already on the top, Infinity when the search found none: unknown, skipped). The split is the first move that doesn't bring the
  * top at least one move closer: the first k with distTo(positions[k]) >= distTo(positions[k-1]). That holds against
  * any shortest route, not just the one the planner prints (shortest routes aren't unique, and a climber on another
  * one must not be told they left it). null when every move brought the top closer (at par there is never a split;
  * over par there always is one).
  */
 export function splitMove<T>(positions: T[], distTo: (p: T) => number): number | null {
-  if (positions.length < 2) return null
-  let prev = distTo(positions[0])
-  for (let k = 1; k < positions.length; k++) {
+  // session 31 (CHANGES_V8_FIX1 item 4): Infinity is "the search gave up" (its 6,000-position cap, or past 8 moves), not a
+  // dead end (a go that topped out from there had a secure route), so it is unknown: no move into or out of such a
+  // position is judged, and it is never the split. With nothing judged the card says "shortest for you: N".
+  let prev = NaN
+  for (let k = 0; k < positions.length; k++) {
     const d = distTo(positions[k])
-    if (!(d < prev)) return k
+    if (!isFinite(d)) { prev = NaN; continue }
+    if (k > 0 && isFinite(prev) && !(d < prev)) return k
     prev = d
   }
   return null

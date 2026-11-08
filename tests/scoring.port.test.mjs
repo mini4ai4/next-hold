@@ -926,10 +926,29 @@ const E = await import("../Assets/Scripts/NextHoldEyeHeight.ts");
     E.heightSource(165, null, 180, 175).cm === 165 && E.heightSource(165, null, 180, 175).source === "kept" &&
     E.heightSource(null, 170, 180, 175).source === "manual" && E.heightSource(null, null, 180, 175).cm === 180 &&
     E.heightSource(null, null, 180, 175).source === "eye" && E.heightSource(null, null, null, 175).source === "inspector");
-  check("the planned line: \"Planned for 175 cm\" / \"from your eye height\"; in the preview \"Preview: the camera's height stands in\"; any other source one line",
+  // session 31 (CHANGES_V8_FIX1 item 1): the preview's line names the feature: "from your eye height (preview camera)"
+  check("the planned line: \"Planned for 175 cm\" / \"from your eye height\"; in the preview \"from your eye height (preview camera)\"; any other source one line",
     E.plannedText(175, "eye", false) === "Planned for 175 cm\nfrom your eye height" &&
-    E.plannedText(175, "eye", true) === "Planned for 175 cm\nPreview: the camera's height stands in" &&
+    E.plannedText(175, "eye", true) === "Planned for 175 cm\nfrom your eye height (preview camera)" &&
     ["kept", "manual", "inspector"].every((src) => E.plannedText(165, src, true) === "Planned for 165 cm"));
+  check("session 31: while the eye is read (no proposal yet) the line reads \"Reading your eye height…\"; once proposed, the height and its source",
+    E.plannedText(175, "inspector", true, true) === "Reading your eye height…" && E.plannedText(175, "kept", false, true) === "Reading your eye height…" &&
+    E.plannedText(155, "eye", true, true) === "Planned for 155 cm\nfrom your eye height (preview camera)");
+  check("session 31: Setup's line \"from your eye height · − / + to change\" only while the height came from the eye",
+    E.setupSourceLine("eye") === "from your eye height · − / + to change" && ["kept", "manual", "inspector"].every((src) => E.setupSourceLine(src) === ""));
+  check("session 31: reading = on, not frozen, nothing proposed, the window filling; a full window that fails (a crouch, a moving head) isn't reading",
+    E.isReading(true, s19) && !E.isReading(false, s19) && !E.isReading(true, s21) && !E.isReading(true, E.freezeEye(s19)) &&
+    !E.isReading(true, crouch) && !E.isReading(true, bob) && !E.isReading(true, wall) && !E.isReading(true, E.initialEye()),
+    [s19.last, crouch.last, bob.last]);
+  // session 31 (item 9, the engineer's P1-1): the device floor's hits, compiled-only code with its arithmetic here
+  const mats = [30.2, 29.8, 30.1, 30.4, 29.9, 30.0, 30.3, 29.7, 30.1, 30.0];
+  check("device floor: the median of the hits once 8 agree; a bench (+45 cm) and a wall's foot (-20) dropped; fewer than 8 none",
+    Math.abs(E.floorFromHits(mats) - 30.05) < 1e-9 && Math.abs(E.floorFromHits(mats.concat([75, 76, 10])) - 30.05) < 1e-9 &&
+    E.floorFromHits(mats.slice(0, 7)) === null && E.floorFromHits([0, 0, 40, 40, 40, 40, 40, 40, 40, 40]) === 40 &&
+    E.floorFromHits([0, 0, 0, 0, 40, 40, 40, 40, 40]) === null && E.floorFromHits([NaN, ...mats]) !== null,
+    [E.floorFromHits(mats), E.floorFromHits(mats.concat([75, 76, 10]))]);
+  check("device floor: measured again after the eye moves 1 m from where it was measured (gym floor -> mats), not before",
+    E.needsRemeasure({ x: 0, z: 0 }, { x: 60, z: 80 }) && !E.needsRemeasure({ x: 0, z: 0 }, { x: 60, z: 79 }) && !E.needsRemeasure(null, { x: 500, z: 0 }));
 }
 {
   // change 2: where a go left the shortest (NextHoldPlan.splitMove over routeDist)
@@ -997,25 +1016,47 @@ const E = await import("../Assets/Scripts/NextHoldEyeHeight.ts");
   console.log(`  secure climbs from the start at 155/175/195 cm: ${parClimbs} at par (${routesSeen.size} distinct), ${overClimbs} one over par`);
   check("split: every secure climb at par (any shortest route, not just the planner's) has no split; every one over par has one",
     parClimbs > 3 && parSplits === 0 && overClimbs > 0 && overNoSplit === 0, { parClimbs, parSplits, overClimbs, overNoSplit });
-  const D = { a: 3, b: Infinity, c: 2, d: 1, e: 0 };
-  check("split: a dead end (no route from there) is the split; fewer than two positions has none",
-    N.splitMove(["a", "b", "c", "d", "e"], (k) => D[k]) === 1 && N.splitMove(["a", "c", "d", "e"], (k) => D[k]) === null && N.splitMove(["a"], (k) => D[k]) === null);
+  // session 31 (CHANGES_V8_FIX1 item 4): Infinity is the search giving up (its cap), not a dead end: a go that topped
+  // from there had a route. It is never the split, and no move into or out of it is judged
+  const tickedOnsightV8 = { tick: "ONSIGHT", go: 1, moves: 4, hints: 0 };
+  const D = { a: 3, b: Infinity, c: 2, d: 1, e: 0, f: 2, g: Infinity, h: 3 };
+  check("split: where the search gave up (Infinity) is never the split, nor the move out of it; a real split after it still counts; fewer than two positions has none",
+    N.splitMove(["a", "b", "c", "d", "e"], (k) => D[k]) === null && N.splitMove(["a", "b", "b", "c", "d", "e"], (k) => D[k]) === null &&
+    N.splitMove(["a", "g", "h", "f", "d", "e"], (k) => D[k]) === null && N.splitMove(["a", "b", "c", "c", "d", "e"], (k) => D[k]) === 3 &&
+    N.splitMove(["a", "c", "f", "d", "e"], (k) => D[k]) === 2 && N.splitMove(["a", "c", "d", "e"], (k) => D[k]) === null &&
+    N.splitMove(["a"], (k) => D[k]) === null && N.splitMove(["b", "b"], (k) => D[k]) === null);
   const over = A.cardLines({ tick: "SEND", go: 2, moves: 5, hints: 0 }, 4, null, 4);
-  check("card over the shortest: \"5 moves · shortest 4 · split at move 4\"; at par unchanged (\"4 moves · the shortest for you\"), with or without a split",
-    over[1] === "5 moves · shortest 4 · split at move 4" && over[2] === "No hints · sent! Again in 4?" &&
+  // session 31 (CHANGES_V8_FIX1 item 2): no "split" (jargon; "the splits" is a stem): "4 is possible · rethink move 4"
+  check("card over the shortest: \"5 moves · 4 is possible · rethink move 4\"; at par unchanged (\"4 moves · the shortest for you\"), with or without a split",
+    over[1] === "5 moves · 4 is possible · rethink move 4" && over[2] === "No hints · sent! Again in 4?" &&
     A.cardLines({ tick: "SEND", go: 2, moves: 4, hints: 0 }, 4, null, null)[1] === "4 moves · the shortest for you" &&
     A.cardLines({ tick: "SEND", go: 2, moves: 4, hints: 0 }, 4, null, 2)[1] === "4 moves · the shortest for you", over);
   const holdNames = Object.keys(ph).concat(["LH", "RH", "LF", "RF", "L hand", "R hand", "L foot", "R foot", "jug", "pinch", "crimp", "sloper", "pocket"]);
-  check("card: the split line names no move, hold or limb, and fits one line (under 40 characters)",
-    !holdNames.some((w) => new RegExp("\\b" + w + "\\b").test(over[1])) && over[1].length < 40, over[1].length);
+  // session 31: the line is 40 characters now (it was 38); k6 measures it drawn whole and not shrunk on the plate
+  check("card: the split line names no hold or limb, and is 40 characters or fewer for a one-digit move (k6 measures it drawn)",
+    !holdNames.some((w) => new RegExp("\\b" + w + "\\b").test(over[1])) && over[1].length <= 40, over[1].length);
+  const onsOver = A.cardLines({ tick: "ONSIGHT", go: 1, moves: 5, hints: 0 }, 4, null, 4);
+  const onsPar = A.cardLines({ tick: "ONSIGHT", go: 1, moves: 4, hints: 0 }, 4, null, null);
+  check("session 31: an onsight over the shortest: \"5 moves · 4 is possible\" (no move number), \"Onsight: first go, no hints.\", never \"Pick something harder?\"; at par unchanged",
+    onsOver.join(" | ") === "ONSIGHT · go 1 | 5 moves · 4 is possible | Onsight: first go, no hints." &&
+    A.cardLines({ tick: "ONSIGHT", go: 1, moves: 5, hints: 0 }, 4, null, null)[1] === "5 moves · 4 is possible" &&
+    onsPar.join(" | ") === "ONSIGHT · go 1 | 4 moves · the shortest for you | Clean onsight. Pick something harder?", [onsOver, onsPar]);
+  const allOver = [];
+  for (const tick of ["ONSIGHT", "FLASH", "SEND", "REPEAT"]) for (const split of [null, 2, 4]) for (const hints of [0, 1, 2])
+    allOver.push(A.cardLines({ tick, go: tick === "ONSIGHT" || tick === "FLASH" ? 1 : 3, moves: 6, hints }, 4, tick === "REPEAT" ? tickedOnsightV8 : null, split));
+  check("session 31: no card says \"split\", and no card over the shortest says \"Pick something harder\"",
+    allOver.every((c) => !/split|Pick something harder/i.test(c.join(" "))), allOver.find((c) => /split|Pick something harder/i.test(c.join(" "))));
 }
 {
   // change 3: the time after the top
   check("clock: m:ss in whole seconds: 102 -> 1:42, 7 -> 0:07, 59.9 -> 0:59, 600 -> 10:00",
     A.clockText(102) === "1:42" && A.clockText(7) === "0:07" && A.clockText(59.9) === "0:59" && A.clockText(600) === "10:00" && A.clockText(-3) === "0:00");
-  check("time line: \"1:42 start to top · best 1:31\"; the first or a faster one \"· new best\"",
-    A.timeLine(102, 91) === "1:42 start to top · best 1:31" && A.timeLine(102, null) === "1:42 start to top · new best" &&
-    A.timeLine(80, 91) === "1:20 start to top · new best" && A.timeLine(91, 91) === "1:31 start to top · best 1:31");
+  // session 31 (CHANGES_V8_FIX1 item 3): the first time kept has no suffix; "fastest", never "best" (best is the go ranking)
+  check("time line: the first \"0:05 start to top\" (no suffix); later \"1:42 start to top · fastest 1:31\", or \"· fastest yet\" when faster; never \"best\"",
+    A.timeLine(5, null) === "0:05 start to top" && A.timeLine(5, undefined) === "0:05 start to top" &&
+    A.timeLine(102, 91) === "1:42 start to top · fastest 1:31" && A.timeLine(80, 91) === "1:20 start to top · fastest yet" &&
+    A.timeLine(91, 91) === "1:31 start to top · fastest 1:31" && A.timeLine(4, 5) === "0:04 start to top · fastest yet" &&
+    [A.timeLine(5, null), A.timeLine(102, 91), A.timeLine(80, 91)].every((l) => !/best/.test(l)));
   const withS = { goes: 0, best: { tick: "SEND", go: 2, moves: 4, hints: 0 }, secs: 91.24 };
   check("the best record keeps the fastest time as \"s\" (0.1 s), and reads it back",
     A.encodeRecord(withS) === '{"g":0,"b":{"t":"SEND","n":2,"m":4,"h":0},"s":91.2}' && A.decodeRecord(A.encodeRecord(withS)).secs === 91.2);

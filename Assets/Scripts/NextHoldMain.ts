@@ -76,7 +76,7 @@ import {GLOW_PROFILE} from "./Wall/ProceduralTextures"
 import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/CameraProvider/WorldCameraFinderProvider"
 import {CHIP_SECONDS, PREVIEW_VOICE_LABEL, VOICE_LOG_MAX, VOICE_PAUSED, VoiceCommand, VoiceContext, chipText, parseCommand} from "./NextHoldVoice"
 import {AsrVoiceSource, InjectedVoiceSource, VoiceSource, lensAsr} from "./NextHoldVoiceSource"
-import {EyeState, FixedFloor, FloorSource, HeightSource, freezeEye, heightSource, initialEye, plannedText, pushSample} from "./NextHoldEyeHeight"
+import {EyeState, FixedFloor, FloorSource, HeightSource, freezeEye, heightSource, initialEye, isReading, plannedText, pushSample, setupSourceLine} from "./NextHoldEyeHeight"
 import {WorldQueryFloor} from "./NextHoldFloorSource"
 
 
@@ -308,6 +308,12 @@ export class NextHoldMain extends BaseScriptComponent {
   private manualHeight: number | null = null
   /** where the planned height came from (the planned line's second line) */
   private heightFrom: HeightSource = "inspector"
+  /** session 31 (CHANGES_V8_FIX1 item 10): may the eye's height be kept on the first move? Only after a deliberate
+   *  enableEyeProposal() or with a device floor: the preview's default floor (the stand-in wall's floor line, 166 cm
+   *  eye, so 180) is shown but never kept, so a judge's first pinch doesn't leave 180 in their preview store */
+  private eyeMaySave = false
+  /** session 31: the planned line reads "Reading your eye height…" (NextHoldEyeHeight.isReading) */
+  private eyeReading = false
   /** a go ended (a fall or the top): "Again" stays on the mats, with or without its card (a hint taken on the
    *  came-off card takes the card down, not Again), until a move, Again itself, or the eye back on the wall */
   private againOffered = false
@@ -363,6 +369,7 @@ export class NextHoldMain extends BaseScriptComponent {
     // v8: with no height kept, the eye proposes one (kept > manual > eye > Inspector)
     this.heightFrom = this.storedHeight !== null ? "kept" : "inspector"
     this.eyeProposalOn = this.storedHeight === null
+    this.eyeMaySave = !this.isEditorRun()
     print(`[NextHold] store: ${this.save.hasStore() ? "max " + this.save.maxBytes() + " bytes, " + this.save.usedBytes() + " used" : "none"}; ` +
       `kept height ${this.storedHeight === null ? "none" : this.storedHeight + " cm"}`)
 
@@ -998,14 +1005,28 @@ export class NextHoldMain extends BaseScriptComponent {
     // v8: a handed-in store means a test or the take: the eye proposes nothing (enableEyeProposal() turns it on).
     // A proposal that landed before this (in the LEAF reset's first seconds) keeps its height, not its words
     this.eyeProposalOn = false
-    if (this.heightFrom === "eye") { this.heightFrom = "inspector"; this.applyHeightSource() }
+    if (this.heightFrom === "eye") this.heightFrom = "inspector"
+    // session 31: and no "Reading your eye height…" left on the line
+    if (this.ready) this.applyHeightSource()
   }
 
   /** v8 tests and the demo: turn the eye's proposal on, as an open with no kept height does, reading the kept height
    *  from the store in use (a kept one still wins) and forgetting any − / + so far. `floor`: where the floor is (the
    *  preview default: the stand-in wall's floor line; on SPECS: hit tests along the gaze) */
   enableEyeProposal(floor?: FloorSource): void {
+    this.startEyeProposal(floor, true)
+  }
+
+  /** session 31 (item 10): as the open does it: the default floor (in the preview the stand-in wall's floor line, which
+   *  is shown but never kept; on SPECS the device's), for m1's check that the preview's open never keeps it */
+  enableEyeProposalAsOpen(): void {
+    this.floor = null
+    this.startEyeProposal(undefined, !this.isEditorRun())
+  }
+
+  private startEyeProposal(floor: FloorSource | undefined, maySave: boolean): void {
     if (!this.ready) return
+    this.eyeMaySave = maySave
     this.storedHeight = this.save.readHeight()
     this.manualHeight = null
     this.eye = initialEye()
@@ -1014,7 +1035,8 @@ export class NextHoldMain extends BaseScriptComponent {
     // as an open: the words follow what is kept, else nothing yet (a proposal sets "from your eye height")
     this.heightFrom = this.storedHeight !== null ? "kept" : "inspector"
     this.applyHeightSource()
-    print(`[NextHold] eye proposal on (floor: ${this.floorSource().name()}; kept ${this.storedHeight === null ? "none" : this.storedHeight + " cm"})`)
+    print(`[NextHold] eye proposal on (floor: ${this.floorSource().name()}; kept ${this.storedHeight === null ? "none" : this.storedHeight + " cm"}; ` +
+      `${maySave ? "kept on the first move" : "never kept: the preview's default floor"})`)
   }
 
   /** Read the store as an open would: the kept height (if any) and the next go's number. The position and
@@ -1048,10 +1070,15 @@ export class NextHoldMain extends BaseScriptComponent {
   // ── v8 (session 29): height from eye height (NextHoldEyeHeight) ─────────────────────────────────────────────
   /** the floor source: the injected one, else the stand-in wall's floor line in the preview, a WorldQueryModule hit
    *  test on SPECS (never run on a device yet) */
+  private isEditorRun(): boolean {
+    let editor = true
+    try { editor = global.deviceInfoSystem.isEditor() } catch (e) { editor = true }
+    return editor
+  }
+
   private floorSource(): FloorSource {
     if (!this.floor) {
-      let editor = true
-      try { editor = global.deviceInfoSystem.isEditor() } catch (e) { editor = true }
+      const editor = this.isEditorRun()
       if (editor) this.floor = new FixedFloor(() => this.wall.wallToWorld(0, 0, 0).y, "preview wall floor")
       else {
         try { this.floor = new WorldQueryFloor() } catch (e) { this.floor = new FixedFloor(() => null, "none") }
@@ -1080,6 +1107,8 @@ export class NextHoldMain extends BaseScriptComponent {
     const was = this.eye.proposal
     this.eye = pushSample(this.eye, {t: now, eyeCm: fy === null ? NaN : pos.y - fy, pitchDeg, rollDeg, x: pos.x, z: pos.z,
       onMats, goLive: this.beta.moves > this.beta.fellAtMoves})
+    // session 31: "Reading your eye height…" while a window fills with nothing proposed yet
+    if (isReading(this.eyeProposalOn, this.eye) !== this.eyeReading) this.applyHeightSource()
     if (this.eye.proposal === null || this.eye.proposal === was) return
     const h = heightSource(this.storedHeight, this.manualHeight, this.eye.proposal, this.climberHeightCm)
     print(`[NextHold] eye height ${this.eye.eyeCm!.toFixed(1)} cm over the ${floor.name()}: stature ${this.eye.stature!.toFixed(1)}, ` +
@@ -1099,18 +1128,23 @@ export class NextHoldMain extends BaseScriptComponent {
   private freezeEyeOnMove(): void {
     if (!this.eye.frozen) this.eye = freezeEye(this.eye)
     if (this.heightFrom === "eye" && this.eyeProposalOn) {
-      this.save.writeHeight(this.heightCm)
       this.eyeProposalOn = false
-      print(`[NextHold] the eye's ${this.heightCm} cm kept on the first move (${this.save.lastWrite})`)
+      if (this.eyeMaySave) {
+        this.save.writeHeight(this.heightCm)
+        print(`[NextHold] the eye's ${this.heightCm} cm kept on the first move (${this.save.lastWrite})`)
+      } else print(`[NextHold] the eye's ${this.heightCm} cm used, not kept (the preview's default floor is no measurement)`)
     }
+    if (this.eyeReading) this.applyHeightSource()
   }
 
   /** the planned line's second line for where the height came from */
   private applyHeightSource(): void {
-    let editor = true
-    try { editor = global.deviceInfoSystem.isEditor() } catch (e) { editor = true }
-    const t = plannedText(this.heightCm, this.heightFrom, editor).split("\n")
+    this.eyeReading = isReading(this.eyeProposalOn, this.eye)
+    const t = plannedText(this.heightCm, this.heightFrom, this.isEditorRun(), this.eyeReading).split("\n")
+    // session 31: line 1 is the reading while there's no number yet; Setup says where an eye height came from
+    this.controlRow.setPlannedOverride(t.length === 1 && this.eyeReading ? t[0] : "")
     this.controlRow.setHeightSource(t.length > 1 ? t[1] : "")
+    this.controlRow.setSetupSource(setupSourceLine(this.heightFrom))
   }
 
   /** v8 reads: where the height came from, the eye's sampler state, the source line as shown */

@@ -3,21 +3,25 @@
 // this proves the logic (the gates, the window, the crouch and up-only rules, snapping, precedence, freezing, the
 // line's words, keeping on the first move), not a measurement. The camera's DeviceTracking is switched off while the
 // test moves it, and put back.
-//   - eye at y = −3 (163 cm): nothing changes before the 2.0 s window is full (read every frame), then 175 with the
-//     preview's line "Preview: the camera's height stands in"; the planned line whole in view, both lines at least
-//     0.5° tall as drawn; every ring by the test's rule at 175
+//   - eye at y = −3 (163 cm): nothing changes before the 2.0 s window is full (read every frame), and through the
+//     window the line reads "Reading your eye height…" (session 31); then 175 with the preview's line "from your eye
+//     height (preview camera)"; the planned line whole in view, both lines at least 0.5° tall as drawn; every ring by
+//     the test's rule at 175
 //   - y = −9 (157 cm): 170 within a window; rings by the rule at 170; y = −5 (161 cm): 170 (ratio 0.935, not 0.93)
 //   - a crouch (y = −60) and a head pitched 20° up change nothing in 3 s
+//   - session 31: Setup with the eye's height reads "Your height: 175 cm" / "from your eye height · − / + to change",
+//     both drawn whole in view; after a − pinch the second line is gone (a manual height)
 //   - a − pinch after a proposal: "Planned for N−5 cm", no eye line, and the eye moving after it changes nothing
 //   - a real move freezes it; the store holds the height only after that move
 //   - a kept 160 plus enableEyeProposal() keeps 160
 //   - y = 0 gives 180 (printed: the preview's 166 cm on record)
+//   - session 31 (CHANGES_V8_FIX1 item 10): the proposal as the preview's open makes it (its default floor, the stand-in
+//     wall's) is shown but never kept: after the first move the store still holds no height
 
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HEIGHT_KEY} from "../../Scripts/NextHoldAttempt"
-import {EYE_LINE_PREVIEW} from "../../Scripts/NextHoldEyeHeight"
 import {NextHoldMain} from "../../Scripts/NextHoldMain"
 import {camera, frames, getMain, makeReference, openPageFor, pinch, pinchCapture, renderedRingColour, restorePreset} from "./NextHoldTestKit"
 import {RefPosition} from "./NextHoldReferenceRule"
@@ -25,6 +29,10 @@ import {RefPosition} from "./NextHoldReferenceRule"
 const D2R = Math.PI / 180
 /** the spec's sampling window (CHANGES_V8: 2.0 s), fixed here, not read from the Lens */
 const WINDOW_S = 2.0
+/** the spec's words (CHANGES_V8_FIX1 item 1), fixed here, not read from the Lens */
+const EYE_LINE_PREVIEW = "from your eye height (preview camera)"
+const READING = "Reading your eye height…"
+const SETUP_LINE = "from your eye height · − / + to change"
 
 /** the screen box of one Text's world box, or null */
 function textBox(t: Text | null, cam: Camera): {x0: number; x1: number; y0: number; y1: number} | null {
@@ -91,10 +99,17 @@ export class M1EyeHeightScenario extends Scenario {
       at(-3); await frames(3)
       enable()
       const t0 = getTime()
-      let early = ""
+      let early = "", readFrames = 0, notReading = ""
       const landed = await waitFor(WINDOW_S + 1.0, () => main.getHeightSource() === "eye", (t) => {
         if (t < WINDOW_S - 0.05 && !early && (main.getHeightSource() === "eye" || main.getHeightSourceLine() !== "" || main.getHeightCm() !== 175)) early = `at ${t.toFixed(2)} s: ${state(main)}`
+        // session 31: through the window (after its first frames) the line names the reading, no number
+        if (t > 0.1 && t < WINDOW_S - 0.1) {
+          if (main.getPlannedLine() === READING) readFrames++
+          else if (!notReading) notReading = `at ${t.toFixed(2)} s: "${main.getPlannedLine()}"`
+        }
       })
+      print(`[M1] y −3: "${READING}" for ${readFrames} frames of the window${notReading ? "; not reading " + notReading : ""}`)
+      if (notReading || readFrames < 10) errs.push(`y −3: the window didn't read "${READING}" throughout (${readFrames} frames; ${notReading})`)
       await frames(2)
       print(`[M1] y −3: the proposal landed at ${landed === null ? "never" : landed.toFixed(2) + " s"} (window ${WINDOW_S} s): ${state(main)}; eye ${main.getEyeState().eyeCm}`)
       if (early) errs.push(`y −3: something changed before the window was full: ${early}`)
@@ -149,8 +164,24 @@ export class M1EyeHeightScenario extends Scenario {
       await frames(2)
       if (main.getHeightCm() !== 175 || main.getHeightSource() !== "eye") errs.push(`level again after the pitch: ${state(main)}`)
 
+      // ── 3b. session 31: Setup says where an eye height came from, and stops saying it after a − ──
+      await openPageFor("HeightDown"); await frames(3)
+      const setupState = `"${main.getPlannedLine()}" / "${main.getHeightSourceLine()}", page ${main.getPage()}`
+      print(`[M1] Setup with the eye's height: ${setupState}`)
+      if (main.getPage() !== "settings" || main.getPlannedLine() !== "Your height: 175 cm" || main.getHeightSourceLine() !== SETUP_LINE)
+        errs.push(`Setup with the eye's height: ${setupState}, want "Your height: 175 cm" / "${SETUP_LINE}"`)
+      const st = main.getPlannedTexts()
+      const spb = textBox(st.planned, live), ssb = textBox(st.source, live)
+      for (const [name, b] of [["Your height: 175 cm", spb], [SETUP_LINE, ssb]] as [string, any][]) {
+        if (!b) { errs.push(`Setup: "${name}" doesn't render`); continue }
+        if (b.x0 < 0 || b.x1 > 1 || b.y0 < 0 || b.y1 > 1) errs.push(`Setup: "${name}" is cut by the frame`)
+        if (degH(b) < 0.5) errs.push(`Setup: "${name}" is ${degH(b).toFixed(2)}° tall as drawn`)
+      }
+      if (spb && ssb && !(ssb.y0 >= spb.y1 - 0.002)) errs.push(`Setup: the line isn't under "Your height" (${ssb.y0.toFixed(3)} vs ${spb.y1.toFixed(3)})`)
+
       // ── 4. a − pinch overrides, and the eye stops ──
       await pinch("HeightDown"); await frames(2)
+      if (main.getPlannedLine() !== "Your height: 170 cm" || main.getHeightSourceLine() !== "") errs.push(`Setup after −: "${main.getPlannedLine()}" / "${main.getHeightSourceLine()}", want no second line`)
       await openPageFor("AskButton"); await frames(2) // Setup's Done, a real pinch: back to the climb page
       print(`[M1] after −: ${state(main)}, page ${main.getPage()}`)
       if (main.getHeightCm() !== 170 || main.getPlannedLine() !== "Planned for 170 cm" || main.getHeightSourceLine() !== "" || main.getHeightSource() !== "manual")
@@ -197,6 +228,24 @@ export class M1EyeHeightScenario extends Scenario {
       await frames(2)
       print(`[M1] the preview's own eye (y 0): ${main.getEyeState().eyeCm} cm over the floor, stature ${main.getEyeState().stature}: ${state(main)}`)
       if (main.getHeightCm() !== 180) errs.push(`y 0: ${state(main)}, want 180`)
+
+      // ── 8. session 31 (item 10): as the preview's open proposes (its default floor), shown but never kept ──
+      await restorePreset(main); await frames(2)
+      const openStore = GeneralDataStore.create()
+      main.useStore(openStore)
+      at(-3); await frames(2)
+      main.enableEyeProposalAsOpen()
+      await waitFor(WINDOW_S + 1.0, proposed)
+      await frames(2)
+      if (main.getHeightCm() !== 175 || main.getHeightSource() !== "eye" || main.getHeightSourceLine() !== EYE_LINE_PREVIEW) errs.push(`the open's proposal: ${state(main)}`)
+      const osug = main.getSuggestion()
+      const omv = osug ? await pinchCapture("Hold_" + osug.holdId, () => ({kept: openStore.has(HEIGHT_KEY) ? openStore.getInt(HEIGHT_KEY) : null, frozen: main.getEyeState().frozen})) : null
+      await frames(3)
+      const keptAfter = openStore.has(HEIGHT_KEY) ? openStore.getInt(HEIGHT_KEY) : null
+      print(`[M1] the open's proposal, then the first move: in its frame ${JSON.stringify(omv && omv.value)}, after it kept ${keptAfter}; ${state(main)}`)
+      if (!omv || !omv.fired || !omv.value || !omv.value.frozen || omv.value.kept !== null || keptAfter !== null)
+        errs.push(`the preview's open kept its default-floor height on the first move: ${JSON.stringify(omv)}, kept after ${keptAfter}`)
+      if (main.getHeightCm() !== 175) errs.push(`after the open's first move: ${state(main)}, want 175 still planned`)
     } catch (e) {
       errs.push(`threw: ${e}`)
     } finally {
