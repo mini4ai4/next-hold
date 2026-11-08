@@ -73,17 +73,23 @@ Built for **Learn AR with SPECS** with Lens Studio 5.23.2, CLAD and the Lens Stu
    here"), the card's hint, Again, go 2 to the top, and the card "SEND · go 2 / 4 moves · the shortest for you /
    1 hint · sent! Again without it?" for the last 5.7 s. Untick it when done. It starts from 175 cm with a fresh
    in-memory store, so nothing kept in the preview changes the take, and the take keeps nothing. (The older v4 take,
-   the full read from its first frame, is kept for LEAF d1: tick **Legacy V4 Take**.)
+   the full read from its first frame, is kept for LEAF d1: tick **Legacy V4 Take**.) Session 30: tick **V8 Take**
+   as well for the v8 take (`Assets/Scripts/Demo/DemoTimelineV8.ts`, 2:10). It opens with 8 s for the eye height: the
+   eye 3 cm under the preview's own (163 cm over the stand-in's floor), the proposal turned on, and "Planned for
+   175 cm" / "Preview: the camera's height stands in" by about 3.6 s, held. Then comes the v7 take, 8 s later, except
+   that go 2 goes one move over the shortest (RF to rh), so the card reads "5 moves · shortest 4 · split at move 4" over
+   its time line. That time is the take's scripted timing, not a climber's: caption it "(demo timing)".
 
 ## Tests
-- LEAF: open the LEAF panel and run all forty scenarios (session 29 added m1 for the eye height, k6 for the split and
-  k7 for the time after the top; the full run below is still session 28's thirty-seven; one per done criterion in `devpost/design-brief.md`, one per review fix, h1–h5 and e1 for beta on request and the tag's outline, g1 for the control count, k1–k3 for the result card, Again, the pinned hint and what is kept, the k4/k5 pair for a kept height on reopen (run k4, refresh, then k5), v1 for voice on the preview's typed path, d1 for the v4 demo autopilot and d2 for the v7 one).
-  `x1-capture` is also listed: it is the screenshot driver for `devpost/visual/v7_3/`, not a test.
-  The raw output of the last full run (37 of 37 pass, session 28, one clean run on one build): `devpost/LEAF_RUN_2026-11-06_s28.txt`, copied out of
+- LEAF: open the LEAF panel and run all forty-one scenarios (session 29 added m1 for the eye height, k6 for the split
+  and k7 for the time after the top, session 30 d3 for the v8 take; one per done criterion in `devpost/design-brief.md`, one per review fix, h1–h5 and e1 for beta on request and the tag's outline, g1 for the control count, k1–k3 for the result card, Again, the pinned hint and what is kept, the k4/k5 pair for a kept height on reopen (run k4, refresh, then k5), v1 for voice on the preview's typed path, d1 for the v4 demo autopilot, d2 for the v7 one and d3 for the v8 one).
+  `x1-capture` is also listed: it is the screenshot driver for `devpost/visual/v7_3/` and `devpost/visual/v8/`, not a test.
+  The raw output of the last full run (41 of 41 pass, session 30, on one build; three scenarios aborted by an
+  overlapping dispatch were run again and passed, nothing failed): `devpost/LEAF_RUN_2026-11-08_s30.txt`, copied out of
   the Lens Studio log with `node tests/extract_leaf_run.mjs <log> <first line>`. `node tests/leaf_wait.mjs <id>` waits
   for one scenario's result in the log when the run call times out; `node tests/leaf_status.mjs <first line>` lists
   every scenario's last verdict since then. Run LEAF in the preview (`onDevice: false`).
-- Scoring port, plan, beta and attempt logic: `node tests/scoring.port.test.mjs` (212 checks; session 29 added the eye-height sampler, the split against any shortest route and the clock, including the voice parser, the 1-2-3 search
+- Scoring port, plan, beta and attempt logic: `node tests/scoring.port.test.mjs` (213 checks; session 29 added the eye-height sampler, the split against any shortest route and the clock, including the voice parser, the 1-2-3 search
   against a brute force, following the glow = par at all 11 heights from 150 to 200 cm (`NextHoldPlan.ts`), the hint
   ladder, cue, came-off, goes and pinned-hint rules of `NextHoldBeta.ts`, and the ticks, card lines, best and fail-safe
   store of `NextHoldAttempt.ts`). The store keeps about 70 bytes a record, so the preview's 100 KB store holds about
